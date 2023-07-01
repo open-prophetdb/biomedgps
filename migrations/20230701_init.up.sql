@@ -78,9 +78,9 @@ CREATE TABLE
     name VARCHAR(64) NOT NULL,
     description TEXT,
     payload TEXT NOT NULL,
-    created_time BIGINT NOT NULL,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     owner VARCHAR(36) NOT NULL,
     version VARCHAR(36) NOT NULL,
     db_version VARCHAR(36) NOT NULL,
-    parent VARCHAR(26) REFERENCES biomedgps_graph(id) ON DELETE CASCADE ON UPDATE CASCADE;
+    parent VARCHAR(36) REFERENCES biomedgps_graph(id) ON DELETE CASCADE ON UPDATE CASCADE;
   );

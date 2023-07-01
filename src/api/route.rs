@@ -1,9 +1,9 @@
 use super::model::{
-    BackgroundFrequencyResponse, BackgroundFrequencyStat, Chromosome, CountResponse, CountStat,
-    Dataset, DatasetPageResponse, SpeciesGenomePairs, GeneDataResponse
+    Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
+    RelationMetadata, Subgraph,
 };
-use crate::query::query_builder::{ComposeQuery, QueryItem};
-use log::{debug, warn};
+use crate::query::sql_builder::{ComposeQuery, QueryItem};
+use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::Object;
 use poem_openapi::{param::Path, param::Query, payload::Json, ApiResponse, OpenApi, Tags};
@@ -12,15 +12,7 @@ use std::sync::Arc;
 
 #[derive(Tags)]
 enum ApiTags {
-    Datasets,
-    Dataset,
-    BackgroundFrequencies,
-    Counts,
-    SpeciesGenomePairs,
-    CountStat,
-    BackgroundFrequencyStat,
-    Chromosomes,
-    Genes,
+    KnowledgeGraph,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
@@ -29,9 +21,19 @@ struct ErrorMessage {
 }
 
 #[derive(ApiResponse)]
-enum GetChromosomesResponse {
+enum GetWholeTableResponse<
+    T: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
     #[oai(status = 200)]
-    Ok(Json<Vec<Chromosome>>),
+    Ok(Json<Vec<T>>),
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
@@ -41,9 +43,19 @@ enum GetChromosomesResponse {
 }
 
 #[derive(ApiResponse)]
-enum GetGenesResponse {
+enum GetRecordsResponse<
+    S: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
     #[oai(status = 200)]
-    Ok(Json<GeneDataResponse>),
+    Ok(Json<RecordResponse<S>>),
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
@@ -53,9 +65,9 @@ enum GetGenesResponse {
 }
 
 #[derive(ApiResponse)]
-enum GetDatasetsResponse {
-    #[oai(status = 200)]
-    Ok(Json<DatasetPageResponse>),
+enum PostKnowledgeResponse {
+    #[oai(status = 201)]
+    Created(Json<KnowledgeCuration>),
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
@@ -64,153 +76,73 @@ enum GetDatasetsResponse {
     NotFound(Json<ErrorMessage>),
 }
 
-#[derive(ApiResponse)]
-enum GetDatasetResponse {
-    #[oai(status = 200)]
-    Ok(Json<Dataset>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-
-    #[oai(status = 500)]
-    InternalError(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetBackgroundFrequenciesResponse {
-    #[oai(status = 200)]
-    Ok(Json<BackgroundFrequencyResponse>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetCountsResponse {
-    #[oai(status = 200)]
-    Ok(Json<CountResponse>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetSpeciesGenomePairsResponse {
-    #[oai(status = 200)]
-    Ok(Json<SpeciesGenomePairs>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetCountStatResponse {
-    #[oai(status = 200)]
-    Ok(Json<Vec<CountStat>>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetBackgroundFrequencyStatResponse {
-    #[oai(status = 200)]
-    Ok(Json<Vec<BackgroundFrequencyStat>>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-pub struct RnmpdbApi;
+pub struct BiomedgpsApi;
 
 #[OpenApi]
-impl RnmpdbApi {
-    /// Call `/api/v1/chromosomes` with query params to fetch chromosomes.
+impl BiomedgpsApi {
+    /// Call `/api/v1/entity-metadata` with query params to fetch all entity metadata.
     #[oai(
-        path = "/api/v1/chromosomes",
+        path = "/api/v1/entity-metadata",
         method = "get",
-        tag = "ApiTags::Chromosomes",
-        operation_id = "fetchChromosomes"
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityMetadata"
     )]
-    async fn fetch_chromosomes(&self, pool: Data<&Arc<sqlx::PgPool>>) -> GetChromosomesResponse {
-        let pool_arc = pool.clone();
-
-        match Chromosome::get_chromosomes(&pool_arc).await {
-            Ok(chromosomes) => GetChromosomesResponse::Ok(Json(chromosomes)),
-            Err(e) => {
-                let err = format!("Failed to fetch chromosomes: {}", e);
-                warn!("{}", err);
-                return GetChromosomesResponse::BadRequest(Json(ErrorMessage { msg: err }));
-            }
-        }
-    }
-
-    /// Call `/api/v1/genes` with query params to fetch genes.
-    #[oai(
-        path = "/api/v1/genes",
-        method = "get",
-        tag = "ApiTags::Genes",
-        operation_id = "fetchGenes"
-    )]
-    async fn fetch_genes(
+    async fn fetch_entity_metadata(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        ref_genome: Query<String>,
-        query_str: Query<Option<String>>,
-        page: Query<Option<u64>>,
-        page_size: Query<Option<u64>>,
-    ) -> GetGenesResponse {
-        let page = page.unwrap_or_else(|| 1);
-        let page_size = page_size.unwrap_or_else(|| 10);
-        let query_str = query_str.0;
+    ) -> GetWholeTableResponse<EntityMetadata> {
         let pool_arc = pool.clone();
-        let ref_genome = ref_genome.as_str();
 
-        match GeneDataResponse::get_genes(&pool_arc, &ref_genome, query_str, page, page_size).await {
-            Ok(genes) => GetGenesResponse::Ok(Json(genes)),
+        match EntityMetadata::get_entity_metadata(&pool_arc).await {
+            Ok(entity_metadata) => GetWholeTableResponse::Ok(Json(entity_metadata)),
             Err(e) => {
-                let err = format!("Failed to fetch genes: {}", e);
+                let err = format!("Failed to fetch entity metadata: {}", e);
                 warn!("{}", err);
-                return GetGenesResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetWholeTableResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }
 
-    /// Call `/api/v1/datasets` with query params to fetch datasets.
+    /// Call `/api/v1/relation-metadata` with query params to fetch all relation metadata.
     #[oai(
-        path = "/api/v1/datasets",
+        path = "/api/v1/relation-metadata",
         method = "get",
-        tag = "ApiTags::Datasets",
-        operation_id = "fetchDatasets"
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchRelationMetadata"
     )]
-    async fn fetch_datasets(
+    async fn fetch_relation_metadata(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+    ) -> GetWholeTableResponse<RelationMetadata> {
+        let pool_arc = pool.clone();
+
+        match RelationMetadata::get_relation_metadata(&pool_arc).await {
+            Ok(relation_metadata) => GetWholeTableResponse::Ok(Json(relation_metadata)),
+            Err(e) => {
+                let err = format!("Failed to fetch relation metadata: {}", e);
+                warn!("{}", err);
+                return GetWholeTableResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/entities` with query params to fetch entities.
+    #[oai(
+        path = "/api/v1/entities",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntities"
+    )]
+    async fn fetch_entities(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
-    ) -> GetDatasetsResponse {
+    ) -> GetRecordsResponse<Entity> {
         let pool_arc = pool.clone();
-        let page = page.unwrap_or_else(|| 1);
-        let page_size = page_size.unwrap_or_else(|| 10);
+        let page = page.0;
+        let page_size = page_size.0;
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -221,157 +153,55 @@ impl RnmpdbApi {
         };
 
         let query = if query_str == "" {
-            ComposeQuery::QueryItem(QueryItem::default())
+            None
         } else {
             debug!("Query string: {}", &query_str);
             // Parse query string as json
             match serde_json::from_str(&query_str) {
-                Ok(query) => query,
+                Ok(query) => Some(query),
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetDatasetsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
                 }
             }
         };
 
-        match DatasetPageResponse::get_datasets(&pool_arc, &query, page, page_size).await {
-            Ok(datasets) => GetDatasetsResponse::Ok(Json(datasets)),
-            Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
-                warn!("{}", err);
-                return GetDatasetsResponse::BadRequest(Json(ErrorMessage { msg: err }));
-            }
-        }
-    }
-
-    /// Call `/api/v1/datasets/:id` to fetch the dataset.
-    #[oai(
-        path = "/api/v1/datasets/:id",
-        method = "get",
-        tag = "ApiTags::Dataset",
-        operation_id = "fetchDataset"
-    )]
-    async fn fetch_dataset(
-        &self,
-        pool: Data<&Arc<sqlx::PgPool>>,
-        id: Path<u32>,
-    ) -> GetDatasetResponse {
-        let pool_arc = pool.clone();
-        let id = id.0;
-
-        match DatasetPageResponse::get_dataset(&pool_arc, id as i32).await {
-            Ok(dataset) => GetDatasetResponse::Ok(Json(dataset)),
-            Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
-                warn!("{}", err);
-                return GetDatasetResponse::BadRequest(Json(ErrorMessage { msg: err }));
-            }
-        }
-    }
-
-    /// Call `/api/v1/species-genome-pairs` to fetch the species-genome pairs.
-    #[oai(
-        path = "/api/v1/species-genome-pairs",
-        method = "get",
-        tag = "ApiTags::SpeciesGenomePairs",
-        operation_id = "fetchSpeciesGenomePairs"
-    )]
-    async fn fetch_species_genome_pairs(
-        &self,
-        pool: Data<&Arc<sqlx::PgPool>>,
-    ) -> GetSpeciesGenomePairsResponse {
-        let pool_arc = pool.clone();
-
-        match DatasetPageResponse::get_species_genomes(&pool_arc).await {
-            Ok(pairs) => {
-                let species_genome_pairs = SpeciesGenomePairs { data: pairs };
-                return GetSpeciesGenomePairsResponse::Ok(Json(species_genome_pairs));
-            }
-            Err(e) => {
-                let err = format!("Failed to fetch species-genome pairs: {}", e);
-                warn!("{}", err);
-                return GetSpeciesGenomePairsResponse::BadRequest(Json(ErrorMessage { msg: err }));
-            }
-        }
-    }
-
-    /// Call `/api/v1/background-frequencies` with query params to fetch background frequencies.
-    #[oai(
-        path = "/api/v1/background-frequencies",
-        method = "get",
-        tag = "ApiTags::BackgroundFrequencies",
-        operation_id = "fetchBackgroundFrequencies"
-    )]
-    async fn fetch_background_frequencies(
-        &self,
-        pool: Data<&Arc<sqlx::PgPool>>,
-        page: Query<Option<u64>>,
-        page_size: Query<Option<u64>>,
-        query_str: Query<Option<String>>,
-    ) -> GetBackgroundFrequenciesResponse {
-        let pool_arc = pool.clone();
-        let page = page.unwrap_or_else(|| 1);
-        let page_size = page_size.unwrap_or_else(|| 10);
-
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            ComposeQuery::QueryItem(QueryItem::default())
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => query,
-                Err(e) => {
-                    let err = format!("Failed to parse query string: {}", e);
-                    warn!("{}", err);
-                    return GetBackgroundFrequenciesResponse::BadRequest(Json(ErrorMessage {
-                        msg: err,
-                    }));
-                }
-            }
-        };
-
-        match BackgroundFrequencyResponse::get_background_frequency(
-            &pool_arc, &query, page, page_size,
+        match RecordResponse::<Entity>::get_records(
+            &pool_arc,
+            "biomedgps_entity",
+            &query,
+            page,
+            page_size,
         )
         .await
         {
-            Ok(records) => GetBackgroundFrequenciesResponse::Ok(Json(records)),
+            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch records: {}", e);
+                let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetBackgroundFrequenciesResponse::BadRequest(Json(ErrorMessage {
-                    msg: err,
-                }));
+                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }
 
-    /// Call `/api/v1/counts` with query params to fetch counts.
+    /// Call `/api/v1/curated-knowledges` with query params to fetch curated knowledges.
     #[oai(
-        path = "/api/v1/counts",
+        path = "/api/v1/curated-knowledges",
         method = "get",
-        tag = "ApiTags::Counts",
-        operation_id = "fetchCounts"
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchCuratedKnowledges"
     )]
-    async fn fetch_counts(
+    async fn fetch_curated_knowledges(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
-    ) -> GetCountsResponse {
+    ) -> GetRecordsResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
-        let page = page.unwrap_or_else(|| 1);
-        let page_size = page_size.unwrap_or_else(|| 10);
+        let page = page.0;
+        let page_size = page_size.0;
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -382,43 +212,55 @@ impl RnmpdbApi {
         };
 
         let query = if query_str == "" {
-            ComposeQuery::QueryItem(QueryItem::default())
+            None
         } else {
             debug!("Query string: {}", &query_str);
             // Parse query string as json
             match serde_json::from_str(&query_str) {
-                Ok(query) => query,
+                Ok(query) => Some(query),
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetCountsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
                 }
             }
         };
 
-        match CountResponse::get_counts(&pool_arc, &query, page, page_size).await {
-            Ok(records) => GetCountsResponse::Ok(Json(records)),
+        match RecordResponse::<KnowledgeCuration>::get_records(
+            &pool_arc,
+            "biomedgps_knowledge_curation",
+            &query,
+            page,
+            page_size,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch records: {}", e);
+                let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetCountsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }
 
-    /// Call `/api/v1/count-stat` with query params to fetch count-stat.
+    /// Call `/api/v1/relations` with query params to fetch relations.
     #[oai(
-        path = "/api/v1/count-stat",
+        path = "/api/v1/relations",
         method = "get",
-        tag = "ApiTags::CountStat",
-        operation_id = "fetchCountStat"
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchRelations"
     )]
-    async fn fetch_count_stat(
+    async fn fetch_relations(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
-    ) -> GetCountStatResponse {
+    ) -> GetRecordsResponse<Relation> {
         let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -429,43 +271,55 @@ impl RnmpdbApi {
         };
 
         let query = if query_str == "" {
-            ComposeQuery::QueryItem(QueryItem::default())
+            None
         } else {
             debug!("Query string: {}", &query_str);
             // Parse query string as json
             match serde_json::from_str(&query_str) {
-                Ok(query) => query,
+                Ok(query) => Some(query),
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetCountStatResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
                 }
             }
         };
 
-        match CountStat::get_count_stat(&pool_arc, &query, vec![]).await {
-            Ok(records) => GetCountStatResponse::Ok(Json(records)),
+        match RecordResponse::<Relation>::get_records(
+            &pool_arc,
+            "biomedgps_relation",
+            &query,
+            page,
+            page_size,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch records: {}", e);
+                let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetCountStatResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }
 
-    /// Call `/api/v1/background-freq-stat` with query params to fetch background-freq-stat.
+    /// Call `/api/v1/entity2d` with query params to fetch entity2d.
     #[oai(
-        path = "/api/v1/background-freq-stat",
+        path = "/api/v1/entity2d",
         method = "get",
-        tag = "ApiTags::BackgroundFrequencyStat",
-        operation_id = "fetchBackgroundFrequencyStat"
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntity2d"
     )]
-    async fn fetch_background_freq_stat(
+    async fn fetch_entity2d(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
-    ) -> GetBackgroundFrequencyStatResponse {
+    ) -> GetRecordsResponse<Entity2D> {
         let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -476,30 +330,93 @@ impl RnmpdbApi {
         };
 
         let query = if query_str == "" {
-            ComposeQuery::QueryItem(QueryItem::default())
+            None
         } else {
             debug!("Query string: {}", &query_str);
             // Parse query string as json
             match serde_json::from_str(&query_str) {
-                Ok(query) => query,
+                Ok(query) => Some(query),
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetBackgroundFrequencyStatResponse::BadRequest(Json(ErrorMessage {
-                        msg: err,
-                    }));
+                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
                 }
             }
         };
 
-        match BackgroundFrequencyStat::get_background_freq_stat(&pool_arc, &query, vec![]).await {
-            Ok(records) => GetBackgroundFrequencyStatResponse::Ok(Json(records)),
+        match RecordResponse::<Entity2D>::get_records(
+            &pool_arc,
+            "biomedgps_entity2d",
+            &query,
+            page,
+            page_size,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch records: {}", e);
+                let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetBackgroundFrequencyStatResponse::BadRequest(Json(ErrorMessage {
-                    msg: err,
-                }));
+                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/subgraphs` with query params to fetch subgraphs.
+    #[oai(
+        path = "/api/v1/subgraphs",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchSubgraphs"
+    )]
+    async fn fetch_subgraphs(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+    ) -> GetRecordsResponse<Subgraph> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                }
+            }
+        };
+
+        match RecordResponse::<Subgraph>::get_records(
+            &pool_arc,
+            "biomedgps_subgraph",
+            &query,
+            page,
+            page_size,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Err(e) => {
+                let err = format!("Failed to fetch datasets: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }

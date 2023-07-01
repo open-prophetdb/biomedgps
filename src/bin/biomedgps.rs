@@ -20,7 +20,7 @@ use poem::{
     Endpoint, Request, Response, Result, Route, Server,
 };
 use poem_openapi::OpenApiService;
-use rnmpdb::api::{model::DatasetPageResponse, route::RnmpdbApi, util};
+use biomedgps::api::route::BiomedgpsApi;
 use rust_embed::RustEmbed;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
@@ -58,9 +58,9 @@ fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle, Str
     })
 }
 
-/// rNMP Database
+/// BioMedGPS backend server.
 #[derive(Debug, PartialEq, StructOpt)]
-#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="rnmpdb", author="Jingcheng Yang <yjcyxky@163.com>")]
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="biomedgps", author="Jingcheng Yang <yjcyxky@163.com>")]
 struct Opt {
     /// Activate debug mode
     /// short and long flags (--debug) will be deduced from the field's name
@@ -75,10 +75,6 @@ struct Opt {
     #[structopt(name = "openapi", short = "o", long = "openapi")]
     openapi: bool,
 
-    /// Check all dependencies, such as bigwig files, reference genomes.
-    #[structopt(name = "check_deps", short = "c", long = "check-deps")]
-    check_deps: bool,
-
     /// 127.0.0.1 or 0.0.0.0
     #[structopt(name = "host", short = "H", long = "host", possible_values=&["127.0.0.1", "0.0.0.0"], default_value = "127.0.0.1")]
     host: String,
@@ -87,14 +83,15 @@ struct Opt {
     #[structopt(name = "port", short = "p", long = "port", default_value = "3000")]
     port: String,
 
-    /// Data directory. It is expected to contain bedgraph files and reference genomes.
-    #[structopt(name = "data-dir", short = "D", long = "data-dir")]
-    data_dir: String,
-
     /// Database url, such as postgres:://user:pass@host:port/dbname.
     /// You can also set it with env var: DATABASE_URL.
     #[structopt(name = "database-url", short = "d", long = "database-url")]
     database_url: Option<String>,
+
+    /// Database url, such as neo4j:://user:pass@host:port/dbname.
+    /// You can also set it with env var: NEO4J_URL.
+    #[structopt(name = "database-url", short = "d", long = "database-url")]
+    neo4j_url: Option<String>,
 }
 
 #[derive(RustEmbed)]
@@ -132,9 +129,9 @@ async fn main() -> Result<(), std::io::Error> {
     let args = Opt::from_args();
 
     let log_result = if args.debug {
-        init_logger("rnmpdb", LevelFilter::Trace)
+        init_logger("biomedgps", LevelFilter::Trace)
     } else {
-        init_logger("rnmpdb", LevelFilter::Info)
+        init_logger("biomedgps", LevelFilter::Info)
     };
 
     if let Err(log) = log_result {
@@ -146,7 +143,7 @@ async fn main() -> Result<(), std::io::Error> {
     let port = args.port;
 
     println!(
-        "\n\t\t*** Launch rnmpdb on {}:{} ***",
+        "\n\t\t*** Launch biomedgps on {}:{} ***",
         host,
         port
     );
@@ -165,6 +162,20 @@ async fn main() -> Result<(), std::io::Error> {
         database_url.unwrap()
     };
 
+    let neo4j_url = args.neo4j_url;
+
+    let neo4j_url = if neo4j_url.is_none() {
+        match std::env::var("NEO4J_URL") {
+            Ok(v) => v,
+            Err(_) => {
+                error!("{}", "NEO4J_URL is not set.");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        neo4j_url.unwrap()
+    };
+
     let pool = match PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
@@ -177,67 +188,17 @@ async fn main() -> Result<(), std::io::Error> {
         }
     };
 
-    if args.check_deps {
-        let sample_names = match DatasetPageResponse::get_sample_names(&pool).await {
-            Ok(v) => v,
-            Err(e) => {
-                error!("Failed to get sample names: {}", e);
-                std::process::exit(1);
-            }
-        };
-
-        let path = Path::new(&args.data_dir).join("bedgraph");
-        match util::check_bedgraphs(path.as_path(), &sample_names) {
-            Ok(_) => {}
-            Err(e) => {
-                for error in e {
-                    error!("{}", error);
-                }
-                std::process::exit(1);
-            }
-        }
-
-        let path = Path::new(&args.data_dir).join("bigwig");
-        match util::check_bigwigs(path.as_path(), &sample_names) {
-            Ok(_) => {}
-            Err(e) => {
-                for error in e {
-                    error!("{}", error);
-                }
-                std::process::exit(1);
-            }
-        }
-
-        let ref_genomes = match DatasetPageResponse::get_ref_genomes(&pool).await {
-            Ok(v) => v,
-            Err(e) => {
-                error!("Failed to get reference genomes: {}", e);
-                std::process::exit(1);
-            }
-        };
-
-        let path = Path::new(&args.data_dir).join("genome");
-        match util::check_ref_genomes(path.as_path(), &ref_genomes) {
-            Ok(_) => {}
-            Err(e) => {
-                for error in e {
-                    error!("{}", error);
-                }
-                std::process::exit(1);
-            }
-        }
-    }
-
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
 
-    let api_service = OpenApiService::new(RnmpdbApi, "rNMPDB", "v0.1.0")
-        .summary("A RESTful API for rNMPDB")
-        .description("A platform for discovering rNMPs.")
+    let api_service = OpenApiService::new(BiomedgpsApi, "BioMedGPS", "v0.1.0")
+        .summary("A RESTful API Service for BioMedGPS.")
+        .description("A knowledge graph system with graph neural network for drug discovery, disease mechanism and biomarker screening.")
         .license("GNU AFFERO GENERAL PUBLIC LICENSE v3")
         .server(format!("http://{}:{}", host, port));
     let openapi = api_service.swagger_ui();
     let mut spec = api_service.spec();
+    
     // Remove charset=utf-8 from spec for compatibility with Apifox.
     spec = spec.replace("; charset=utf-8", "");
 
