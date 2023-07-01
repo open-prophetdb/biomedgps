@@ -1,0 +1,16 @@
+[Unit]
+Description=BioMedGPS
+After=network.target
+
+[Service]
+Environment=DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps
+Environment=NEO4J_URL=neo4j://localhost:7687?user=neo4j&password=password
+ExecStart=/opt/local/bin/biomedgps -H 0.0.0.0 -p 80 --openapi --ui
+ExecReload=/bin/kill -HUP $MAINPID
+Type=simple
+KillMode=process
+Restart=on-failure
+RestartSec=42s
+
+[Install]
+WantedBy=multi-user.target
