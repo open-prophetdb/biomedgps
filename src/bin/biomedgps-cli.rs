@@ -50,7 +50,7 @@ enum SubCommands {
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - initdb", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct InitDbArguments {
-    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb
+    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 }
@@ -59,7 +59,7 @@ pub struct InitDbArguments {
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importdb", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct ImportDBArguments {
-    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb
+    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 

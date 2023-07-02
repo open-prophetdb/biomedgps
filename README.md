@@ -41,7 +41,7 @@ make test-db
 ### 3. Run the server
 
 ```bash
-export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run -- -H 0.0.0.0 -p 8888 -D data --openapi --debug
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run -- -H 0.0.0.0 -p 8888 --openapi --debug
 ```
 
 ## Installation (Development) for Frontend
@@ -112,23 +112,19 @@ brew install docker docker-compose
     Assume all data files are in `/data` folder.
 
     ```bash
-    # Upload dataset data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli import -f /data/dataset.tsv -t dataset -D
+    # Upload entity data
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity -t entity 
 
-    # Upload count data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli import -f /data/rnmp_count_output/ -t count -D
+    # Upload entity2d data
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity2d.tsv -t entity2d
 
-    # Upload background_frequency data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli import -f /data/background_frequency.tsv -t background_frequency -D
+    # Upload relation data
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/relation -t relation
+
+    ...
     ```
 
-6. Upload all bedgraph files to `/data/bedgraph` folder
-
-7. Upload all bigwig files to `/data/bigwig` folder
-
-8. Upload all genome files to `/data/genome` folder
-
-9. Configure a nginx server to serve the frontend and backend
+6. Configure a nginx server to serve the frontend and backend
 
     - Download biomedgps_nginx.conf and modify it to fit your environment
 
@@ -148,10 +144,10 @@ Run the following command to see the usage.
 $ biomedgps --help
 biomedgps 0.1.0
 Jingcheng Yang <yjcyxky@163.com>
-rNMP Database
+BioMedGPS backend server
 
 USAGE:
-    biomedgps [FLAGS] [OPTIONS] --data-dir <data-dir>
+    biomedgps [FLAGS] [OPTIONS]
 
 FLAGS:
         --debug      Activate debug mode short and long flags (--debug) will be deduced from the field's name
@@ -161,20 +157,21 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -D, --data-dir <data-dir>            Data directory. It is expected to contain bedgraph files and reference genomes
     -d, --database-url <database-url>    Database url, such as postgres:://user:pass@host:port/dbname. You can also set
                                          it with env var: DATABASE_URL
     -H, --host <host>                    127.0.0.1 or 0.0.0.0 [default: 127.0.0.1]  [possible values: 127.0.0.1,
                                          0.0.0.0]
+    -g, --neo4j-url <neo4j-url>          Graph Database url, such as neo4j:://user:pass@host:port/dbname. You can also
+                                         set it with env var: NEO4J_URL
     -p, --port <port>                    Which port [default: 3000]
 ```
 
 ## Example
 
-If you want to launch the server with openapi and ui mode, run the following command. The data directory must contain bedgraph, bigwig and genome subdirectories. The bedgraph files must be named as `*.bedgraph` and the genome files must be named as `*.fa.gz`, `*.fa.gz.fai`, `*.fa.gz.gzi`, `*.gff3.gz`, `*.gff3.gz.tbi`, `*.gff3.gz.ix`, `*.gff3.gz.ixx` and `*.gff3.gz_meta.json`.
+If you want to launch the server with openapi and ui mode, run the following command.
 
 ```bash
-export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps -H 0.0.0.0 -p 8888 -D data --openapi --ui
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps -H 0.0.0.0 -p 8888 --openapi --ui
 ```
 
 ## For Linux with systemd
@@ -187,9 +184,6 @@ sudo systemctl daemon-reload
 sudo systemctl enable biomedgps
 sudo systemctl start biomedgps
 ```
-
-## Issues
-1. Species names are not consistent in the `biomedgps_background_frequency`, `biomedgps_dataset` and `biomedgps_count` tables.
 
 ## Contributing
 Comming soon...
