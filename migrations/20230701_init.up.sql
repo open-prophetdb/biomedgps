@@ -61,7 +61,7 @@ CREATE TABLE
 -- biomedgps_entity2d table is used to store the 2D embedding of the entities for computing the similarity of the entities
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity2d (
-    embedding_id PRIMARY KEY, -- The embedding ID
+    embedding_id BIGINT PRIMARY KEY, -- The embedding ID
     entity_id VARCHAR(64) NOT NULL, -- The entity ID
     entity_type VARCHAR(64) NOT NULL, -- The entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     entity_name VARCHAR(64) NOT NULL, -- The entity name
@@ -82,5 +82,5 @@ CREATE TABLE
     owner VARCHAR(36) NOT NULL,
     version VARCHAR(36) NOT NULL,
     db_version VARCHAR(36) NOT NULL,
-    parent VARCHAR(36) REFERENCES biomedgps_graph(id) ON DELETE CASCADE ON UPDATE CASCADE;
+    parent VARCHAR(36) REFERENCES biomedgps_subgraph(id) ON DELETE CASCADE ON UPDATE CASCADE
   );

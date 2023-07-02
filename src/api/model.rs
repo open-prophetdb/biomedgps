@@ -175,10 +175,8 @@ impl<
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
 pub struct Entity {
-    #[oai(read_only)]
-    // Ignore this field when deserialize from json
-    #[serde(skip_deserializing)]
-    pub id: i32,
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    pub id: String,
     #[oai(validator(max_length = 64))]
     pub name: String,
     #[oai(validator(max_length = 64))]
@@ -198,7 +196,7 @@ pub struct EntityMetadata {
     pub id: i32,
     #[oai(validator(max_length = 64))]
     pub resource: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub entity_type: String,
     pub entity_count: i64,
 }
@@ -229,9 +227,9 @@ pub struct RelationMetadata {
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
     pub relation_count: i64,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub start_entity_type: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub end_entity_type: String,
 }
 
@@ -252,30 +250,87 @@ impl RelationMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
 pub struct KnowledgeCuration {
-    #[oai(read_only)]
-    // Ignore this field when deserialize from json
-    #[serde(skip_deserializing)]
     pub relation_id: i32,
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
     #[oai(validator(max_length = 64))]
     pub source_name: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub source_type: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub source_id: String,
     #[oai(validator(max_length = 64))]
     pub target_name: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub target_type: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub target_id: String,
     pub key_sentence: String,
+    #[oai(read_only)]
+    #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
     pub created_at: DateTime<Utc>,
     #[oai(validator(max_length = 64))]
     pub curator: String,
     pub pmid: i64,
+}
+
+impl KnowledgeCuration {
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KnowledgeCuration, anyhow::Error> {
+        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_id, relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, created_at, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11) RETURNING *";
+        let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
+            .bind(&self.relation_id)
+            .bind(&self.relation_type)
+            .bind(&self.source_name)
+            .bind(&self.source_type)
+            .bind(&self.source_id)
+            .bind(&self.target_name)
+            .bind(&self.target_type)
+            .bind(&self.target_id)
+            .bind(&self.key_sentence)
+            .bind(&self.curator)
+            .bind(&self.pmid)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(knowledge_curation)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: &str,
+    ) -> Result<KnowledgeCuration, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_knowledge_curation SET relation_type = $1, source_name = $2, source_type = $3, source_id = $4, target_name = $5, target_type = $6, target_id = $7, key_sentence = $8, created_at = now(), pmid = $9 WHERE id = $10 RETURNING *";
+        let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
+            .bind(&self.relation_type)
+            .bind(&self.source_name)
+            .bind(&self.source_type)
+            .bind(&self.source_id)
+            .bind(&self.target_name)
+            .bind(&self.target_type)
+            .bind(&self.target_id)
+            .bind(&self.key_sentence)
+            .bind(&self.pmid)
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(knowledge_curation)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        id: &str,
+    ) -> Result<KnowledgeCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_knowledge_curation WHERE id = $1 RETURNING *";
+        let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(knowledge_curation)
+    }
 }
 
 impl CheckData for KnowledgeCuration {}
@@ -288,13 +343,13 @@ pub struct Relation {
     pub id: i32,
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub source_id: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub source_type: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub target_id: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub target_type: String,
     pub resource: String,
 }
@@ -303,10 +358,10 @@ impl CheckData for Relation {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
 pub struct Entity2D {
-    pub embedding_id: i32,
-    #[oai(validator(max_length = 64))]
+    pub embedding_id: i64,
+    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub entity_id: String,
-    #[oai(validator(max_length = 64))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub entity_type: String,
     #[oai(validator(max_length = 64))]
     pub entity_name: String,
@@ -318,15 +373,22 @@ pub struct Entity2D {
 
 impl CheckData for Entity2D {}
 
+// UUID Pattern: https://stackoverflow.com/questions/136505/searching-for-uuids-in-text-with-regex
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
 pub struct Subgraph {
     #[oai(read_only)]
-    #[oai(validator(max_length = 36))]
+    #[oai(validator(
+        max_length = 36,
+        pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    ))]
     pub id: String,
     #[oai(validator(max_length = 64))]
     pub name: String,
     pub description: Option<String>,
     pub payload: String, // json string, e.g. {"nodes": [], "edges": []}. how to validate json string?
+    #[oai(read_only)]
+    #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
     pub created_time: DateTime<Utc>,
     #[oai(validator(max_length = 36))]
@@ -335,8 +397,60 @@ pub struct Subgraph {
     pub version: String,
     #[oai(validator(max_length = 36))]
     pub db_version: String,
-    #[oai(validator(max_length = 36))]
-    pub parent: String, // parent subgraph id, it is same as id if it is a root subgraph (no parent), otherwise it is the parent subgraph id
+    #[oai(validator(
+        max_length = 36,
+        pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    ))]
+    pub parent: Option<String>, // parent subgraph id, it is same as id if it is a root subgraph (no parent), otherwise it is the parent subgraph id
 }
 
 impl CheckData for Subgraph {}
+
+impl Subgraph {
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Subgraph, anyhow::Error> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let parent = if self.parent.is_none() {
+            id.clone()
+        } else {
+            self.parent.clone().unwrap()
+        };
+
+        let sql_str = "INSERT INTO biomedgps_subgraph (id, name, description, payload, created_time, owner, version, db_version, parent) VALUES ($1, $2, $3, $4, now(), $5, $6, $7, $8) RETURNING *";
+        let subgraph = sqlx::query_as::<_, Subgraph>(sql_str)
+            .bind(id)
+            .bind(&self.name)
+            .bind(&self.description)
+            .bind(&self.payload)
+            .bind(&self.owner)
+            .bind(&self.version)
+            .bind(&self.db_version)
+            .bind(parent)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(subgraph)
+    }
+
+    pub async fn update(&self, pool: &sqlx::PgPool, id: &str) -> Result<Subgraph, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_subgraph SET name = $1, description = $2, payload = $3, WHERE id = $4 RETURNING *";
+        let subgraph = sqlx::query_as::<_, Subgraph>(sql_str)
+            .bind(&self.name)
+            .bind(&self.description)
+            .bind(&self.payload)
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(subgraph)
+    }
+
+    pub async fn delete(pool: &sqlx::PgPool, id: &str) -> Result<Subgraph, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_subgraph WHERE id = $1 RETURNING *";
+        let subgraph = sqlx::query_as::<_, Subgraph>(sql_str)
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(subgraph)
+    }
+}

@@ -88,9 +88,9 @@ struct Opt {
     #[structopt(name = "database-url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// Database url, such as neo4j:://user:pass@host:port/dbname.
+    /// Graph Database url, such as neo4j:://user:pass@host:port/dbname.
     /// You can also set it with env var: NEO4J_URL.
-    #[structopt(name = "database-url", short = "d", long = "database-url")]
+    #[structopt(name = "neo4j-url", short = "g", long = "neo4j-url")]
     neo4j_url: Option<String>,
 }
 
@@ -162,19 +162,19 @@ async fn main() -> Result<(), std::io::Error> {
         database_url.unwrap()
     };
 
-    let neo4j_url = args.neo4j_url;
+    // let neo4j_url = args.neo4j_url;
 
-    let neo4j_url = if neo4j_url.is_none() {
-        match std::env::var("NEO4J_URL") {
-            Ok(v) => v,
-            Err(_) => {
-                error!("{}", "NEO4J_URL is not set.");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        neo4j_url.unwrap()
-    };
+    // let _neo4j_url = if neo4j_url.is_none() {
+    //     match std::env::var("NEO4J_URL") {
+    //         Ok(v) => v,
+    //         Err(_) => {
+    //             error!("{}", "NEO4J_URL is not set.");
+    //             std::process::exit(1);
+    //         }
+    //     }
+    // } else {
+    //     neo4j_url.unwrap()
+    // };
 
     let pool = match PgPoolOptions::new()
         .max_connections(5)

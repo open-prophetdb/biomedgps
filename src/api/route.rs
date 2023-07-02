@@ -2,7 +2,6 @@ use super::model::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Subgraph,
 };
-use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::Object;
@@ -65,9 +64,31 @@ enum GetRecordsResponse<
 }
 
 #[derive(ApiResponse)]
-enum PostKnowledgeResponse {
+enum PostResponse<
+    S: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
     #[oai(status = 201)]
-    Created(Json<KnowledgeCuration>),
+    Created(Json<S>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+#[derive(ApiResponse)]
+enum DeleteResponse {
+    #[oai(status = 204)]
+    NoContent,
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
@@ -240,6 +261,83 @@ impl BiomedgpsApi {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/curated-knowledges` with payload to create a curated knowledge.
+    #[oai(
+        path = "/api/v1/curated-knowledges",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postCuratedKnowledge"
+    )]
+    async fn post_curated_knowledge(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<KnowledgeCuration>,
+    ) -> PostResponse<KnowledgeCuration> {
+        let pool_arc = pool.clone();
+        let payload = payload.0;
+
+        match payload.insert(&pool_arc).await {
+            Ok(kc) => PostResponse::Created(Json(kc)),
+            Err(e) => {
+                let err = format!("Failed to insert curated knowledge: {}", e);
+                warn!("{}", err);
+                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/curated-knowledges/:id` with payload to create a curated knowledge.
+    #[oai(
+        path = "/api/v1/curated-knowledges/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putCuratedKnowledge"
+    )]
+    async fn put_curated_knowledge(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<KnowledgeCuration>,
+        id: Path<String>,
+    ) -> PostResponse<KnowledgeCuration> {
+        let pool_arc = pool.clone();
+        let payload = payload.0;
+        let id = id.0;
+
+        match payload.update(&pool_arc, &id).await {
+            Ok(kc) => PostResponse::Created(Json(kc)),
+            Err(e) => {
+                let err = format!("Failed to insert curated knowledge: {}", e);
+                warn!("{}", err);
+                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/curated-knowledges/:id` with payload to delete a curated knowledge.
+    #[oai(
+        path = "/api/v1/curated-knowledges/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteCuratedKnowledge"
+    )]
+    async fn delete_curated_knowledge(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<String>,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+
+        match KnowledgeCuration::delete(&pool_arc, &id).await {
+            Ok(_) => DeleteResponse::NoContent,
+            Err(e) => {
+                let err = format!("Failed to delete curated knowledge: {}", e);
+                warn!("{}", err);
+                DeleteResponse::NotFound(Json(ErrorMessage { msg: err }))
             }
         }
     }
@@ -417,6 +515,83 @@ impl BiomedgpsApi {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/subgraphs` with payload to create a subgraph.
+    #[oai(
+        path = "/api/v1/subgraphs",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postSubgraph"
+    )]
+    async fn post_subgraph(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<Subgraph>,
+    ) -> PostResponse<Subgraph> {
+        let pool_arc = pool.clone();
+        let payload = payload.0;
+
+        match payload.insert(&pool_arc).await {
+            Ok(kc) => PostResponse::Created(Json(kc)),
+            Err(e) => {
+                let err = format!("Failed to insert curated knowledge: {}", e);
+                warn!("{}", err);
+                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/subgraphs/:id` with payload to update a subgraph.
+    #[oai(
+        path = "/api/v1/subgraphs",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putSubgraph"
+    )]
+    async fn put_subgraph(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<String>,
+        payload: Json<Subgraph>,
+    ) -> PostResponse<Subgraph> {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let payload = payload.0;
+
+        match payload.update(&pool_arc, &id).await {
+            Ok(kc) => PostResponse::Created(Json(kc)),
+            Err(e) => {
+                let err = format!("Failed to update curated knowledge: {}", e);
+                warn!("{}", err);
+                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/subgraphs/:id` with payload to create subgraph.
+    #[oai(
+        path = "/api/v1/subgraphs/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteSubgraph"
+    )]
+    async fn delete_subgraph(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<String>,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+
+        match Subgraph::delete(&pool_arc, &id).await {
+            Ok(_) => DeleteResponse::NoContent,
+            Err(e) => {
+                let err = format!("Failed to delete a subgraph: {}", e);
+                warn!("{}", err);
+                DeleteResponse::NotFound(Json(ErrorMessage { msg: err }))
             }
         }
     }
