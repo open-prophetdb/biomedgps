@@ -113,13 +113,13 @@ brew install docker docker-compose
 
     ```bash
     # Upload entity data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity -t entity 
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity -t entity -D
 
     # Upload entity2d data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity2d.tsv -t entity2d
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/entity2d.tsv -t entity2d -D
 
     # Upload relation data
-    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/relation -t relation
+    export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && /opt/local/bin/biomedgps-cli importdb -f /data/relation -t relation -D
 
     ...
     ```
@@ -150,7 +150,7 @@ USAGE:
     biomedgps [FLAGS] [OPTIONS]
 
 FLAGS:
-        --debug      Activate debug mode short and long flags (--debug) will be deduced from the field's name
+    --debug          Activate debug mode short and long flags (--debug) will be deduced from the field's name
     -h, --help       Prints help information
     -o, --openapi    Activate openapi mode
     -u, --ui         Activate ui mode

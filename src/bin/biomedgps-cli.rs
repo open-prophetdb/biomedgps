@@ -3,6 +3,7 @@ extern crate stderrlog;
 
 use log::*;
 use sqlx::migrate::Migrator;
+use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -11,9 +12,11 @@ use structopt::StructOpt;
 use tempfile::tempdir;
 
 use biomedgps::api::model::{
-    get_column_names, CheckData, Entity, Entity2D, EntityMetadata, KnowledgeCuration, Relation,
-    RelationMetadata, Subgraph,
+    CheckData, Entity, Entity2D, EntityMetadata, KnowledgeCuration, Relation, RelationMetadata,
+    Subgraph,
 };
+
+use biomedgps::api::util::get_delimiter;
 
 /// A cli for rnmpdb.
 #[derive(StructOpt, Debug)]
@@ -74,6 +77,10 @@ pub struct ImportDBArguments {
     /// Drop the table before import data.
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
+
+    /// Show the first 10 errors when import data.
+    #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
+    show_all_errors: bool,
 }
 
 const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");
@@ -138,20 +145,14 @@ async fn import_file_in_loop(
     pool: &sqlx::PgPool,
     filepath: &PathBuf,
     table_name: &str,
+    expected_columns: &Vec<String>,
     unique_columns: &Vec<&str>,
-) -> sqlx::Result<()> {
+    delimiter: u8,
+) -> Result<(), Box<dyn Error>> {
     match sqlx::query("DROP TABLE staging").execute(pool).await {
         Ok(_) => {}
         Err(_) => {}
     }
-
-    let columns = match get_column_names(filepath) {
-        Ok(columns) => columns,
-        Err(e) => {
-            error!("Failed to get column names: {}", e);
-            return Ok(());
-        }
-    };
 
     let mut tx = pool.begin().await?;
     // Here we replace '{}' and {} placeholders with the appropriate values.
@@ -162,13 +163,17 @@ async fn import_file_in_loop(
     .execute(&mut tx)
     .await?;
 
-    sqlx::query(&format!(
-        "COPY staging ({}) FROM '{}' DELIMITER E'\t' CSV HEADER",
-        columns.join(","),
-        filepath.display()
-    ))
-    .execute(&mut tx)
-    .await?;
+    let columns = expected_columns.join(",");
+    let query_str = format!(
+        "COPY staging ({}) FROM '{}' DELIMITER E'{}' CSV HEADER",
+        columns,
+        filepath.display(),
+        delimiter as char
+    );
+
+    debug!("Importing query string: {}", query_str);
+
+    sqlx::query(&query_str).execute(&mut tx).await?;
 
     let where_clause = unique_columns
         .iter()
@@ -180,11 +185,7 @@ async fn import_file_in_loop(
         "INSERT INTO {} ({})
          SELECT {} FROM staging
          WHERE NOT EXISTS (SELECT 1 FROM {} WHERE {})",
-        table_name,
-        columns.join(","),
-        columns.join(","),
-        table_name,
-        where_clause
+        table_name, columns, columns, table_name, where_clause
     ))
     .execute(&mut tx)
     .await?;
@@ -194,30 +195,37 @@ async fn import_file_in_loop(
     Ok(())
 }
 
-async fn import_file(pool: &sqlx::PgPool, table_name: &str, drop: bool, filepath: &PathBuf) {
+async fn import_file(
+    pool: &sqlx::PgPool,
+    filepath: &PathBuf,
+    table_name: &str,
+    expected_columns: &Vec<String>,
+    delimiter: u8,
+    drop: bool,
+) -> Result<(), Box<dyn Error>> {
     if drop {
         drop_table(&pool, table_name).await;
     };
 
-    let columns = match get_column_names(filepath) {
-        Ok(columns) => columns,
-        Err(e) => {
-            error!("Failed to get column names: {}", e);
-            return;
-        }
-    };
+    let columns = expected_columns.join(", ");
 
     let stmt = format!(
-        r#"COPY {} ({}) FROM '{}' DELIMITER E'\t' CSV HEADER;"#,
+        r#"COPY {} ({}) FROM '{}' DELIMITER E'{}' CSV HEADER;"#,
         table_name,
-        columns.join(", "),
-        filepath.display()
+        columns,
+        filepath.display(),
+        delimiter as char
     );
+
+    debug!("Importing query string: {}", stmt);
+
     sqlx::query(&stmt)
         .execute(pool)
         .await
         .expect("Failed to import data.");
     info!("{} imported.", filepath.display());
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -226,6 +234,7 @@ async fn main() {
 
     stderrlog::new()
         .module(module_path!())
+        .module("biomedgps")
         .quiet(opt.quiet)
         .show_module_names(true)
         .verbosity(opt.verbose + 2)
@@ -286,16 +295,21 @@ async fn main() {
                 let paths = std::fs::read_dir(&arguments.filepath).unwrap();
                 for path in paths {
                     let path = path.unwrap().path();
-                    if path.is_file() && path.extension().unwrap() == "tsv" {
-                        files.push(path);
-                    }
+                    match get_delimiter(&path) {
+                        Ok(_d) => {
+                            if path.is_file() {
+                                files.push(path);
+                            }
+                        }
+                        Err(_) => continue,
+                    };
                 }
             } else {
                 files.push(std::path::PathBuf::from(&arguments.filepath));
             }
 
             if files.is_empty() {
-                error!("No valid files found. Only tsv files are supported.");
+                error!("No valid files found. Only tsv/csv/txt files are supported.");
                 std::process::exit(1);
             }
 
@@ -305,28 +319,105 @@ async fn main() {
 
                 let table = arguments.table.as_str();
 
-                let is_valid = if table == "entity" {
-                    Entity::check_csv_is_valid::<Entity>(&file)
+                let validation_errors = if table == "entity" {
+                    Entity::check_csv_is_valid(&file)
                 } else if table == "entity_metadata" {
-                    EntityMetadata::check_csv_is_valid::<EntityMetadata>(&file)
+                    EntityMetadata::check_csv_is_valid(&file)
                 } else if table == "entity2d" {
-                    Entity2D::check_csv_is_valid::<Entity2D>(&file)
+                    Entity2D::check_csv_is_valid(&file)
                 } else if table == "relation" {
-                    Relation::check_csv_is_valid::<Relation>(&file)
+                    Relation::check_csv_is_valid(&file)
                 } else if table == "relation_metadata" {
-                    RelationMetadata::check_csv_is_valid::<RelationMetadata>(&file)
+                    RelationMetadata::check_csv_is_valid(&file)
                 } else if table == "knowledge_curation" {
-                    KnowledgeCuration::check_csv_is_valid::<KnowledgeCuration>(&file)
+                    KnowledgeCuration::check_csv_is_valid(&file)
                 } else if table == "subgraph" {
-                    Subgraph::check_csv_is_valid::<Subgraph>(&file)
+                    Subgraph::check_csv_is_valid(&file)
                 } else {
                     error!("Invalid table name: {}", table);
-                    false
+                    vec![]
                 };
 
-                if !is_valid {
+                if validation_errors.len() > 0 {
                     error!("Invalid file: {}", filename);
+                    if !arguments.show_all_errors {
+                        warn!("Only show the 10 validation errors.");
+                        for e in validation_errors.iter().take(10) {
+                            error!("{}", e);
+                        }
+                    } else {
+                        for e in validation_errors {
+                            error!("{}", e);
+                        }
+                        continue;
+                    }
+                } else {
+                    info!("{} is valid.", filename);
+                }
+
+                let delimiter = match get_delimiter(&file) {
+                    Ok(d) => d,
+                    Err(_) => {
+                        error!("Invalid filename: {}, no extension found.", filename);
+                        continue;
+                    }
+                };
+
+                let expected_columns = if table == "entity" {
+                    Entity::get_column_names(&file)
+                } else if table == "entity_metadata" {
+                    EntityMetadata::get_column_names(&file)
+                } else if table == "entity2d" {
+                    Entity2D::get_column_names(&file)
+                } else if table == "relation" {
+                    Relation::get_column_names(&file)
+                } else if table == "relation_metadata" {
+                    RelationMetadata::get_column_names(&file)
+                } else if table == "knowledge_curation" {
+                    KnowledgeCuration::get_column_names(&file)
+                } else if table == "subgraph" {
+                    Subgraph::get_column_names(&file)
+                } else {
+                    error!("Invalid table name: {}", table);
+                    Ok(vec![])
+                };
+
+                let expected_columns = match expected_columns {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("Invalid file: {}, reason: {}", filename, e);
+                        continue;
+                    }
+                };
+
+                // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
+                let temp_file = tempfile::NamedTempFile::new().unwrap();
+                let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
+                let results = if table == "entity" {
+                    Entity::select_expected_columns(&file, &temp_filepath)
+                } else if table == "entity_metadata" {
+                    EntityMetadata::select_expected_columns(&file, &temp_filepath)
+                } else if table == "entity2d" {
+                    Entity2D::select_expected_columns(&file, &temp_filepath)
+                } else if table == "relation" {
+                    Relation::select_expected_columns(&file, &temp_filepath)
+                } else if table == "relation_metadata" {
+                    RelationMetadata::select_expected_columns(&file, &temp_filepath)
+                } else if table == "knowledge_curation" {
+                    KnowledgeCuration::select_expected_columns(&file, &temp_filepath)
+                } else if table == "subgraph" {
+                    Subgraph::select_expected_columns(&file, &temp_filepath)
+                } else {
+                    error!("Invalid table name: {}", table);
                     continue;
+                };
+
+                let file = match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!("Invalid file: {}, reason: {}", filename, e);
+                        continue;
+                    }
                 };
 
                 match arguments.table.as_str() {
@@ -335,10 +426,16 @@ async fn main() {
                             drop_table(&pool, "staging").await;
                         };
 
-                        import_file_in_loop(&pool, &file, "biomedgps_entity", &vec!["id", "label"])
-                            .await
-                            .expect("Failed to import data.");
-                        info!("{} imported.", filename);
+                        import_file_in_loop(
+                            &pool,
+                            &file,
+                            "biomedgps_entity",
+                            &expected_columns,
+                            &vec!["id", "label"],
+                            delimiter,
+                        )
+                        .await
+                        .expect("Failed to import data into the biomedgps_entity table.");
                     }
                     "relation" => {
                         if arguments.drop {
@@ -349,6 +446,7 @@ async fn main() {
                             &pool,
                             &file,
                             "biomedgps_relation",
+                            &expected_columns,
                             &vec![
                                 "relation_type",
                                 "source_id",
@@ -356,34 +454,82 @@ async fn main() {
                                 "target_id",
                                 "target_type",
                             ],
+                            delimiter,
                         )
                         .await
-                        .expect("Failed to import data.");
-                        info!("{} imported.", filename);
+                        .expect("Failed to import data into the biomedgps_relation table.");
                     }
                     "entity_metadata" => {
-                        import_file(&pool, "biomedgps_entity_metadata", arguments.drop, &file)
-                            .await;
+                        import_file(
+                            &pool,
+                            &file,
+                            "biomedgps_entity_metadata",
+                            &expected_columns,
+                            delimiter,
+                            arguments.drop,
+                        )
+                        .await
+                        .expect("Failed to import data into the biomedgps_entity_metadata table.");
                     }
                     "relation_metadata" => {
-                        import_file(&pool, "biomedgps_relation_metadata", arguments.drop, &file)
-                            .await;
+                        import_file(
+                            &pool,
+                            &file,
+                            "biomedgps_relation_metadata",
+                            &expected_columns,
+                            delimiter,
+                            arguments.drop,
+                        )
+                        .await
+                        .expect(
+                            "Failed to import data into the biomedgps_relation_metadata table.",
+                        );
                     }
                     "entity2d" => {
-                        import_file(&pool, "biomedgps_entity2d", arguments.drop, &file).await;
+                        import_file(
+                            &pool,
+                            &file,
+                            "biomedgps_entity2d",
+                            &&expected_columns,
+                            delimiter,
+                            arguments.drop,
+                        )
+                        .await
+                        .expect("Failed to import data into the biomedgps_entity2d table.");
                     }
                     "knowledge_curation" => {
-                        import_file(&pool, "biomedgps_knowledge_curation", arguments.drop, &file)
-                            .await;
+                        import_file(
+                            &pool,
+                            &file,
+                            "biomedgps_knowledge_curation",
+                            &expected_columns,
+                            delimiter,
+                            arguments.drop,
+                        )
+                        .await
+                        .expect(
+                            "Failed to import data into the biomedgps_knowledge_curation table.",
+                        );
                     }
                     "subgraph" => {
-                        import_file(&pool, "biomedgps_subgraph", arguments.drop, &file).await;
+                        import_file(
+                            &pool,
+                            &file,
+                            "biomedgps_subgraph",
+                            &expected_columns,
+                            delimiter,
+                            arguments.drop,
+                        )
+                        .await
+                        .expect("Failed to import data into the biomedgps_subgraph table.");
                     }
                     _ => {
                         error!("Unsupported table name: {}", arguments.table);
                         return;
                     }
                 };
+
+                info!("{} imported.", filename);
             }
         }
     }

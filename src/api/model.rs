@@ -1,52 +1,116 @@
+use crate::api::util::get_delimiter;
 use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use poem_openapi::Object;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, fmt, path::PathBuf};
+use validator::Validate;
 
-pub fn get_column_names(filepath: &PathBuf) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut reader = csv::ReaderBuilder::new()
-        .delimiter(b'\t')
-        .from_path(filepath)?; // Use tab as delimiter
+const ENTITY_NAME_MAX_LENGTH: u64 = 64;
+const DEFAULT_MAX_LENGTH: u64 = 64;
 
-    let headers = reader.headers()?;
-    let mut column_names = Vec::new();
-    for header in headers {
-        column_names.push(header.to_string());
+lazy_static! {
+    static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Z][a-z]+$").unwrap();
+    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Z0-9\-]+:[a-z0-9A-Z\.]+$").unwrap();
+}
+
+#[derive(Debug)]
+pub struct ValidationError {
+    details: String,
+}
+
+impl ValidationError {
+    pub fn new(msg: &str) -> ValidationError {
+        ValidationError {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for ValidationError {
+    fn description(&self) -> &str {
+        &self.details
     }
 
-    Ok(column_names)
+    fn cause(&self) -> Option<&dyn Error> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
 }
 
 pub trait CheckData {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>>;
+
     // Implement the check function
-    fn check_csv_is_valid<S: for<'de> serde::Deserialize<'de>>(filepath: &PathBuf) -> bool {
+    fn check_csv_is_valid_default<
+        S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug,
+    >(
+        filepath: &PathBuf,
+    ) -> Vec<Box<dyn Error>> {
+        let mut validation_errors: Vec<Box<dyn Error>> = vec![];
+        let delimiter = match get_delimiter(filepath) {
+            Ok(d) => d,
+            Err(e) => {
+                validation_errors.push(Box::new(ValidationError::new(&format!(
+                    "Failed to get delimiter: {}",
+                    e
+                ))));
+                return validation_errors;
+            }
+        };
+
+        debug!("The delimiter is: {:?}", delimiter as char);
         // Build the CSV reader
         let mut reader = match csv::ReaderBuilder::new()
-            .delimiter(b'\t')
+            .delimiter(delimiter)
             .from_path(filepath)
         {
             Ok(r) => r,
             Err(e) => {
-                error!("Failed to read CSV: {}", e);
-                return false;
+                validation_errors.push(Box::new(ValidationError::new(&format!(
+                    "Failed to read CSV: {}",
+                    e
+                ))));
+                return validation_errors;
             }
         };
 
-        let mut any_error = false;
         // Try to deserialize each record
+        info!("Start to deserialize the CSV file: {:?}", reader.headers());
+        let mut line_number = 1;
         for result in reader.deserialize::<S>() {
             match result {
-                Ok(_) => (),
+                Ok(data) => match data.validate() {
+                    Ok(_) => {
+                        continue;
+                    }
+                    Err(e) => {
+                        validation_errors.push(Box::new(ValidationError::new(&format!(
+                            "Failed to validate the data, line: {}, details: {}",
+                            line_number, e
+                        ))));
+                        continue;
+                    }
+                },
                 Err(e) => {
-                    any_error = true;
-                    let columns = match get_column_names(filepath) {
+                    let columns = match Self::get_column_names(filepath) {
                         Ok(c) => c,
                         Err(e) => {
-                            error!("Failed to get column names: {}", e);
+                            validation_errors.push(Box::new(ValidationError::new(&format!(
+                                "Failed to get column names: {}",
+                                e
+                            ))));
                             continue;
                         }
                     };
@@ -57,30 +121,104 @@ pub trait CheckData {
                             ref err,
                             ..
                         } => {
-                            error!(
-                                "CSV does not match the related table, line: {}, field: {}, details: {}",
+                            validation_errors.push(Box::new(ValidationError::new(&format!(
+                                "Failed to deserialize the data, line: {}, column: {}, details: {}",
                                 pos.line(),
                                 columns[err.field().unwrap() as usize],
                                 err.kind()
-                            )
+                            ))));
                         }
                         _ => {
-                            error!("Failed to parse CSV: {}", e);
+                            validation_errors.push(Box::new(ValidationError::new(&format!(
+                                "Failed to parse CSV: {}",
+                                e
+                            ))));
                         }
                     }
 
                     continue;
                 }
+            };
+        }
+
+        validation_errors
+    }
+
+    fn fields() -> Vec<String>;
+
+    /// Select the columns to keep
+    /// Return the path of the output file which is a temporary file
+    fn select_expected_columns(
+        in_filepath: &PathBuf,
+        out_filepath: &PathBuf,
+    ) -> Result<(), Box<dyn Error>> {
+        let delimiter = get_delimiter(in_filepath)?;
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(in_filepath)?;
+
+        let headers = reader.headers()?.clone();
+
+        // Identify the indices of the columns to keep
+        let indices_to_keep: Vec<usize> = headers
+            .iter()
+            .enumerate()
+            .filter_map(|(i, h)| {
+                if Self::fields().contains(&h.to_string()) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut wtr = csv::WriterBuilder::new()
+            .delimiter(delimiter)
+            .from_writer(std::fs::File::create(out_filepath)?);
+
+        // Write the headers of the columns to keep to the output file
+        let headers_to_keep: Vec<&str> = indices_to_keep.iter().map(|&i| &headers[i]).collect();
+        wtr.write_record(&headers_to_keep)?;
+
+        // Read each record, keep only the desired fields, and write to the output file
+        for result in reader.records() {
+            let record = result?;
+            let record_to_keep: Vec<&str> = indices_to_keep.iter().map(|&i| &record[i]).collect();
+            wtr.write_record(&record_to_keep)?;
+        }
+
+        // Flush the writer to ensure all output is written
+        wtr.flush()?;
+
+        info!("Select the columns to keep successfully.");
+        debug!(
+            "The path of the temporary file is: {}",
+            out_filepath.display()
+        );
+
+        Ok(())
+    }
+
+    fn get_column_names(filepath: &PathBuf) -> Result<Vec<String>, Box<dyn Error>> {
+        let delimiter = get_delimiter(filepath)?;
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(filepath)?;
+
+        let headers = reader.headers()?;
+        let mut column_names = Vec::new();
+        let expected_columns = Self::fields();
+        for header in headers {
+            let column = header.to_string();
+            // Don't need to check whether all the columns are in the input file, because we have already checked it in the function `check_csv_is_valid`.
+            if expected_columns.contains(&column) {
+                column_names.push(column);
+            } else {
+                continue;
             }
         }
 
-        if !any_error {
-            info!("{}", format!("{} is valid.", filepath.display()));
-            return true;
-        } else {
-            error!("{}", format!("{} is invalid.", filepath.display()));
-            return false;
-        }
+        Ok(column_names)
     }
 }
 
@@ -173,35 +311,77 @@ impl<
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct Entity {
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub id: String,
-    #[oai(validator(max_length = 64))]
+
+    #[oai(validator(max_length = 255))]
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
     pub name: String,
-    #[oai(validator(max_length = 64))]
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub label: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
+
     pub description: Option<String>,
 }
 
-impl CheckData for Entity {}
+impl CheckData for Entity {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Entity>(filepath)
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
+    fn fields() -> Vec<String> {
+        vec![
+            "id".to_string(),
+            "name".to_string(),
+            "label".to_string(),
+            "resource".to_string(),
+            "description".to_string(),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct EntityMetadata {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     pub id: i32,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub entity_type: String,
+
     pub entity_count: i64,
 }
 
-impl CheckData for EntityMetadata {}
+impl CheckData for EntityMetadata {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<EntityMetadata>(filepath)
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "resource".to_string(),
+            "entity_type".to_string(),
+            "entity_count".to_string(),
+        ]
+    }
+}
 
 impl EntityMetadata {
     pub async fn get_entity_metadata(
@@ -216,24 +396,49 @@ impl EntityMetadata {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct RelationMetadata {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     pub id: i32,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
+
     pub relation_count: i64,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub start_entity_type: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub end_entity_type: String,
 }
 
-impl CheckData for RelationMetadata {}
+impl CheckData for RelationMetadata {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<RelationMetadata>(filepath)
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "resource".to_string(),
+            "relation_type".to_string(),
+            "relation_count".to_string(),
+            "start_entity_type".to_string(),
+            "end_entity_type".to_string(),
+        ]
+    }
+}
 
 impl RelationMetadata {
     pub async fn get_relation_metadata(
@@ -248,30 +453,53 @@ impl RelationMetadata {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct KnowledgeCuration {
     pub relation_id: i32,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
-    #[oai(validator(max_length = 64))]
+
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
+    #[oai(validator(max_length = 255))]
     pub source_name: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub source_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub source_id: String,
-    #[oai(validator(max_length = 64))]
+
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
+    #[oai(validator(max_length = 255))]
     pub target_name: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub target_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub target_id: String,
+
     pub key_sentence: String,
+
     #[oai(read_only)]
     #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
     pub created_at: DateTime<Utc>,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub curator: String,
+
     pub pmid: i64,
 }
 
@@ -319,10 +547,7 @@ impl KnowledgeCuration {
         AnyOk(knowledge_curation)
     }
 
-    pub async fn delete(
-        pool: &sqlx::PgPool,
-        id: &str,
-    ) -> Result<KnowledgeCuration, anyhow::Error> {
+    pub async fn delete(pool: &sqlx::PgPool, id: &str) -> Result<KnowledgeCuration, anyhow::Error> {
         let sql_str = "DELETE FROM biomedgps_knowledge_curation WHERE id = $1 RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
             .bind(id)
@@ -333,49 +558,127 @@ impl KnowledgeCuration {
     }
 }
 
-impl CheckData for KnowledgeCuration {}
+impl CheckData for KnowledgeCuration {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<KnowledgeCuration>(filepath)
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow)]
+    fn fields() -> Vec<String> {
+        vec![
+            "relation_type".to_string(),
+            "source_name".to_string(),
+            "source_type".to_string(),
+            "source_id".to_string(),
+            "target_name".to_string(),
+            "target_type".to_string(),
+            "target_id".to_string(),
+            "key_sentence".to_string(),
+            "curator".to_string(),
+            "pmid".to_string(),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct Relation {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     pub id: i32,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub source_id: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub source_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub target_id: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub target_type: String,
+
     pub resource: String,
 }
 
-impl CheckData for Relation {}
+impl CheckData for Relation {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Relation>(filepath)
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
+    fn fields() -> Vec<String> {
+        vec![
+            "relation_type".to_string(),
+            "source_id".to_string(),
+            "source_type".to_string(),
+            "target_id".to_string(),
+            "target_type".to_string(),
+            "resource".to_string(),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Entity2D {
     pub embedding_id: i64,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
     pub entity_id: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
     pub entity_type: String,
-    #[oai(validator(max_length = 64))]
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[oai(validator(max_length = 255))]
     pub entity_name: String,
+
     pub umap_x: f64,
+
     pub umap_y: f64,
+
     pub tsne_x: f64,
+
     pub tsne_y: f64,
 }
 
-impl CheckData for Entity2D {}
+impl CheckData for Entity2D {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Entity2D>(filepath)
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "embedding_id".to_string(),
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "umap_x".to_string(),
+            "umap_y".to_string(),
+            "tsne_x".to_string(),
+            "tsne_y".to_string(),
+        ]
+    }
+}
 
 // UUID Pattern: https://stackoverflow.com/questions/136505/searching-for-uuids-in-text-with-regex
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Subgraph {
     #[oai(read_only)]
     #[oai(validator(
@@ -383,20 +686,29 @@ pub struct Subgraph {
         pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     ))]
     pub id: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub name: String,
+
     pub description: Option<String>,
+
     pub payload: String, // json string, e.g. {"nodes": [], "edges": []}. how to validate json string?
+
     #[oai(read_only)]
     #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
     pub created_time: DateTime<Utc>,
+
     #[oai(validator(max_length = 36))]
     pub owner: String,
+
     #[oai(validator(max_length = 36))]
     pub version: String,
+
     #[oai(validator(max_length = 36))]
     pub db_version: String,
+
     #[oai(validator(
         max_length = 36,
         pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
@@ -404,7 +716,23 @@ pub struct Subgraph {
     pub parent: Option<String>, // parent subgraph id, it is same as id if it is a root subgraph (no parent), otherwise it is the parent subgraph id
 }
 
-impl CheckData for Subgraph {}
+impl CheckData for Subgraph {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Subgraph>(filepath)
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "name".to_string(),
+            "description".to_string(),
+            "payload".to_string(),
+            "owner".to_string(),
+            "version".to_string(),
+            "db_version".to_string(),
+            "parent".to_string(),
+        ]
+    }
+}
 
 impl Subgraph {
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Subgraph, anyhow::Error> {

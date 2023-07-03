@@ -23,10 +23,7 @@ use poem_openapi::OpenApiService;
 use biomedgps::api::route::BiomedgpsApi;
 use rust_embed::RustEmbed;
 use sqlx::postgres::PgPoolOptions;
-use std::env;
 use std::error::Error;
-use std::path::Path;
-use std::path::Path as OsPath;
 use std::sync::Arc;
 // use tokio::{self, time::Duration};
 

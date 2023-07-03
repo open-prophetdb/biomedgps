@@ -6,7 +6,8 @@ test: clean-test-db test-db
 
 test-db: clean-test-db
 	@printf "\nLaunch postgres database...(default password: password)\n"
-	@docker run -v /Users/codespace/Downloads:/Users/codespace/Downloads --name biomedgps -e POSTGRES_PASSWORD=password -e POSTGRES_USER=postgres -p 5432:5432 -d postgres:10.0
+	# Make it compatible with mac and linux, the temp folder is different, so we need to mount both
+	@docker run -v /tmp:/tmp -v /var/folders:/var/folders --name biomedgps -e POSTGRES_PASSWORD=password -e POSTGRES_USER=postgres -p 5432:5432 -d postgres:10.0
 	@sleep 3
 	@echo "Create database: test_biomedgps"
 	@bash build/create-db.sh test_biomedgps 5432

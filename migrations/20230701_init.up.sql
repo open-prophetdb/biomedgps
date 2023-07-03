@@ -3,7 +3,7 @@
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity (
     id VARCHAR(64) PRIMARY KEY, -- The entity ID
-    name VARCHAR(64) NOT NULL, -- The name of the entity
+    name VARCHAR(255) NOT NULL, -- The name of the entity
     label VARCHAR(64) NOT NULL, -- The label of the entity, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the entity, such as UBERON, DOID, HGNC, CHEBI, GO, etc.
     description TEXT -- The description of the entity
@@ -34,10 +34,10 @@ CREATE TABLE
   IF NOT EXISTS biomedgps_knowledge_curation (
     relation_id SERIAL PRIMARY KEY, -- The knowledge curation ID
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
-    source_name VARCHAR(64) NOT NULL, -- The name of the start entity
+    source_name VARCHAR(255) NOT NULL, -- The name of the start entity
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     source_id VARCHAR(64) NOT NULL, -- The ID of the start entity
-    target_name VARCHAR(64) NOT NULL, -- The name of the end entity
+    target_name VARCHAR(255) NOT NULL, -- The name of the end entity
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
     key_sentence TEXT NOT NULL, -- The key sentence of the relation
@@ -64,7 +64,7 @@ CREATE TABLE
     embedding_id BIGINT PRIMARY KEY, -- The embedding ID
     entity_id VARCHAR(64) NOT NULL, -- The entity ID
     entity_type VARCHAR(64) NOT NULL, -- The entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    entity_name VARCHAR(64) NOT NULL, -- The entity name
+    entity_name VARCHAR(255) NOT NULL, -- The entity name
     umap_x FLOAT NOT NULL, -- The UMAP X coordinate
     umap_y FLOAT NOT NULL, -- The UMAP Y coordinate
     tsne_x FLOAT NOT NULL, -- The t-SNE X coordinate
