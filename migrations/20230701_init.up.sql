@@ -2,11 +2,13 @@
 -- biomedgps_entity table is used to store the entities, it's same with the nodes in the biomedgps neo4j database
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity (
-    id VARCHAR(64) PRIMARY KEY, -- The entity ID
+    id VARCHAR(64), -- The entity ID
     name VARCHAR(255) NOT NULL, -- The name of the entity
     label VARCHAR(64) NOT NULL, -- The label of the entity, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the entity, such as UBERON, DOID, HGNC, CHEBI, GO, etc.
-    description TEXT -- The description of the entity
+    description TEXT, -- The description of the entity
+    UNIQUE (id, label), -- The unique constraint of the entity
+    PRIMARY KEY (id, label)
   );
 
 -- biomedgps_entity_metadata table is used to store the metadata of the entities, it is used to visualize the statistics of the entities on the statistics page
@@ -14,7 +16,7 @@ CREATE TABLE
   IF NOT EXISTS biomedgps_entity_metadata (
     id SERIAL PRIMARY KEY, -- The entity metadata ID
     resource VARCHAR(64) NOT NULL, -- The source of the entity metadata
-    entity_type VARCHAR(64) NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
+    entity_type VARCHAR(64) UNIQUE NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     entity_count BIGINT NOT NULL -- The entity count of the entity metadata
   );
 
@@ -26,7 +28,8 @@ CREATE TABLE
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
     relation_count BIGINT NOT NULL, -- The relation count
     start_entity_type VARCHAR(64) NOT NULL, -- The start entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    end_entity_type VARCHAR(64) NOT NULL -- The end entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
+    end_entity_type VARCHAR(64) NOT NULL, -- The end entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
+    UNIQUE (relation_type, start_entity_type, end_entity_type)
   );
 
 -- biomedgps_knowledge_curation table is used to store the knowledges which are curated by the curators from the literature
@@ -55,7 +58,8 @@ CREATE TABLE
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
-    resource VARCHAR(64) NOT NULL -- The resource of the relation
+    resource VARCHAR(64) NOT NULL, -- The resource of the relation
+    UNIQUE (relation_type, source_id, source_type, target_id, target_type)
   );
 
 -- biomedgps_entity2d table is used to store the 2D embedding of the entities for computing the similarity of the entities
@@ -68,7 +72,8 @@ CREATE TABLE
     umap_x FLOAT NOT NULL, -- The UMAP X coordinate
     umap_y FLOAT NOT NULL, -- The UMAP Y coordinate
     tsne_x FLOAT NOT NULL, -- The t-SNE X coordinate
-    tsne_y FLOAT NOT NULL -- The t-SNE Y coordinate
+    tsne_y FLOAT NOT NULL, -- The t-SNE Y coordinate
+    UNIQUE (entity_id, entity_type)
   );
 
 -- biomedgps_subgraph table is used to store the subgraph which is created by the user

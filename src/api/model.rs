@@ -11,12 +11,12 @@ use serde::{Deserialize, Serialize};
 use std::{error::Error, fmt, path::PathBuf};
 use validator::Validate;
 
-const ENTITY_NAME_MAX_LENGTH: u64 = 64;
+const ENTITY_NAME_MAX_LENGTH: u64 = 255;
 const DEFAULT_MAX_LENGTH: u64 = 64;
 
 lazy_static! {
-    static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Z][a-z]+$").unwrap();
-    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Z0-9\-]+:[a-z0-9A-Z\.]+$").unwrap();
+    static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
+    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.]+$").unwrap();
 }
 
 #[derive(Debug)]
@@ -63,7 +63,7 @@ pub trait CheckData {
             Ok(d) => d,
             Err(e) => {
                 validation_errors.push(Box::new(ValidationError::new(&format!(
-                    "Failed to get delimiter: {}",
+                    "Failed to get delimiter: ({})",
                     e
                 ))));
                 return validation_errors;
@@ -79,7 +79,7 @@ pub trait CheckData {
             Ok(r) => r,
             Err(e) => {
                 validation_errors.push(Box::new(ValidationError::new(&format!(
-                    "Failed to read CSV: {}",
+                    "Failed to read CSV: ({})",
                     e
                 ))));
                 return validation_errors;
@@ -90,6 +90,8 @@ pub trait CheckData {
         info!("Start to deserialize the CSV file: {:?}", reader.headers());
         let mut line_number = 1;
         for result in reader.deserialize::<S>() {
+            line_number += 1;
+
             match result {
                 Ok(data) => match data.validate() {
                     Ok(_) => {
@@ -97,7 +99,7 @@ pub trait CheckData {
                     }
                     Err(e) => {
                         validation_errors.push(Box::new(ValidationError::new(&format!(
-                            "Failed to validate the data, line: {}, details: {}",
+                            "Failed to validate the data, line: {}, details: ({})",
                             line_number, e
                         ))));
                         continue;
@@ -108,7 +110,7 @@ pub trait CheckData {
                         Ok(c) => c,
                         Err(e) => {
                             validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to get column names: {}",
+                                "Failed to get column names: ({})",
                                 e
                             ))));
                             continue;
@@ -122,7 +124,7 @@ pub trait CheckData {
                             ..
                         } => {
                             validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to deserialize the data, line: {}, column: {}, details: {}",
+                                "Failed to deserialize the data, line: {}, column: {}, details: ({})",
                                 pos.line(),
                                 columns[err.field().unwrap() as usize],
                                 err.kind()
@@ -130,7 +132,7 @@ pub trait CheckData {
                         }
                         _ => {
                             validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to parse CSV: {}",
+                                "Failed to parse CSV: ({})",
                                 e
                             ))));
                         }
@@ -324,7 +326,7 @@ pub struct Entity {
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub label: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
@@ -363,7 +365,7 @@ pub struct EntityMetadata {
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub entity_type: String,
 
     pub entity_count: i64,
@@ -415,12 +417,12 @@ pub struct RelationMetadata {
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub start_entity_type: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub end_entity_type: String,
 }
 
@@ -467,7 +469,7 @@ pub struct KnowledgeCuration {
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub source_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
@@ -481,7 +483,7 @@ pub struct KnowledgeCuration {
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
@@ -597,7 +599,7 @@ pub struct Relation {
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub source_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
@@ -607,7 +609,7 @@ pub struct Relation {
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
 
     pub resource: String,
@@ -641,7 +643,7 @@ pub struct Entity2D {
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z][a-z]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub entity_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH"))]

@@ -78,7 +78,7 @@ pub struct ImportDBArguments {
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
 
-    /// Show the first 10 errors when import data.
+    /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
 }
@@ -341,16 +341,17 @@ async fn main() {
                 if validation_errors.len() > 0 {
                     error!("Invalid file: {}", filename);
                     if !arguments.show_all_errors {
-                        warn!("Only show the 10 validation errors.");
-                        for e in validation_errors.iter().take(10) {
+                        warn!("Only show the 3 validation errors, if you want to see all errors, use --show-all-errors.");
+                        for e in validation_errors.iter().take(3) {
                             error!("{}", e);
                         }
                     } else {
                         for e in validation_errors {
                             error!("{}", e);
                         }
-                        continue;
                     }
+                    warn!("Skipping {}...\n\n", filename);
+                    continue;
                 } else {
                     info!("{} is valid.", filename);
                 }
@@ -529,7 +530,7 @@ async fn main() {
                     }
                 };
 
-                info!("{} imported.", filename);
+                info!("{} imported.\n\n", filename);
             }
         }
     }
