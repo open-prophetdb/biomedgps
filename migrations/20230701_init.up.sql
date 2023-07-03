@@ -61,6 +61,7 @@ CREATE TABLE
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the relation
     key_sentence TEXT, -- The key sentence of the relation
+    score FLOAT, -- The score of the relation
     UNIQUE (relation_type, source_id, source_type, target_id, target_type)
   );
 

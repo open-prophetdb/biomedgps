@@ -146,7 +146,7 @@ async fn import_file_in_loop(
     filepath: &PathBuf,
     table_name: &str,
     expected_columns: &Vec<String>,
-    unique_columns: &Vec<&str>,
+    unique_columns: &Vec<String>,
     delimiter: u8,
 ) -> Result<(), Box<dyn Error>> {
     match sqlx::query("DROP TABLE staging").execute(pool).await {
@@ -245,6 +245,7 @@ async fn update_entity_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(), B
     ",
         table_name
     );
+
     sqlx::query(&query_str)
         .execute(pool)
         .await
@@ -268,6 +269,7 @@ async fn update_relation_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(),
         FROM biomedgps_relation
         GROUP BY relation_type, source_type, target_type, resource;
     ", table_name);
+
     sqlx::query(&query_str)
         .execute(pool)
         .await
@@ -335,9 +337,7 @@ async fn main() {
                 .unwrap();
 
             if arguments.table == "relation_metadata" {
-                update_relation_metadata(&pool, true)
-                    .await
-                    .unwrap();
+                update_relation_metadata(&pool, true).await.unwrap();
                 return;
             } else if arguments.table == "entity_metadata" {
                 update_entity_metadata(&pool, true).await.unwrap();
@@ -475,63 +475,59 @@ async fn main() {
 
                 match arguments.table.as_str() {
                     "entity" => {
+                        let table_name = "biomedgps_entity";
                         if arguments.drop {
-                            drop_table(&pool, "staging").await;
+                            drop_table(&pool, table_name).await;
                         };
 
                         import_file_in_loop(
                             &pool,
                             &file,
-                            "biomedgps_entity",
+                            table_name,
                             &expected_columns,
-                            &vec!["id", "label"],
+                            &Entity::unique_fields(),
                             delimiter,
                         )
                         .await
                         .expect("Failed to import data into the biomedgps_entity table.");
                     }
                     "relation" => {
+                        let table_name = "biomedgps_relation";
                         if arguments.drop {
-                            drop_table(&pool, "staging").await;
+                            drop_table(&pool, table_name).await;
                         };
 
                         import_file_in_loop(
                             &pool,
                             &file,
-                            "biomedgps_relation",
+                            table_name,
                             &expected_columns,
-                            &vec![
-                                "relation_type",
-                                "source_id",
-                                "source_type",
-                                "target_id",
-                                "target_type",
-                            ],
+                            &Relation::unique_fields(),
                             delimiter,
                         )
                         .await
                         .expect("Failed to import data into the biomedgps_relation table.");
                     }
                     "entity2d" => {
-                        import_file(
+                        import_file_in_loop(
                             &pool,
                             &file,
                             "biomedgps_entity2d",
-                            &&expected_columns,
+                            &expected_columns,
+                            &Entity2D::unique_fields(),
                             delimiter,
-                            arguments.drop,
                         )
                         .await
                         .expect("Failed to import data into the biomedgps_entity2d table.");
                     }
                     "knowledge_curation" => {
-                        import_file(
+                        import_file_in_loop(
                             &pool,
                             &file,
                             "biomedgps_knowledge_curation",
                             &expected_columns,
+                            &KnowledgeCuration::unique_fields(),
                             delimiter,
-                            arguments.drop,
                         )
                         .await
                         .expect(
@@ -539,13 +535,13 @@ async fn main() {
                         );
                     }
                     "subgraph" => {
-                        import_file(
+                        import_file_in_loop(
                             &pool,
                             &file,
                             "biomedgps_subgraph",
                             &expected_columns,
+                            &Subgraph::unique_fields(),
                             delimiter,
-                            arguments.drop,
                         )
                         .await
                         .expect("Failed to import data into the biomedgps_subgraph table.");

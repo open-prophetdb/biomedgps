@@ -130,7 +130,7 @@ pub trait CheckData {
                         } => {
                             let column = match err.field() {
                                 Some(c) => &columns[c as usize],
-                                None => "unknown"
+                                None => "unknown",
                             };
 
                             validation_errors.push(Box::new(ValidationError::new(&format!(
@@ -157,6 +157,8 @@ pub trait CheckData {
     }
 
     fn fields() -> Vec<String>;
+
+    fn unique_fields() -> Vec<String>;
 
     /// Select the columns to keep
     /// Return the path of the output file which is a temporary file
@@ -351,6 +353,10 @@ impl CheckData for Entity {
         Self::check_csv_is_valid_default::<Entity>(filepath)
     }
 
+    fn unique_fields() -> Vec<String> {
+        vec!["id".to_string(), "label".to_string()]
+    }
+
     fn fields() -> Vec<String> {
         vec![
             "id".to_string(),
@@ -384,6 +390,10 @@ pub struct EntityMetadata {
 impl CheckData for EntityMetadata {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
         Self::check_csv_is_valid_default::<EntityMetadata>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec!["resource".to_string(), "entity_type".to_string()]
     }
 
     fn fields() -> Vec<String> {
@@ -439,6 +449,15 @@ pub struct RelationMetadata {
 impl CheckData for RelationMetadata {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
         Self::check_csv_is_valid_default::<RelationMetadata>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "resource".to_string(),
+            "relation_type".to_string(),
+            "start_entity_type".to_string(),
+            "end_entity_type".to_string(),
+        ]
     }
 
     fn fields() -> Vec<String> {
@@ -575,6 +594,17 @@ impl CheckData for KnowledgeCuration {
         Self::check_csv_is_valid_default::<KnowledgeCuration>(filepath)
     }
 
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "relation_type".to_string(),
+            "source_type".to_string(),
+            "source_id".to_string(),
+            "target_type".to_string(),
+            "target_id".to_string(),
+            "pmid".to_string(),
+        ]
+    }
+
     fn fields() -> Vec<String> {
         vec![
             "relation_type".to_string(),
@@ -591,7 +621,7 @@ impl CheckData for KnowledgeCuration {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Relation {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
@@ -622,6 +652,8 @@ pub struct Relation {
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
 
+    pub score: Option<f64>,
+
     pub key_sentence: Option<String>,
 
     pub resource: String,
@@ -632,6 +664,16 @@ impl CheckData for Relation {
         Self::check_csv_is_valid_default::<Relation>(filepath)
     }
 
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "relation_type".to_string(),
+            "source_id".to_string(),
+            "source_type".to_string(),
+            "target_id".to_string(),
+            "target_type".to_string(),
+        ]
+    }
+
     fn fields() -> Vec<String> {
         vec![
             "relation_type".to_string(),
@@ -639,8 +681,9 @@ impl CheckData for Relation {
             "source_type".to_string(),
             "target_id".to_string(),
             "target_type".to_string(),
-            "resource".to_string(),
+            "score".to_string(),
             "key_sentence".to_string(),
+            "resource".to_string(),
         ]
     }
 }
@@ -675,6 +718,14 @@ pub struct Entity2D {
 impl CheckData for Entity2D {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
         Self::check_csv_is_valid_default::<Entity2D>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "embedding_id".to_string(),
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+        ]
     }
 
     fn fields() -> Vec<String> {
@@ -734,6 +785,16 @@ pub struct Subgraph {
 impl CheckData for Subgraph {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
         Self::check_csv_is_valid_default::<Subgraph>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "id".to_string(),
+            "owner".to_string(),
+            "version".to_string(),
+            "db_version".to_string(),
+            "parent".to_string(),
+        ]
     }
 
     fn fields() -> Vec<String> {
