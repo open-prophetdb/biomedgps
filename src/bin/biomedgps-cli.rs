@@ -68,7 +68,7 @@ pub struct ImportDBArguments {
 
     /// The file path of the data file to import. It may be a file or a directory.
     #[structopt(name = "filepath", short = "f", long = "filepath")]
-    filepath: String,
+    filepath: Option<String>,
 
     /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph, record_response.
     #[structopt(name = "table", short = "t", long = "table")]
@@ -228,6 +228,55 @@ async fn import_file(
     Ok(())
 }
 
+async fn update_entity_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(), Box<dyn Error>> {
+    let table_name = "biomedgps_entity_metadata";
+    if drop {
+        drop_table(&pool, table_name).await;
+    };
+
+    info!("Update entity metadata from entity table.");
+
+    let query_str = format!(
+        "
+        INSERT INTO {} (resource, entity_type, entity_count)
+        SELECT resource, label as entity_type, count(*) as entity_count
+        FROM biomedgps_entity
+        GROUP BY resource, label;
+    ",
+        table_name
+    );
+    sqlx::query(&query_str)
+        .execute(pool)
+        .await
+        .expect("Failed to update data.");
+    info!("{} updated.", table_name);
+
+    Ok(())
+}
+
+async fn update_relation_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(), Box<dyn Error>> {
+    let table_name = "biomedgps_relation_metadata";
+    if drop {
+        drop_table(&pool, table_name).await;
+    };
+
+    info!("Update relation metadata from relation table.");
+
+    let query_str = format!("
+        INSERT INTO {} (relation_type, start_entity_type, end_entity_type, relation_count, resource)
+        SELECT relation_type, source_type as start_entity_type, target_type as end_entity_type, count(*) as relation_count, resource
+        FROM biomedgps_relation
+        GROUP BY relation_type, source_type, target_type, resource;
+    ", table_name);
+    sqlx::query(&query_str)
+        .execute(pool)
+        .await
+        .expect("Failed to update data.");
+    info!("{} updated.", table_name);
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
@@ -275,11 +324,6 @@ async fn main() {
                 database_url.unwrap()
             };
 
-            if arguments.filepath.is_empty() {
-                error!("Please specify the file path.");
-                return;
-            }
-
             if arguments.table.is_empty() {
                 error!("Please specify the table name.");
                 return;
@@ -290,9 +334,27 @@ async fn main() {
                 .await
                 .unwrap();
 
+            if arguments.table == "relation_metadata" {
+                update_relation_metadata(&pool, true)
+                    .await
+                    .unwrap();
+                return;
+            } else if arguments.table == "entity_metadata" {
+                update_entity_metadata(&pool, true).await.unwrap();
+                return;
+            }
+
+            let filepath = match arguments.filepath {
+                Some(filepath) => filepath,
+                None => {
+                    error!("Please specify the file path.");
+                    return;
+                }
+            };
+
             let mut files = vec![];
-            if std::path::Path::new(&arguments.filepath).is_dir() {
-                let paths = std::fs::read_dir(&arguments.filepath).unwrap();
+            if std::path::Path::new(&filepath).is_dir() {
+                let paths = std::fs::read_dir(&filepath).unwrap();
                 for path in paths {
                     let path = path.unwrap().path();
                     match get_delimiter(&path) {
@@ -305,7 +367,7 @@ async fn main() {
                     };
                 }
             } else {
-                files.push(std::path::PathBuf::from(&arguments.filepath));
+                files.push(std::path::PathBuf::from(&filepath));
             }
 
             if files.is_empty() {
@@ -321,14 +383,10 @@ async fn main() {
 
                 let validation_errors = if table == "entity" {
                     Entity::check_csv_is_valid(&file)
-                } else if table == "entity_metadata" {
-                    EntityMetadata::check_csv_is_valid(&file)
                 } else if table == "entity2d" {
                     Entity2D::check_csv_is_valid(&file)
                 } else if table == "relation" {
                     Relation::check_csv_is_valid(&file)
-                } else if table == "relation_metadata" {
-                    RelationMetadata::check_csv_is_valid(&file)
                 } else if table == "knowledge_curation" {
                     KnowledgeCuration::check_csv_is_valid(&file)
                 } else if table == "subgraph" {
@@ -368,14 +426,10 @@ async fn main() {
 
                 let expected_columns = if table == "entity" {
                     Entity::get_column_names(&file)
-                } else if table == "entity_metadata" {
-                    EntityMetadata::get_column_names(&file)
                 } else if table == "entity2d" {
                     Entity2D::get_column_names(&file)
                 } else if table == "relation" {
                     Relation::get_column_names(&file)
-                } else if table == "relation_metadata" {
-                    RelationMetadata::get_column_names(&file)
                 } else if table == "knowledge_curation" {
                     KnowledgeCuration::get_column_names(&file)
                 } else if table == "subgraph" {
@@ -398,14 +452,10 @@ async fn main() {
                 let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
                 let results = if table == "entity" {
                     Entity::select_expected_columns(&file, &temp_filepath)
-                } else if table == "entity_metadata" {
-                    EntityMetadata::select_expected_columns(&file, &temp_filepath)
                 } else if table == "entity2d" {
                     Entity2D::select_expected_columns(&file, &temp_filepath)
                 } else if table == "relation" {
                     Relation::select_expected_columns(&file, &temp_filepath)
-                } else if table == "relation_metadata" {
-                    RelationMetadata::select_expected_columns(&file, &temp_filepath)
                 } else if table == "knowledge_curation" {
                     KnowledgeCuration::select_expected_columns(&file, &temp_filepath)
                 } else if table == "subgraph" {
@@ -461,32 +511,6 @@ async fn main() {
                         )
                         .await
                         .expect("Failed to import data into the biomedgps_relation table.");
-                    }
-                    "entity_metadata" => {
-                        import_file(
-                            &pool,
-                            &file,
-                            "biomedgps_entity_metadata",
-                            &expected_columns,
-                            delimiter,
-                            arguments.drop,
-                        )
-                        .await
-                        .expect("Failed to import data into the biomedgps_entity_metadata table.");
-                    }
-                    "relation_metadata" => {
-                        import_file(
-                            &pool,
-                            &file,
-                            "biomedgps_relation_metadata",
-                            &expected_columns,
-                            delimiter,
-                            arguments.drop,
-                        )
-                        .await
-                        .expect(
-                            "Failed to import data into the biomedgps_relation_metadata table.",
-                        );
                     }
                     "entity2d" => {
                         import_file(

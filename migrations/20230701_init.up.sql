@@ -16,8 +16,9 @@ CREATE TABLE
   IF NOT EXISTS biomedgps_entity_metadata (
     id SERIAL PRIMARY KEY, -- The entity metadata ID
     resource VARCHAR(64) NOT NULL, -- The source of the entity metadata
-    entity_type VARCHAR(64) UNIQUE NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    entity_count BIGINT NOT NULL -- The entity count of the entity metadata
+    entity_type VARCHAR(64) NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
+    entity_count BIGINT NOT NULL, -- The entity count of the entity metadata
+    UNIQUE (resource, entity_type)
   );
 
 -- biomedgps_relation_metadata table is used to store the metadata of the relations, it is used to visualize the statistics of the relations on the statistics page
@@ -29,7 +30,7 @@ CREATE TABLE
     relation_count BIGINT NOT NULL, -- The relation count
     start_entity_type VARCHAR(64) NOT NULL, -- The start entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     end_entity_type VARCHAR(64) NOT NULL, -- The end entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    UNIQUE (relation_type, start_entity_type, end_entity_type)
+    UNIQUE (resource, relation_type, start_entity_type, end_entity_type)
   );
 
 -- biomedgps_knowledge_curation table is used to store the knowledges which are curated by the curators from the literature
