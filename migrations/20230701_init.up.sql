@@ -59,6 +59,7 @@ CREATE TABLE
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the relation
+    key_sentence TEXT, -- The key sentence of the relation
     UNIQUE (relation_type, source_id, source_type, target_id, target_type)
   );
 

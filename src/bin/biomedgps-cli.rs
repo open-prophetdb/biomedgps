@@ -345,6 +345,8 @@ async fn main() {
                         for e in validation_errors.iter().take(3) {
                             error!("{}", e);
                         }
+
+                        warn!("Hide {} validation errors.", validation_errors.len() - 3);
                     } else {
                         for e in validation_errors {
                             error!("{}", e);

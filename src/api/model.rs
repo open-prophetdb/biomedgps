@@ -13,10 +13,11 @@ use validator::Validate;
 
 const ENTITY_NAME_MAX_LENGTH: u64 = 255;
 const DEFAULT_MAX_LENGTH: u64 = 64;
+const DEFAULT_MIN_LENGTH: u64 = 1;
 
 lazy_static! {
     static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
-    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.]+$").unwrap();
+    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
 }
 
 #[derive(Debug)]
@@ -87,7 +88,11 @@ pub trait CheckData {
         };
 
         // Try to deserialize each record
-        info!("Start to deserialize the CSV file: {:?}", reader.headers());
+        info!(
+            "Start to deserialize the csv file, real columns: {:?}, expected columns: {:?}",
+            reader.headers().unwrap().into_iter().collect::<Vec<_>>(),
+            Self::fields()
+        );
         let mut line_number = 1;
         for result in reader.deserialize::<S>() {
             line_number += 1;
@@ -123,10 +128,15 @@ pub trait CheckData {
                             ref err,
                             ..
                         } => {
+                            let column = match err.field() {
+                                Some(c) => &columns[c as usize],
+                                None => "unknown"
+                            };
+
                             validation_errors.push(Box::new(ValidationError::new(&format!(
                                 "Failed to deserialize the data, line: {}, column: {}, details: ({})",
                                 pos.line(),
-                                columns[err.field().unwrap() as usize],
+                                column,
                                 err.kind()
                             ))));
                         }
@@ -315,21 +325,21 @@ impl<
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct Entity {
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub id: String,
 
     #[oai(validator(max_length = 255))]
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     pub name: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub label: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
 
@@ -359,12 +369,12 @@ pub struct EntityMetadata {
     #[serde(skip_deserializing)]
     pub id: i32,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub entity_type: String,
 
@@ -405,23 +415,23 @@ pub struct RelationMetadata {
     #[serde(skip_deserializing)]
     pub id: i32,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub resource: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
 
     pub relation_count: i64,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub start_entity_type: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub end_entity_type: String,
 }
@@ -459,36 +469,36 @@ impl RelationMetadata {
 pub struct KnowledgeCuration {
     pub relation_id: i32,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 255))]
     pub source_name: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub source_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub source_id: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH"))]
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 255))]
     pub target_name: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub target_id: String,
 
     pub key_sentence: String,
@@ -498,7 +508,7 @@ pub struct KnowledgeCuration {
     #[serde(with = "ts_seconds")]
     pub created_at: DateTime<Utc>,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub curator: String,
 
@@ -588,29 +598,31 @@ pub struct Relation {
     #[serde(skip_deserializing)]
     pub id: i32,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub relation_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub source_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub source_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub target_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
+
+    pub key_sentence: Option<String>,
 
     pub resource: String,
 }
@@ -628,6 +640,7 @@ impl CheckData for Relation {
             "target_id".to_string(),
             "target_type".to_string(),
             "resource".to_string(),
+            "key_sentence".to_string(),
         ]
     }
 }
@@ -636,17 +649,17 @@ impl CheckData for Relation {
 pub struct Entity2D {
     pub embedding_id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Z0-9\\-]+:[a-z0-9A-Z\\.]+$"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub entity_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub entity_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 255))]
     pub entity_name: String,
 
@@ -689,7 +702,7 @@ pub struct Subgraph {
     ))]
     pub id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH"))]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
     pub name: String,
 
