@@ -1,4 +1,4 @@
-use crate::api::util::get_delimiter;
+use crate::api::util::{drop_table, get_delimiter};
 use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use poem_openapi::Object;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{error::Error, fmt, path::PathBuf};
 use validator::Validate;
 
@@ -18,6 +18,8 @@ const DEFAULT_MIN_LENGTH: u64 = 1;
 lazy_static! {
     static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
     static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
+    // 1.23|-4.56|7.89
+    static ref EMBEDDING_ARRAY_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
 }
 
 #[derive(Debug)]
@@ -364,6 +366,222 @@ impl CheckData for Entity {
             "label".to_string(),
             "resource".to_string(),
             "description".to_string(),
+        ]
+    }
+}
+
+fn text2array<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    s.split('|')
+        .map(|s| s.parse().map_err(serde::de::Error::custom))
+        .collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct EntityEmbedding {
+    pub embedding_id: i64,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
+    pub entity_id: String,
+
+    #[oai(validator(max_length = 255))]
+    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    pub entity_name: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
+    pub entity_type: String,
+
+    #[serde(deserialize_with = "text2array")]
+    pub embedding_array: Vec<f32>,
+}
+
+impl EntityEmbedding {
+    pub async fn import_entity_embeddings(
+        pool: &sqlx::PgPool,
+        filepath: &PathBuf,
+        delimiter: u8,
+        drop: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if drop {
+            drop_table(&pool, "biomedgps_entity_embedding").await;
+        };
+
+        // Build the CSV reader
+        let mut reader = match csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(filepath)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        };
+
+        for result in reader.deserialize() {
+            let record: EntityEmbedding = match result {
+                Ok(r) => r,
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+
+            let sql_str = format!(
+                "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding_array) VALUES ({}, '{}', '{}', '{}', ARRAY[{}]::FLOAT[])",
+                record.embedding_id,
+                record.entity_id,
+                record.entity_type,
+                record.entity_name,
+                record.embedding_array.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(",")
+            );
+
+            match sqlx::query(&sql_str).execute(pool).await {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+        }
+
+        Ok(())
+    }
+}
+
+impl CheckData for EntityEmbedding {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Entity>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec!["entity_id".to_string(), "entity_type".to_string()]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "embedding_id".to_string(),
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "embedding_array".to_string(),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct RelationEmbedding {
+    pub embedding_id: i64,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[oai(validator(max_length = 64))]
+    pub relation_type: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
+    pub source_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
+    pub source_id: String,
+
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
+    pub target_type: String,
+
+    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
+    pub target_id: String,
+
+    #[serde(deserialize_with = "text2array")]
+    pub embedding_array: Vec<f32>,
+}
+
+impl RelationEmbedding {
+    pub async fn import_relation_embeddings(
+        pool: &sqlx::PgPool,
+        filepath: &PathBuf,
+        delimiter: u8,
+        drop: bool,
+    ) -> Result<(), Box<dyn Error>> {
+        if drop {
+            drop_table(&pool, "biomedgps_relation_embedding").await;
+        };
+
+        // Build the CSV reader
+        let mut reader = match csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(filepath)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        };
+
+        for result in reader.deserialize() {
+            let record: RelationEmbedding = match result {
+                Ok(r) => r,
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+
+            let sql_str = format!(
+                "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, source_type, source_id, target_type, target_id, embedding_array) VALUES ({}, '{}', '{}', '{}', '{}', '{}', ARRAY[{}]::FLOAT[])",
+                record.embedding_id,
+                record.relation_type,
+                record.source_type,
+                record.source_id,
+                record.target_type,
+                record.target_id,
+                record.embedding_array.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(",")
+            );
+
+            match sqlx::query(&sql_str).execute(pool).await {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+        }
+
+        Ok(())
+    }
+}
+
+impl CheckData for RelationEmbedding {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Entity>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "relation_type".to_string(),
+            "source_id".to_string(),
+            "source_type".to_string(),
+            "target_id".to_string(),
+            "target_type".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "embedding_id".to_string(),
+            "relation_type".to_string(),
+            "source_id".to_string(),
+            "source_type".to_string(),
+            "target_id".to_string(),
+            "target_type".to_string(),
+            "embedding_array".to_string(),
         ]
     }
 }
