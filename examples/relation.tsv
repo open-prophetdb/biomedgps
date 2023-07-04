@@ -1,0 +1,16 @@
+relation_type	source_id	source_type	target_id	target_type	key_sentence	score	resource
+RELATION	ENTREZ:108715297	Gene	MESH:C000601183	Chemical	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715297	Gene	HMDB:HMDB0108363	Metabolite	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715297	Gene	ENTREZ:108715299	Gene	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715297	Gene	MESH:D0001	Disease	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715297	Gene	MESH:C0001	Chemical	Placeholder	1.0	Custom
+RELATION	MESH:C000601183	Chemical	HMDB:HMDB0108363	Metabolite	Placeholder	1.0	Custom
+RELATION	MESH:C000601183	Chemical	ENTREZ:108715299	Gene	Placeholder	1.0	Custom
+RELATION	MESH:C000601183	Chemical	MESH:D0001	Disease	Placeholder	1.0	Custom
+RELATION	MESH:C000601183	Chemical	MESH:C0001	Chemical	Placeholder	1.0	Custom
+RELATION	HMDB:HMDB0108363	Metabolite	ENTREZ:108715299	Gene	Placeholder	1.0	Custom
+RELATION	HMDB:HMDB0108363	Metabolite	MESH:D0001	Disease	Placeholder	1.0	Custom
+RELATION	HMDB:HMDB0108363	Metabolite	MESH:C0001	Chemical	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715299	Gene	MESH:D0001	Disease	Placeholder	1.0	Custom
+RELATION	ENTREZ:108715299	Gene	MESH:C0001	Chemical	Placeholder	1.0	Custom
+RELATION	MESH:D0001	Disease	MESH:C0001	Chemical	Placeholder	1.0	Custom

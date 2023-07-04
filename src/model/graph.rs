@@ -1,13 +1,22 @@
-use crate::model::core::{Entity, RecordResponse, Relation};
-use crate::query::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
-use log::error;
+//! Graph module is used to define the graph data structure and its related functions. You can use it to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
+//!
+
+use crate::model::core::{Entity, Relation};
+use lazy_static::lazy_static;
+use log::{debug, error};
 use poem_openapi::Object;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::{error::Error, fmt};
 
+lazy_static! {
+    static ref COMPOSED_ENTITY_REGEX: Regex =
+        Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
+}
+
+/// Custom Error type for the graph module
 #[derive(Debug)]
 pub struct ValidationError {
     details: String,
@@ -40,9 +49,10 @@ impl Error for ValidationError {
     }
 }
 
-// More details on https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=12
-// Don't change the order of the colors. It is important to keep the colors consistent.
-// In future, we may specify a color for each node label when we can know all the node labels.
+/// A color map for the node labels.
+/// More details on https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=12
+/// Don't change the order of the colors. It is important to keep the colors consistent.
+/// In future, we may specify a color for each node label when we can know all the node labels.
 const NODE_COLORS: [&str; 12] = [
     "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
     "#cab2d6", "#6a3d9a", "#ffff99", "#b15928",
@@ -350,45 +360,51 @@ impl Graph {
         &self.nodes
     }
 
-    // Get the edges in the graph and check if the related nodes are in the graph
-    // We cannot get the missed nodes in the get_nodes function, so we return the missed nodes here instead of fetching the missed nodes in the get_nodes function.
-    pub fn get_edges(&mut self) -> Result<&Vec<Edge>, ValidationError> {
+    /// Get the edges in the graph and check if the related nodes are in the graph if the strict_mode is true. It will return the missed nodes here instead of fetching the missed nodes in the get_nodes function.
+    ///
+    /// # Arguments
+    pub fn get_edges(&mut self, strict_mode: Option<bool>) -> Result<&Vec<Edge>, ValidationError> {
         // Dedup the edges
         self.edges.sort_by(|a, b| a.relid.cmp(&b.relid));
         self.edges.dedup_by(|a, b| a.relid == b.relid);
-        // Ensure the related nodes are in the graph
-        let mut node_ids: Vec<String> = vec![];
-        for edge in &self.edges {
-            node_ids.push(edge.source.clone());
-            node_ids.push(edge.target.clone());
-        }
-        node_ids.sort();
-        node_ids.dedup();
 
-        let all_node_ids = self
-            .nodes
-            .iter()
-            .map(|node| &node.id)
-            .collect::<Vec<&String>>();
-        let missed_node_ids = node_ids
-            .iter()
-            .filter(|node_id| !all_node_ids.contains(node_id))
-            .collect::<Vec<&String>>();
-        let missed_node_ids = if missed_node_ids.len() > 0 {
-            // TODO: we need to handle the error here
-            missed_node_ids
+        if strict_mode.is_some() {
+            // Ensure the related nodes are in the graph
+            let mut node_ids: Vec<String> = vec![];
+            for edge in &self.edges {
+                node_ids.push(edge.source.clone());
+                node_ids.push(edge.target.clone());
+            }
+            node_ids.sort();
+            node_ids.dedup();
+
+            let all_node_ids = self
+                .nodes
                 .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-        } else {
-            vec![]
-        };
+                .map(|node| &node.id)
+                .collect::<Vec<&String>>();
+            let missed_node_ids = node_ids
+                .iter()
+                .filter(|node_id| !all_node_ids.contains(node_id))
+                .collect::<Vec<&String>>();
+            let missed_node_ids = if missed_node_ids.len() > 0 {
+                // TODO: we need to handle the error here
+                missed_node_ids
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<String>>()
+            } else {
+                vec![]
+            };
 
-        if missed_node_ids.len() > 0 {
-            Err(ValidationError::new(
-                "The related nodes of the edges are not in the graph",
-                missed_node_ids,
-            ))
+            if missed_node_ids.len() > 0 {
+                Err(ValidationError::new(
+                    "The related nodes of the edges are not in the graph",
+                    missed_node_ids,
+                ))
+            } else {
+                Ok(&self.edges)
+            }
         } else {
             Ok(&self.edges)
         }
@@ -400,166 +416,341 @@ impl Graph {
         self.nodes.push(node);
     }
 
-    // Add an edge to the graph
-    // TODO: we need to check if the edge and the related nodes already exists in the graph?
-    fn add_edge(&mut self, edge: Edge) {
+    /// Add an edge to the graph, we will check if the edge and the related nodes already exists in the get_edges function
+    ///
+    /// # Arguments
+    ///
+    /// * `edge` - An edge struct.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use biomedgps::model::graph::{Graph, Edge};
+    /// use biomedgps::model::core::Relation;
+    ///
+    /// let relation = Relation {
+    ///     id: 1,
+    ///     relation_type: "TREATS".to_string(),
+    ///     source_id: "MESH:D0001".to_string(),
+    ///     source_type: "Compound".to_string(),
+    ///     target_id: "MESH:D0002".to_string(),
+    ///     target_type: "Disease".to_string(),
+    ///     score: Some(0.9),
+    ///     key_sentence: Some("The compound treats the disease".to_string()),
+    ///     resource: "CORD19".to_string(),
+    /// };
+    ///
+    /// let mut graph = Graph::new();
+    /// let edge = Edge::new(&relation);
+    /// graph.add_edge(edge);
+    ///
+    /// let edges = graph.get_edges(None).unwrap();
+    /// assert_eq!(edges.len(), 1);
+    /// ```
+    ///
+    pub fn add_edge(&mut self, edge: Edge) {
         self.edges.push(edge);
     }
 
-    pub async fn fetch_nodes_from_db(&mut self, pool: &sqlx::PgPool, node_ids: Vec<&str>) -> Result<(), anyhow::Error> {
-        let page = None;
-        let page_size = None;
-        let node_id_arr = Value::ArrayString(node_ids.iter().map(|id| id.to_string()).collect());
-        let query_item = QueryItem::new("id".to_string(), node_id_arr, "in".to_string());
-        let query = Some(ComposeQuery::QueryItem(query_item));
-        match RecordResponse::<Entity>::get_records(
-            pool,
-            "biomedgps_entity",
-            &query,
-            page,
-            page_size,
-            Some("id ASC"),
-        )
-        .await
+    /// Generate a query string to get the nodes from the database
+    ///
+    /// # Arguments
+    ///
+    /// * `node_ids` - A vector of node ids
+    ///
+    /// # Returns
+    ///
+    /// A query string
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use regex::Regex;
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let node_ids = vec!["Compound::MESH:D0001", "Compound::MESH:D0002"];
+    /// let query = Graph::gen_entity_query_from_node_ids(&node_ids);
+    /// let re = Regex::new(r"\s+").unwrap();
+    /// let query = re.replace_all(&query, " ");
+    /// let expected_query = "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '::' || COALESCE(id, '') in ('Compound::MESH:D0001', 'Compound::MESH:D0002');";
+    /// assert_eq!(query, expected_query);
+    /// ```
+    pub fn gen_entity_query_from_node_ids(node_ids: &Vec<&str>) -> String {
+        // SELECT *
+        // FROM (SELECT *, COALESCE(label, '') || '::' || COALESCE(id, '') AS full_name FROM biomedgps_entity) as T
+        // WHERE full_name in ('Compound::MESH:002', 'Compound::MESH:D0001');
+
+        debug!("Raw node_ids: {:?}", node_ids);
+
+        // Remove invalid node ids
+        let filtered_node_ids: Vec<&str> = node_ids
+            .iter()
+            .filter(|node_id| COMPOSED_ENTITY_REGEX.is_match(node_id))
+            .map(|&node_id| node_id)
+            .collect();
+
+        debug!("Filtered node_ids: {:?}", node_ids);
+        debug!(
+            "There are {} invalid node ids.",
+            node_ids.len() - filtered_node_ids.len()
+        );
+
+        if filtered_node_ids.len() == 0 {
+            return "".to_string();
+        } else {
+            let query_str = format!(
+                "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '::' || COALESCE(id, '') in ('{}');",
+                filtered_node_ids.join("', '")
+            );
+
+            query_str
+        }
+    }
+
+    /// Fetch the nodes from the database
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - The database connection pool
+    /// * `node_ids` - The node ids, which are composed of node type and node id. For example, "Compound::MESH:D0001"
+    ///
+    /// # Returns
+    ///
+    /// * `Result<&Self, anyhow::Error>` - The result of fetching the nodes from the database
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqlx::postgres::PgPool;
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
+    ///     let pool = PgPool::connect(database_url).await.unwrap();
+    ///     let mut graph = Graph::new();
+    ///     let node_ids = vec!["Compound::MESH:D0001", "Compound::MESH:D0002"];
+    ///
+    ///     assert!(graph.fetch_nodes_from_db(&pool, &node_ids).await.is_ok());
+    /// }
+    /// ```
+    ///
+    pub async fn fetch_nodes_from_db(
+        &mut self,
+        pool: &sqlx::PgPool,
+        node_ids: &Vec<&str>,
+    ) -> Result<&Self, anyhow::Error> {
+        let query_str = Self::gen_entity_query_from_node_ids(node_ids);
+
+        debug!("query_str: {}", query_str);
+
+        match sqlx::query_as::<_, Entity>(query_str.as_str())
+            .fetch_all(pool)
+            .await
         {
             Ok(records) => {
-                for record in records.records {
+                for record in records {
                     let node = Node::new(&record);
                     self.add_node(node);
-                };
-
-                Ok(())
-            }
-            Err(e) => {
-                Err(e)
-            }
-        }
-    }
-
-    fn parse_composed_node_ids(composed_node_id: &str) -> Result<(String, String), ValidationError> {
-        let node_ids: Vec<&str> = composed_node_id.split("::").collect();
-        if node_ids.len() == 2 {
-            let node_type = node_ids[0].to_string();
-            let node_id = node_ids[1].to_string();
-            Ok((node_type, node_id))
-        } else {
-            Err(ValidationError::new(&format!("The composed node id is not valid: {}", composed_node_id), vec![]))
-        }
-    }
-
-    fn gen_relation_query_from_node_ids(node_ids: Vec<&str>) -> ComposeQuery {
-        let parsed_node_ids = node_ids
-            .iter()
-            .map(|node_id| {
-                match Graph::parse_composed_node_ids(node_id) {
-                    Ok((node_type, node_id)) => Some((node_type, node_id)),
-                    Err(e) => {
-                        None
-                    }
-                }
-            })
-            .collect::<Vec<Option<(String, String)>>>();
-
-        // Filter out the invalid node ids
-        let parsed_node_ids = parsed_node_ids
-            .iter()
-            .filter(|node_id| node_id.is_some())
-            .map(|node_id| node_id.clone().unwrap())
-            .collect::<Vec<(String, String)>>();
-
-        // Group the node ids by node type
-        let mut node_ids_by_type: HashMap<String, Vec<String>> = HashMap::new();
-        for (node_type, node_id) in parsed_node_ids {
-            if node_ids_by_type.contains_key(&node_type) {
-                let node_ids = node_ids_by_type.get_mut(&node_type).unwrap();
-                node_ids.push(node_id);
-            } else {
-                node_ids_by_type.insert(node_type, vec![node_id]);
-            }
-        }
-
-        // Generate query item for each node type
-        let mut query_items: Vec<ComposeQueryItem> = vec![];
-        for (node_type, node_ids) in node_ids_by_type {
-            let source_node_type = Value::String(node_type.clone());
-            let target_node_type = Value::String(node_type.clone());
-
-            let node_id_arr =
-                Value::ArrayString(node_ids.iter().map(|id| id.to_string()).collect());
-
-            let source_query_item1 = ComposeQuery::QueryItem(QueryItem::new(
-                "source_id".to_string(),
-                node_id_arr.clone(),
-                "in".to_string(),
-            ));
-            let source_query_item2 = ComposeQuery::QueryItem(QueryItem::new(
-                "source_type".to_string(),
-                source_node_type,
-                "=".to_string(),
-            ));
-
-            let mut source_query = ComposeQueryItem::new("and");
-            source_query.add_item(source_query_item1);
-            source_query.add_item(source_query_item2);
-
-            let target_query_item1 = ComposeQuery::QueryItem(QueryItem::new(
-                "target_id".to_string(),
-                node_id_arr,
-                "in".to_string(),
-            ));
-            let target_query_item2 = ComposeQuery::QueryItem(QueryItem::new(
-                "target_type".to_string(),
-                target_node_type,
-                "=".to_string(),
-            ));
-
-            let mut target_query = ComposeQueryItem::new("and");
-            target_query.add_item(target_query_item1);
-            target_query.add_item(target_query_item2);
-
-            let mut query_item = ComposeQueryItem::new("and");
-            query_item.add_item(ComposeQuery::ComposeQueryItem(source_query));
-            query_item.add_item(ComposeQuery::ComposeQueryItem(target_query));
-
-            query_items.push(query_item);
-        }
-
-        let mut query = ComposeQueryItem::new("or");
-        for query_item in query_items {
-            query.add_item(ComposeQuery::ComposeQueryItem(query_item));
-        }
-
-        ComposeQuery::ComposeQueryItem(query)
-    }
-
-    pub async fn auto_connect_nodes(&mut self, pool: &sqlx::PgPool, node_ids: Vec<&str>) -> Result<&Self, anyhow::Error> {
-        let page = None;
-        let page_size = None;
-
-        let query = Self::gen_relation_query_from_node_ids(node_ids);
-
-        match RecordResponse::<Relation>::get_records(
-            pool,
-            "biomedgps_relation",
-            &Some(query),
-            page,
-            page_size,
-            Some("id ASC"),
-        )
-        .await
-        {
-            Ok(records) => {
-                for record in records.records {
-                    let edge = Edge::new(&record);
-                    self.add_edge(edge);
                 }
 
                 Ok(self)
             }
             Err(e) => {
                 error!("Error in auto_connect_nodes: {}", e);
-                Err(e)
+                Err(e.into())
             }
+        }
+    }
+
+    /// Parse the composed node id to get the node type and node id
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let composed_node_id = "Compound::MESH:D0001";
+    /// let (node_type, node_id) = Graph::parse_composed_node_ids(composed_node_id).unwrap();
+    /// assert_eq!(node_type, "Compound");
+    /// assert_eq!(node_id, "MESH:D0001");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If the composed node id is not valid, it will return an error.
+    ///
+    /// ```
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let composed_node_id = "Compound::MESH:D0001::";
+    /// let result = Graph::parse_composed_node_ids(composed_node_id);
+    /// assert!(result.is_err());
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `composed_node_id` - The composed node id, like `Compound::MESH:D0001`
+    ///
+    /// # Returns
+    ///
+    /// * `Ok((node_type, node_id))` - The node type and node id
+    /// * `Err(ValidationError)` - The error message and the invalid node ids
+    ///
+    pub fn parse_composed_node_ids(
+        composed_node_id: &str,
+    ) -> Result<(String, String), ValidationError> {
+        let node_ids: Vec<&str> = composed_node_id.split("::").collect();
+        if node_ids.len() == 2 {
+            let node_type = node_ids[0].to_string();
+            let node_id = node_ids[1].to_string();
+            Ok((node_type, node_id))
+        } else {
+            Err(ValidationError::new(
+                &format!("The composed node id is not valid: {}", composed_node_id),
+                vec![composed_node_id.to_string()],
+            ))
+        }
+    }
+
+    /// Generate the query string to fetch the relations from the database
+    /// The query string is like:
+    /// SELECT *
+    /// FROM biomedgps_relation)
+    /// WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('Compound::MESH:D001', 'Compound::MESH:D002');
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use regex::Regex;
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let node_ids = vec!["Compound::MESH:D001", "Compound::MESH:D002"];
+    /// let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
+    /// let re = Regex::new(r"\s+").unwrap();
+    /// let query_str = re.replace_all(query_str.as_str(), " ");
+    /// assert_eq!(query_str, "SELECT * FROM biomedgps_relation WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('Compound::MESH:D001', 'Compound::MESH:D002') AND COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('Compound::MESH:D001', 'Compound::MESH:D002');");
+    /// ```
+    ///  
+    /// # Arguments
+    ///
+    /// * `node_ids` - a list of composed node ids, such as ['Compound::MESH:D001', 'Compound::MESH:D002']
+    ///
+    /// # Returns
+    ///
+    /// Returns a query string.
+    ///
+    pub fn gen_relation_query_from_node_ids(node_ids: &Vec<&str>) -> String {
+        debug!("Raw node_ids: {:?}", node_ids);
+
+        // Remove invalid node ids
+        let filtered_node_ids: Vec<&str> = node_ids
+            .iter()
+            .filter(|node_id| COMPOSED_ENTITY_REGEX.is_match(node_id))
+            .map(|&node_id| node_id)
+            .collect();
+
+        debug!("Filtered node_ids: {:?}", node_ids);
+        debug!(
+            "There are {} invalid node ids.",
+            node_ids.len() - filtered_node_ids.len()
+        );
+
+        if filtered_node_ids.len() == 0 {
+            return "".to_string();
+        } else {
+            let query_str = format!(
+                "SELECT * 
+                 FROM biomedgps_relation
+                 WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('{}') AND 
+                       COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('{}');",
+                filtered_node_ids.join("', '"),
+                filtered_node_ids.join("', '"),
+            );
+
+            query_str
+        }
+    }
+
+    /// Try to connect the nodes in the graph and return the edges and nodes that are in the graph.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut graph = Graph::new();
+    ///
+    ///     // Please use your own database url
+    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
+    ///     let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+    ///
+    ///     let node_ids = vec![
+    ///         "Chemical::MESH:C000601183",
+    ///         "Metabolite::HMDB:HMDB0108363",
+    ///         "Gene::ENTREZ:108715297",
+    ///     ];
+    ///
+    ///     graph.auto_connect_nodes(&pool, &node_ids).await.unwrap();
+    ///
+    ///     println!("graph: {:?}", graph);
+    ///     assert_eq!(graph.get_nodes().len(), 3);
+    ///     assert_eq!(graph.get_edges(None).unwrap().len(), 3);
+    /// }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - The database connection pool
+    /// * `node_ids` - The node ids, like `["Compound::MESH:D0001", "Compound::MESH:D0002"]`
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(&Self)` - The graph
+    /// * `Err(anyhow::Error)` - The error message
+    ///
+    pub async fn auto_connect_nodes(
+        &mut self,
+        pool: &sqlx::PgPool,
+        node_ids: &Vec<&str>,
+    ) -> Result<&Self, anyhow::Error> {
+        let query_str = Self::gen_relation_query_from_node_ids(node_ids);
+
+        debug!("query_str: {}", query_str);
+
+        let mut error_msg = "".to_string();
+        match sqlx::query_as::<_, Relation>(query_str.as_str())
+            .fetch_all(pool)
+            .await
+        {
+            Ok(records) => {
+                for record in records {
+                    let edge = Edge::new(&record);
+                    self.add_edge(edge);
+                }
+            }
+            Err(e) => {
+                error_msg = format!("Error in auto_connect_nodes: {}", e);
+            }
+        };
+
+        match self.fetch_nodes_from_db(pool, node_ids).await {
+            Ok(_) => {}
+            Err(e) => {
+                error_msg = format!(
+                    "{}\n{}",
+                    error_msg,
+                    format!("Error in fetch_nodes_from_db: {}", e)
+                );
+            }
+        };
+
+        if error_msg.len() > 0 {
+            Err(anyhow::Error::msg(error_msg))
+        } else {
+            Ok(self)
         }
     }
 
@@ -572,43 +763,106 @@ impl Graph {
 
 #[cfg(test)]
 mod tests {
+    extern crate log;
+    extern crate stderrlog;
     use super::*;
+    use crate::{import_data, run_migrations, init_log};
+    use regex::Regex;
+
+    // Setup the test database
+    async fn setup_test_db() -> sqlx::PgPool {
+        // Get the database url from the environment variable
+        let database_url = match std::env::var("DATABASE_URL") {
+            Ok(v) => v,
+            Err(_) => {
+                println!("{}", "DATABASE_URL is not set.");
+                std::process::exit(1);
+            }
+        };
+        let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+
+        // Run the migrations
+        run_migrations(&database_url).await.unwrap();
+
+        // Import data file in examples folder into the database
+        let entity_data_file = "examples/entity.tsv";
+
+        import_data(&database_url, entity_data_file, "entity", true, true).await;
+
+        let relation_data_file = "examples/relation.tsv";
+
+        import_data(&database_url, relation_data_file, "relation", true, true).await;
+
+        return pool;
+    }
 
     #[test]
     fn test_parse_composed_node_ids() {
-        let composed_node_id = "Gene::ENTREZ001";
+        init_log();
+        let composed_node_id = "Gene::ENTREZ:1";
         let (node_type, node_id) = Graph::parse_composed_node_ids(composed_node_id).unwrap();
         assert_eq!(node_type, "Gene");
-        assert_eq!(node_id, "ENTREZ001");
+        assert_eq!(node_id, "ENTREZ:1");
 
-        let composed_node_id = "ENTREZ001";
+        let composed_node_id = "ENTREZ:1";
         match Graph::parse_composed_node_ids(composed_node_id) {
             Ok(_) => assert!(false),
-            Err(e) => assert_eq!(e.details, "The composed node id is not valid: ENTREZ001"),
-        }
+            Err(e) => assert_eq!(e.details, "The composed node id is not valid: ENTREZ:1"),
+        };
+    }
+
+    #[test]
+    fn test_gen_entity_query_from_node_ids() {
+        init_log();
+        let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
+        let query_str = Graph::gen_entity_query_from_node_ids(&node_ids);
+
+        // Remove the newlines and unnecessary spaces by using regex
+        let re = Regex::new(r"\s+").unwrap();
+        let query_str = re.replace_all(query_str.as_str(), " ");
+
+        assert_eq!(query_str, "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '::' || COALESCE(id, '') in ('Gene::ENTREZ:1', 'Gene::ENTREZ:2', 'Gene::ENTREZ:3');")
     }
 
     #[test]
     fn test_gen_relation_query_from_node_ids() {
-        let node_ids = vec!["Gene::ENTREZ001", "Gene::ENTREZ002", "Gene::ENTREZ003"];
-        let query = Graph::gen_relation_query_from_node_ids(node_ids);
-        let query_str = match query {
-            ComposeQuery::ComposeQueryItem(query_item) => query_item.format(),
-            _ => "".to_string(),
-        };
+        init_log();
+        let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
+        let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
 
-        assert_eq!(
-            query_str, 
-            "((source_id in ('ENTREZ001','ENTREZ002','ENTREZ003') and source_type = 'Gene') and (target_id in ('ENTREZ001','ENTREZ002','ENTREZ003') and target_type = 'Gene'))".to_string()
-        );
+        // Remove the newlines and unnecessary spaces by using regex
+        let re = Regex::new(r"\s+").unwrap();
+        let query_str = re.replace_all(query_str.as_str(), " ");
 
-        let node_ids = vec!["ENTREZ001", "Gene::ENTREZ002", "Gene::ENTREZ003", "Disease::DOID001"];
-        let query = Graph::gen_relation_query_from_node_ids(node_ids);
-        let query_str = match query {
-            ComposeQuery::ComposeQueryItem(query_item) => query_item.format(),
-            _ => "".to_string(),
-        };
+        assert_eq!(query_str, "SELECT * FROM biomedgps_relation WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('Gene::ENTREZ:1', 'Gene::ENTREZ:2', 'Gene::ENTREZ:3') AND COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('Gene::ENTREZ:1', 'Gene::ENTREZ:2', 'Gene::ENTREZ:3');".to_string());
 
-        assert_eq!(query_str, "((source_id in ('DOID001') and source_type = 'Disease') and (target_id in ('DOID001') and target_type = 'Disease')) or ((source_id in ('ENTREZ002','ENTREZ003') and source_type = 'Gene') and (target_id in ('ENTREZ002','ENTREZ003') and target_type = 'Gene'))".to_string());
+        let invalid_node_ids = vec!["Gene:ENTREZ::001", "Gene:ENTREZ::002", "Gene::ENTREZ::003"];
+        let query_str = Graph::gen_relation_query_from_node_ids(&invalid_node_ids);
+
+        // Remove the newlines and unnecessary spaces by using regex
+        let re = Regex::new(r"\s+").unwrap();
+        let query_str = re.replace_all(query_str.as_str(), " ");
+
+        assert_eq!(query_str, "".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_auto_connect_nodes() {
+        init_log();
+        let mut graph = Graph::new();
+
+        let pool = setup_test_db().await;
+
+        let node_ids = vec![
+            "Chemical::MESH:C000601183",
+            "Metabolite::HMDB:HMDB0108363",
+            "Gene::ENTREZ:108715297",
+        ];
+
+        graph.auto_connect_nodes(&pool, &node_ids).await.unwrap();
+
+        println!("graph: {:?}", graph);
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(graph.edges.len(), 3);
     }
 }

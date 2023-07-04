@@ -1,24 +1,9 @@
 extern crate log;
 extern crate stderrlog;
 
+use biomedgps::{import_data, run_migrations};
 use log::*;
-use sqlx::migrate::Migrator;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
 use structopt::StructOpt;
-use tempfile::tempdir;
-
-use biomedgps::model::core::{
-    CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
-    Subgraph,
-};
-
-use biomedgps::model::util::{
-    drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
-    update_relation_metadata,
-};
 
 /// A cli for rnmpdb.
 #[derive(StructOpt, Debug)]
@@ -76,52 +61,13 @@ pub struct ImportDBArguments {
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
-    /// Drop the table before import data.
+    /// Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
 
     /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
-}
-
-const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");
-
-async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
-    info!("Running migrations.");
-    // Create a temporary directory.
-    let dir = tempdir()?;
-
-    for file in MIGRATIONS.files() {
-        // Create each file in the temporary directory.
-        let file_path = dir.path().join(file.path());
-        let mut temp_file = File::create(&file_path)?;
-        // Write the contents of the included file to the temporary file.
-        temp_file.write_all(file.contents())?;
-    }
-
-    // Now we can create a Migrator from the temporary directory.
-    info!("Importing migrations from {:?}", dir.path());
-    // List all files in the temporary directory.
-    for file in dir.path().read_dir()? {
-        match file {
-            Ok(file) => info!("Found file: {:?}", file.path()),
-            Err(e) => warn!("Error: {:?}", e),
-        }
-    }
-    let migrator = Migrator::new(Path::new(dir.path())).await?;
-
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect(database_url)
-        .await?;
-
-    migrator.run(&pool).await?;
-
-    // Don't forget to cleanup the temporary directory.
-    dir.close()?;
-    info!("Migrations finished.");
-
-    Ok(())
 }
 
 #[tokio::main]
@@ -157,9 +103,7 @@ async fn main() {
             run_migrations(&database_url).await.unwrap();
         }
         SubCommands::ImportDB(arguments) => {
-            let database_url = arguments.database_url;
-
-            let database_url = if database_url.is_none() {
+            let database_url = if arguments.database_url.is_none() {
                 match std::env::var("DATABASE_URL") {
                     Ok(v) => v,
                     Err(_) => {
@@ -168,290 +112,30 @@ async fn main() {
                     }
                 }
             } else {
-                database_url.unwrap()
+                arguments.database_url.unwrap()
             };
 
             if arguments.table.is_empty() {
                 error!("Please specify the table name.");
                 return;
-            }
+            };
 
-            let pool = sqlx::postgres::PgPoolOptions::new()
-                .connect(&database_url)
-                .await
-                .unwrap();
-
-            if arguments.table == "relation_metadata" {
-                update_relation_metadata(&pool, true).await.unwrap();
-                return;
-            } else if arguments.table == "entity_metadata" {
-                update_entity_metadata(&pool, true).await.unwrap();
-                return;
-            } else if arguments.table == "entity_embedding"
-                || arguments.table == "relation_embedding"
-            {
-                let file = match arguments.filepath {
-                    Some(file) => PathBuf::from(file),
-                    None => {
-                        error!("Please specify the file path.");
-                        return;
-                    }
-                };
-
-                if file.is_dir() {
-                    error!("Please specify the file path, not a directory.");
+            let file = match arguments.filepath {
+                Some(file) => file,
+                None => {
+                    error!("Please specify the file path.");
                     return;
-                };
-
-                let delimiter = match get_delimiter(&file) {
-                    Ok(d) => d,
-                    Err(_) => {
-                        error!("Invalid filename: {}, no extension found.", file.display());
-                        return;
-                    }
-                };
-
-                match if arguments.table == "entity_embedding" {
-                    let errors = EntityEmbedding::check_csv_is_valid(&file);
-                    if errors.len() > 0 {
-                        show_errors(&errors, arguments.show_all_errors);
-                        return;
-                    } else {
-                        info!("The data file {} is valid.", file.display());
-                    }
-
-                    EntityEmbedding::import_entity_embeddings(
-                        &pool,
-                        &file,
-                        delimiter,
-                        arguments.drop,
-                    )
-                    .await
-                } else {
-                    let errors = RelationEmbedding::check_csv_is_valid(&file);
-                    if errors.len() > 0 {
-                        show_errors(&errors, arguments.show_all_errors);
-                        return;
-                    };
-
-                    RelationEmbedding::import_relation_embeddings(
-                        &pool,
-                        &file,
-                        delimiter,
-                        arguments.drop,
-                    )
-                    .await
-                } {
-                    Ok(_) => {
-                        info!("Import embeddings into {} table successfully.", arguments.table);
-                        return;
-                    }
-                    Err(e) => {
-                        error!("Failed to parse CSV: ({})", e);
-                        return;
-                    }
                 }
-            } else {
-                let filepath = match arguments.filepath {
-                    Some(filepath) => filepath,
-                    None => {
-                        error!("Please specify the file path.");
-                        return;
-                    }
-                };
+            };
 
-                let mut files = vec![];
-                if std::path::Path::new(&filepath).is_dir() {
-                    let paths = std::fs::read_dir(&filepath).unwrap();
-                    for path in paths {
-                        let path = path.unwrap().path();
-                        match get_delimiter(&path) {
-                            Ok(_d) => {
-                                if path.is_file() {
-                                    files.push(path);
-                                }
-                            }
-                            Err(_) => continue,
-                        };
-                    }
-                } else {
-                    files.push(std::path::PathBuf::from(&filepath));
-                }
-
-                if files.is_empty() {
-                    error!("No valid files found. Only tsv/csv/txt files are supported.");
-                    std::process::exit(1);
-                }
-
-                for file in files {
-                    let filename = file.to_str().unwrap();
-                    info!("Importing {} into {}...", filename, arguments.table);
-
-                    let table = arguments.table.as_str();
-
-                    let validation_errors = if table == "entity" {
-                        Entity::check_csv_is_valid(&file)
-                    } else if table == "entity2d" {
-                        Entity2D::check_csv_is_valid(&file)
-                    } else if table == "relation" {
-                        Relation::check_csv_is_valid(&file)
-                    } else if table == "knowledge_curation" {
-                        KnowledgeCuration::check_csv_is_valid(&file)
-                    } else if table == "subgraph" {
-                        Subgraph::check_csv_is_valid(&file)
-                    } else {
-                        error!("Invalid table name: {}", table);
-                        vec![]
-                    };
-
-                    if validation_errors.len() > 0 {
-                        error!("Invalid file: {}", filename);
-                        show_errors(&validation_errors, arguments.show_all_errors);
-                        warn!("Skipping {}...\n\n", filename);
-                        continue;
-                    } else {
-                        info!("{} is valid.", filename);
-                    }
-
-                    let delimiter = match get_delimiter(&file) {
-                        Ok(d) => d,
-                        Err(_) => {
-                            error!("Invalid filename: {}, no extension found.", filename);
-                            continue;
-                        }
-                    };
-
-                    let expected_columns = if table == "entity" {
-                        Entity::get_column_names(&file)
-                    } else if table == "entity2d" {
-                        Entity2D::get_column_names(&file)
-                    } else if table == "relation" {
-                        Relation::get_column_names(&file)
-                    } else if table == "knowledge_curation" {
-                        KnowledgeCuration::get_column_names(&file)
-                    } else if table == "subgraph" {
-                        Subgraph::get_column_names(&file)
-                    } else {
-                        error!("Invalid table name: {}", table);
-                        Ok(vec![])
-                    };
-
-                    let expected_columns = match expected_columns {
-                        Ok(v) => v,
-                        Err(e) => {
-                            error!("Invalid file: {}, reason: {}", filename, e);
-                            continue;
-                        }
-                    };
-
-                    // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
-                    let temp_file = tempfile::NamedTempFile::new().unwrap();
-                    let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
-                    let results = if table == "entity" {
-                        Entity::select_expected_columns(&file, &temp_filepath)
-                    } else if table == "entity2d" {
-                        Entity2D::select_expected_columns(&file, &temp_filepath)
-                    } else if table == "relation" {
-                        Relation::select_expected_columns(&file, &temp_filepath)
-                    } else if table == "knowledge_curation" {
-                        KnowledgeCuration::select_expected_columns(&file, &temp_filepath)
-                    } else if table == "subgraph" {
-                        Subgraph::select_expected_columns(&file, &temp_filepath)
-                    } else {
-                        error!("Invalid table name: {}", table);
-                        continue;
-                    };
-
-                    let file = match results {
-                        Ok(_) => temp_filepath,
-                        Err(e) => {
-                            error!("Invalid file: {}, reason: {}", filename, e);
-                            continue;
-                        }
-                    };
-
-                    match arguments.table.as_str() {
-                        "entity" => {
-                            let table_name = "biomedgps_entity";
-                            if arguments.drop {
-                                drop_table(&pool, table_name).await;
-                            };
-
-                            import_file_in_loop(
-                                &pool,
-                                &file,
-                                table_name,
-                                &expected_columns,
-                                &Entity::unique_fields(),
-                                delimiter,
-                            )
-                            .await
-                            .expect("Failed to import data into the biomedgps_entity table.");
-                        }
-                        "relation" => {
-                            let table_name = "biomedgps_relation";
-                            if arguments.drop {
-                                drop_table(&pool, table_name).await;
-                            };
-
-                            import_file_in_loop(
-                                &pool,
-                                &file,
-                                table_name,
-                                &expected_columns,
-                                &Relation::unique_fields(),
-                                delimiter,
-                            )
-                            .await
-                            .expect("Failed to import data into the biomedgps_relation table.");
-                        }
-                        "entity2d" => {
-                            import_file_in_loop(
-                                &pool,
-                                &file,
-                                "biomedgps_entity2d",
-                                &expected_columns,
-                                &Entity2D::unique_fields(),
-                                delimiter,
-                            )
-                            .await
-                            .expect("Failed to import data into the biomedgps_entity2d table.");
-                        }
-                        "knowledge_curation" => {
-                            import_file_in_loop(
-                            &pool,
-                            &file,
-                            "biomedgps_knowledge_curation",
-                            &expected_columns,
-                            &KnowledgeCuration::unique_fields(),
-                            delimiter,
-                        )
-                        .await
-                        .expect(
-                            "Failed to import data into the biomedgps_knowledge_curation table.",
-                        );
-                        }
-                        "subgraph" => {
-                            import_file_in_loop(
-                                &pool,
-                                &file,
-                                "biomedgps_subgraph",
-                                &expected_columns,
-                                &Subgraph::unique_fields(),
-                                delimiter,
-                            )
-                            .await
-                            .expect("Failed to import data into the biomedgps_subgraph table.");
-                        }
-                        _ => {
-                            error!("Unsupported table name: {}", arguments.table);
-                            return;
-                        }
-                    };
-
-                    info!("{} imported.\n\n", filename);
-                }
-            }
+            import_data(
+                &database_url,
+                &file,
+                &arguments.table,
+                arguments.drop,
+                arguments.show_all_errors,
+            )
+            .await
         }
     }
 }

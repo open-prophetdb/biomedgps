@@ -2,19 +2,19 @@
 -- biomedgps_entity table is used to store the entities, it's same with the nodes in the biomedgps neo4j database
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity (
+    idx BIGSERIAL PRIMARY KEY, -- The entity index
     id VARCHAR(64), -- The entity ID
     name VARCHAR(255) NOT NULL, -- The name of the entity
     label VARCHAR(64) NOT NULL, -- The label of the entity, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the entity, such as UBERON, DOID, HGNC, CHEBI, GO, etc.
     description TEXT, -- The description of the entity
-    UNIQUE (id, label), -- The unique constraint of the entity
-    PRIMARY KEY (id, label)
+    UNIQUE (id, label) -- The unique constraint of the entity
   );
 
 -- biomedgps_entity_metadata table is used to store the metadata of the entities, it is used to visualize the statistics of the entities on the statistics page
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity_metadata (
-    id SERIAL PRIMARY KEY, -- The entity metadata ID
+    id BIGSERIAL PRIMARY KEY, -- The entity metadata ID
     resource VARCHAR(64) NOT NULL, -- The source of the entity metadata
     entity_type VARCHAR(64) NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     entity_count BIGINT NOT NULL, -- The entity count of the entity metadata
@@ -24,7 +24,7 @@ CREATE TABLE
 -- biomedgps_relation_metadata table is used to store the metadata of the relations, it is used to visualize the statistics of the relations on the statistics page
 CREATE TABLE
   IF NOT EXISTS biomedgps_relation_metadata (
-    id SERIAL PRIMARY KEY, -- The relation metadata ID
+    id BIGSERIAL PRIMARY KEY, -- The relation metadata ID
     resource VARCHAR(64) NOT NULL, -- The resource of the relation
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
     relation_count BIGINT NOT NULL, -- The relation count
@@ -41,7 +41,7 @@ CREATE TABLE
 -- biomedgps_knowledge_curation table is used to store the knowledges which are curated by the curators from the literature
 CREATE TABLE
   IF NOT EXISTS biomedgps_knowledge_curation (
-    relation_id SERIAL PRIMARY KEY, -- The knowledge curation ID
+    relation_id BIGSERIAL PRIMARY KEY, -- The knowledge curation ID
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
     source_name VARCHAR(255) NOT NULL, -- The name of the start entity
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
@@ -58,7 +58,7 @@ CREATE TABLE
 -- biomedgps_relation table is used to store the relations between the entities, it's same with the edges in the biomedgps neo4j database
 CREATE TABLE
   IF NOT EXISTS biomedgps_relation (
-    id SERIAL PRIMARY KEY, -- The relation ID
+    id BIGSERIAL PRIMARY KEY, -- The relation ID
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
     source_id VARCHAR(64) NOT NULL, -- The ID of the start entity
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.

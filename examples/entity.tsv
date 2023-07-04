@@ -1,0 +1,54 @@
+idx	id	name	label	resource	description
+682379	MESH:C000601183	persenone C	Chemical	MESH	
+720297	MESH:C035657	Nico-Padutin	Chemical	MESH	
+1078598	GO:0071362	cellular response to ether	BiologicalProcess	GO	
+335692	HMDB:HMDB0108363	TG(i-18:0/i-15:0/12:0)	Metabolite	HMDB	
+1235552	NDF-RT:N0000150021	I-L-X B12 TAB	PharmacologicClass	NDF-RT	
+998279	ENTREZ:108715297	p2rx2.L	Gene	ENTREZ	
+918521	MedDRA:10049515	Non-traumatic fracture	SideEffect	MedDRA	
+784400	MESH:C442373	3-hydroxymethyl-3',4'-di-O-camphanoylkhellactone	Chemical	MESH	
+474911	HMDB:HMDB0318804	CL(18:2(9Z,12Z)/22:5(7Z,10Z,13Z,16Z,19Z)/14:0/18:1(9Z))	Metabolite	HMDB	
+815871	MESH:C526723	abyssenine A	Chemical	MESH	
+678422	MESH:C000592632	3,4,5-trimethoxybenzyl leuconicine B	Chemical	MESH	
+472012	HMDB:HMDB0315780	CL(18:1(9Z)/18:4(6Z,9Z,12Z,15Z)/20:5(5Z,8Z,11Z,14Z,17Z)/18:2(9Z,12Z))	Metabolite	HMDB	
+278604	HMDB:HMDB0050256	TG(18:1(9Z)/22:5(7Z,10Z,13Z,16Z,19Z)/20:4(8Z,11Z,14Z,17Z))	Metabolite	HMDB	
+378582	HMDB:HMDB0214108	CL(13:0/a-15:0/22:0/22:0)	Metabolite	HMDB	
+1258529	NDF-RT:N0000155634	MULTIPLE ELECTROLYTE ADDITIVE INJ	PharmacologicClass	NDF-RT	
+820960	MESH:C534911	N-(1-(2-(4-((1-tert-butyl-3-(2,4-difluorophenyl)piperidin-4-yl)carbonyl)piperazin-1-yl)-4-chloro-5-methylphenyl)ethyl)-N-isopropylacetamide	Chemical	MESH	
+1171852	DOID:2022	obsolete metastatic neoplasm to the placenta	Disease	DOID	
+470951	HMDB:HMDB0314665	CL(18:0/22:6(4Z,7Z,10Z,13Z,16Z,19Z)/20:5(5Z,8Z,11Z,14Z,17Z)/22:5(7Z,10Z,13Z,16Z,19Z))	Metabolite	HMDB	
+460334	HMDB:HMDB0303819	(卢卤)-Limonene diepoxide	Metabolite	HMDB	
+368674	HMDB:HMDB0204200	CL(12:0/i-14:0/a-21:0/25:0)	Metabolite	HMDB	
+1113286	DrugBank:DB04617	(9S)-9-[(8-AMMONIOOCTYL)AMINO]-1,2,3,4,9,10-HEXAHYDROACRIDINIUM	Compound	DrugBank	
+798375	MESH:C495111	cedkathryn A	Chemical	MESH	
+1027387	MESH:D015427	Reperfusion Injury	Disease	MESH	
+285080	HMDB:HMDB0056837	CL(16:0/22:5(7Z,10Z,13Z,16Z,19Z)/16:1(9Z)/16:0)	Metabolite	HMDB	
+915996	MedDRA:10069511	Rhabdoid meningioma	SideEffect	MedDRA	
+300052	HMDB:HMDB0072690	TG(8:0/18:0/i-17:0)	Metabolite	HMDB	
+352543	HMDB:HMDB0188069	CL(10:0/10:0/22:0/25:0)	Metabolite	HMDB	
+1137651	MESH:D019046	Bone Marrow Neoplasms	Disease	MESH	Neoplasms located in the bone marrow. They are differentiated from neoplasms composed of bone marrow cells, such as MULTIPLE MYELOMA. Most bone marrow neoplasms are metastatic.
+1248136	NDF-RT:N0000151742	VERAPAMIL HCL 2.5MG/ML (PF) INJ	PharmacologicClass	NDF-RT	
+320472	HMDB:HMDB0093111	DG(12:0/21:0/0:0)	Metabolite	HMDB	
+682384	MESH:C000601190	wubeizi	Chemical	MESH	
+286542	HMDB:HMDB0058299	CL(18:1(11Z)/22:6(4Z,7Z,10Z,13Z,16Z,19Z)/20:4(5Z,8Z,11Z,14Z)/20:4(5Z,8Z,11Z,14Z))	Metabolite	HMDB	
+459053	HMDB:HMDB0302312	1-Heptadecene	Metabolite	HMDB	
+295475	HMDB:HMDB0068113	TG(22:0/13:0/21:0)	Metabolite	HMDB	
+1270963	NDF-RT:N0000147451	ALLERGENIC EXTRACT, MOUSE	PharmacologicClass	NDF-RT	
+1119627	DrugBank:DB12697	Methylselenocysteine	Compound	DrugBank	
+1265441	NDF-RT:N0000186040	AMYLASE 78300UNT/LIPASE 20880UNT/PROTEASE 78300UNT TAB	PharmacologicClass	NDF-RT	
+919723	MedDRA:10067097	5q minus MDS	SideEffect	MedDRA	
+830167	MESH:C553502	HLA-DRB1*03:01 antigen	Chemical	MESH	
+286282	HMDB:HMDB0058039	CL(18:1(11Z)/18:1(9Z)/18:1(11Z)/22:5(4Z,7Z,10Z,13Z,16Z))	Metabolite	HMDB	
+989686	ENTREZ:1350	COX7C	Gene	ENTREZ	
+331362	HMDB:HMDB0104032	TG(16:0/a-15:0/a-13:0)[rac]	Metabolite	HMDB	
+473867	HMDB:HMDB0317731	CL(18:2(9Z,12Z)/18:1(9Z)/20:5(5Z,8Z,11Z,14Z,17Z)/20:4(5Z,8Z,11Z,14Z))	Metabolite	HMDB	
+825825	MESH:C546371	ficuseptamine B	Chemical	MESH	
+938367	MedDRA:10066865	Ureteric anastomotic stenosis	SideEffect	MedDRA	
+947209	MedDRA:10006734	Burn of unspecified degree of foot	SideEffect	MedDRA	
+714515	MESH:C027755	rhodamine isothiocyanate	Chemical	MESH	
+400695	HMDB:HMDB0236221	CL(i-15:0/a-17:0/a-17:0/21:0)	Metabolite	HMDB	
+794986	MESH:C484112	kigamicin E	Chemical	MESH	
+843079	MESH:C583542	periconiasin A	Chemical	MESH	
+698682	MESH:C002934	MK 316	Chemical	MESH	
+1014039	ENTREZ:348262	MCRIP1	Gene	ENTREZ	
+461384	HMDB:HMDB0304879	Lasmiditan	Metabolite	HMDB	

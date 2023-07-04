@@ -1,3 +1,5 @@
+//! This module defines the routes of the API.
+
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Subgraph,

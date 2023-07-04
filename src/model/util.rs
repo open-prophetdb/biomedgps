@@ -1,3 +1,5 @@
+//! Utility functions for the model module. Contains functions to import data from CSV files into the database, and to update the metadata tables.
+
 use log::{debug, error, info, warn};
 use std::{error::Error, path::PathBuf};
 
@@ -45,7 +47,7 @@ pub async fn import_file_in_loop(
     unique_columns: &Vec<String>,
     delimiter: u8,
 ) -> Result<(), Box<dyn Error>> {
-    match sqlx::query("DROP TABLE staging").execute(pool).await {
+    match sqlx::query("DROP TABLE IF EXISTS staging").execute(pool).await {
         Ok(_) => {}
         Err(_) => {}
     }
@@ -87,6 +89,11 @@ pub async fn import_file_in_loop(
     .await?;
 
     tx.commit().await?;
+
+    match sqlx::query("DROP TABLE IF EXISTS staging").execute(pool).await {
+        Ok(_) => {}
+        Err(_) => {}
+    };
 
     Ok(())
 }

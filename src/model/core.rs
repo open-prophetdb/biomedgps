@@ -1,3 +1,5 @@
+//! The database schema for the application. These are the models that will be used to interact with the database.
+
 use super::util::{drop_table, get_delimiter, parse_csv_error};
 use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
@@ -310,6 +312,11 @@ impl<
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct Entity {
+    #[oai(read_only)]
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    pub idx: i64,
+
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
     #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
@@ -574,7 +581,7 @@ pub struct EntityMetadata {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
-    pub id: i32,
+    pub id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
@@ -624,7 +631,7 @@ pub struct RelationMetadata {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
-    pub id: i32,
+    pub id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]
@@ -827,7 +834,7 @@ pub struct Relation {
     #[oai(read_only)]
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
-    pub id: i32,
+    pub id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[oai(validator(max_length = 64))]

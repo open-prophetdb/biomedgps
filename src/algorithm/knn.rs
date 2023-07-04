@@ -1,3 +1,5 @@
+//! KNN algorithm for finding nearest neighbours
+
 use crate::model::core::EntityEmbedding;
 use kiddo::distance::squared_euclidean;
 use kiddo::KdTree;

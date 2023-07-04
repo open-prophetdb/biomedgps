@@ -1,3 +1,5 @@
+//! A SQL builder for building SQL queries.
+
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 
