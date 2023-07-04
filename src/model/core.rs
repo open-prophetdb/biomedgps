@@ -243,10 +243,11 @@ impl<
 {
     pub async fn get_records(
         pool: &sqlx::PgPool,
-        database_name: &str,
+        table_name: &str,
         query: &Option<ComposeQuery>,
         page: Option<u64>,
         page_size: Option<u64>,
+        order_by: Option<&str>,
     ) -> Result<RecordResponse<S>, anyhow::Error> {
         let mut query_str = match query {
             Some(ComposeQuery::QueryItem(item)) => item.format(),
@@ -258,29 +259,41 @@ impl<
             query_str = "1=1".to_string();
         };
 
-        let page = match page {
-            Some(page) => page,
-            None => 1,
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
         };
 
-        let page_size = match page_size {
-            Some(page_size) => page_size,
-            None => 10,
+        let pagination_str = if page.is_none() && page_size.is_none() {
+            "".to_string()
+        } else {
+            let page = match page {
+                Some(page) => page,
+                None => 1,
+            };
+
+            let page_size = match page_size {
+                Some(page_size) => page_size,
+                None => 10,
+            };
+
+            let limit = page_size;
+            let offset = (page - 1) * page_size;
+
+            format!("LIMIT {} OFFSET {}", limit, offset)
         };
 
         let sql_str = format!(
-            "SELECT * FROM {} WHERE {} ORDER BY id LIMIT {} OFFSET {}",
-            database_name,
-            query_str,
-            page_size,
-            (page - 1) * page_size
+            "SELECT * FROM {} WHERE {} {} {}",
+            table_name, query_str, order_by_str, pagination_str
         );
 
         let records = sqlx::query_as::<_, S>(sql_str.as_str())
             .fetch_all(pool)
             .await?;
 
-        let sql_str = format!("SELECT COUNT(*) FROM {} WHERE {}", database_name, query_str);
+        let sql_str = format!("SELECT COUNT(*) FROM {} WHERE {}", table_name, query_str);
 
         let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
             .fetch_one(pool)
@@ -289,8 +302,8 @@ impl<
         AnyOk(RecordResponse {
             records: records,
             total: total.0 as u64,
-            page: page,
-            page_size: page_size,
+            page: page.unwrap_or(0),
+            page_size: page_size.unwrap_or(0),
         })
     }
 }

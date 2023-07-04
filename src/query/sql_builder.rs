@@ -147,19 +147,21 @@ pub enum ComposeQuery {
 }
 
 impl ComposeQueryItem {
-    pub fn new(operator: String) -> Self {
+    pub fn new(operator: &str) -> Self {
         Self {
-            operator,
+            operator: operator.to_string(),
             items: vec![],
         }
     }
 
+    // Why ComposeQuery here?
+    // Because we can have nested ComposeQueryItem, it maybe a QueryItem or ComposeQueryItem
     pub fn add_item(&mut self, item: ComposeQuery) {
         self.items.push(item);
     }
 
     pub fn default() -> Self {
-        let mut default_query = ComposeQueryItem::new("and".to_string());
+        let mut default_query = ComposeQueryItem::new("and");
         default_query.add_item(ComposeQuery::QueryItem(QueryItem::new(
             "1".to_string(),
             Value::Int(1),
@@ -197,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_compose_query() {
-        let mut query = ComposeQueryItem::new("and".to_string());
+        let mut query = ComposeQueryItem::new("and");
         query.add_item(ComposeQuery::QueryItem(QueryItem::new(
             "id".to_string(),
             Value::Int(1),
@@ -209,7 +211,7 @@ mod tests {
             "like".to_string(),
         )));
 
-        let mut compose_query = ComposeQueryItem::new("or".to_string());
+        let mut compose_query = ComposeQueryItem::new("or");
         compose_query.add_item(ComposeQuery::QueryItem(QueryItem::new(
             "id".to_string(),
             Value::Int(2),

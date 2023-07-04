@@ -194,6 +194,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
+            Some("id ASC"),
         )
         .await
         {
@@ -253,6 +254,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
+            Some("relation_id ASC"),
         )
         .await
         {
@@ -389,6 +391,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
+            Some("id ASC"),
         )
         .await
         {
@@ -448,6 +451,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
+            Some("embedding_id ASC"),
         )
         .await
         {
@@ -507,6 +511,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
+            Some("created_time DESC"),
         )
         .await
         {
