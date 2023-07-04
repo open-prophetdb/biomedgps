@@ -72,7 +72,7 @@ pub struct ImportDBArguments {
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
-    /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph, record_response.
+    /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph, entity_embedding, relation_embedding
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
