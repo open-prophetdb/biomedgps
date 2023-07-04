@@ -10,12 +10,12 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use tempfile::tempdir;
 
-use biomedgps::api::model::{
+use biomedgps::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
     Subgraph,
 };
 
-use biomedgps::api::util::{
+use biomedgps::model::util::{
     drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
     update_relation_metadata,
 };

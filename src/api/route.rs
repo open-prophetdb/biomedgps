@@ -1,4 +1,4 @@
-use super::model::{
+use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Subgraph,
 };

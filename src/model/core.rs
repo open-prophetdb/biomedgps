@@ -1,4 +1,4 @@
-use crate::api::util::{drop_table, get_delimiter, parse_csv_error};
+use super::util::{drop_table, get_delimiter, parse_csv_error};
 use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
