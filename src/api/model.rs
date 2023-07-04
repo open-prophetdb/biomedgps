@@ -1,4 +1,4 @@
-use crate::api::util::{drop_table, get_delimiter};
+use crate::api::util::{drop_table, get_delimiter, parse_csv_error};
 use crate::query::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
@@ -61,6 +61,7 @@ pub trait CheckData {
     >(
         filepath: &PathBuf,
     ) -> Vec<Box<dyn Error>> {
+        info!("Start to check the csv file: {:?}", filepath);
         let mut validation_errors: Vec<Box<dyn Error>> = vec![];
         let delimiter = match get_delimiter(filepath) {
             Ok(d) => d,
@@ -90,7 +91,7 @@ pub trait CheckData {
         };
 
         // Try to deserialize each record
-        info!(
+        debug!(
             "Start to deserialize the csv file, real columns: {:?}, expected columns: {:?}",
             reader.headers().unwrap().into_iter().collect::<Vec<_>>(),
             Self::fields()
@@ -113,42 +114,9 @@ pub trait CheckData {
                     }
                 },
                 Err(e) => {
-                    let columns = match Self::get_column_names(filepath) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to get column names: ({})",
-                                e
-                            ))));
-                            continue;
-                        }
-                    };
+                    let error_msg = parse_csv_error(&e);
 
-                    match *e.kind() {
-                        csv::ErrorKind::Deserialize {
-                            pos: Some(ref pos),
-                            ref err,
-                            ..
-                        } => {
-                            let column = match err.field() {
-                                Some(c) => &columns[c as usize],
-                                None => "unknown",
-                            };
-
-                            validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to deserialize the data, line: {}, column: {}, details: ({})",
-                                pos.line(),
-                                column,
-                                err.kind()
-                            ))));
-                        }
-                        _ => {
-                            validation_errors.push(Box::new(ValidationError::new(&format!(
-                                "Failed to parse CSV: ({})",
-                                e
-                            ))));
-                        }
-                    }
+                    validation_errors.push(Box::new(ValidationError::new(&error_msg)));
 
                     continue;
                 }
@@ -428,7 +396,8 @@ impl EntityEmbedding {
             let record: EntityEmbedding = match result {
                 Ok(r) => r,
                 Err(e) => {
-                    return Err(Box::new(e));
+                    let error_msg = parse_csv_error(&e);
+                    return Err(Box::new(ValidationError::new(&error_msg)));
                 }
             };
 
@@ -455,7 +424,7 @@ impl EntityEmbedding {
 
 impl CheckData for EntityEmbedding {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
-        Self::check_csv_is_valid_default::<Entity>(filepath)
+        Self::check_csv_is_valid_default::<EntityEmbedding>(filepath)
     }
 
     fn unique_fields() -> Vec<String> {
@@ -531,7 +500,8 @@ impl RelationEmbedding {
             let record: RelationEmbedding = match result {
                 Ok(r) => r,
                 Err(e) => {
-                    return Err(Box::new(e));
+                    let error_msg = parse_csv_error(&e);
+                    return Err(Box::new(ValidationError::new(&error_msg)));
                 }
             };
 
@@ -560,7 +530,7 @@ impl RelationEmbedding {
 
 impl CheckData for RelationEmbedding {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
-        Self::check_csv_is_valid_default::<Entity>(filepath)
+        Self::check_csv_is_valid_default::<RelationEmbedding>(filepath)
     }
 
     fn unique_fields() -> Vec<String> {

@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{debug, error, info, warn};
 use std::{error::Error, path::PathBuf};
 
 pub fn get_delimiter(filepath: &PathBuf) -> Result<u8, Box<dyn Error>> {
@@ -176,4 +176,45 @@ pub async fn update_relation_metadata(
     info!("{} updated.", table_name);
 
     Ok(())
+}
+
+pub fn parse_csv_error(e: &csv::Error) -> String {
+    match *e.kind() {
+        csv::ErrorKind::Deserialize {
+            pos: Some(ref pos),
+            ref err,
+            ..
+        } => {
+            format!(
+                "Failed to deserialize the data, line: {}, column: {}, details: ({})",
+                pos.line(),
+                pos.record() + 1,
+                err.kind()
+            )
+        }
+        _ => {
+            format!("Failed to parse CSV: ({})", e)
+        }
+    }
+}
+
+pub fn show_errors(errors: &Vec<Box<dyn std::error::Error>>, show_all_errors: bool) {
+    if !show_all_errors {
+        let total = errors.len();
+        let num = if total > 3 { 3 } else { total };
+        warn!("Found {} errors, only show the {} validation errors, if you want to see all errors, use --show-all-errors.", total, num);
+        for e in errors.iter().take(3) {
+            error!("{}", e);
+        }
+
+        if total == num {
+            return;
+        } else {
+            warn!("Hide {} validation errors.", errors.len() - num);
+        }
+    } else {
+        for e in errors {
+            error!("{}", e);
+        }
+    }
 }

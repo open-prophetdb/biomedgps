@@ -16,7 +16,7 @@ use biomedgps::api::model::{
 };
 
 use biomedgps::api::util::{
-    drop_table, get_delimiter, import_file, import_file_in_loop, update_entity_metadata,
+    drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
     update_relation_metadata,
 };
 
@@ -211,41 +211,44 @@ async fn main() {
                     }
                 };
 
-                if arguments.table == "entity_embedding" {
-                    match EntityEmbedding::import_entity_embeddings(
-                        &pool,
-                        &file,
-                        delimiter,
-                        arguments.drop,
-                    )
-                    .await
-                    {
-                        Ok(_) => {
-                            info!("Import entity embeddings successfully.");
-                            return;
-                        }
-                        Err(e) => {
-                            error!("Failed to import entity embeddings: {}", e);
-                            return;
-                        }
+                match if arguments.table == "entity_embedding" {
+                    let errors = EntityEmbedding::check_csv_is_valid(&file);
+                    if errors.len() > 0 {
+                        show_errors(&errors, arguments.show_all_errors);
+                        return;
+                    } else {
+                        info!("The data file {} is valid.", file.display());
                     }
-                } else {
-                    match RelationEmbedding::import_relation_embeddings(
+
+                    EntityEmbedding::import_entity_embeddings(
                         &pool,
                         &file,
                         delimiter,
                         arguments.drop,
                     )
                     .await
-                    {
-                        Ok(_) => {
-                            info!("Import relation embeddings successfully.");
-                            return;
-                        }
-                        Err(e) => {
-                            error!("Failed to import relation embeddings: {}", e);
-                            return;
-                        }
+                } else {
+                    let errors = RelationEmbedding::check_csv_is_valid(&file);
+                    if errors.len() > 0 {
+                        show_errors(&errors, arguments.show_all_errors);
+                        return;
+                    };
+
+                    RelationEmbedding::import_relation_embeddings(
+                        &pool,
+                        &file,
+                        delimiter,
+                        arguments.drop,
+                    )
+                    .await
+                } {
+                    Ok(_) => {
+                        info!("Import embeddings into {} table successfully.", arguments.table);
+                        return;
+                    }
+                    Err(e) => {
+                        error!("Failed to parse CSV: ({})", e);
+                        return;
                     }
                 }
             } else {
@@ -303,18 +306,7 @@ async fn main() {
 
                     if validation_errors.len() > 0 {
                         error!("Invalid file: {}", filename);
-                        if !arguments.show_all_errors {
-                            warn!("Only show the 3 validation errors, if you want to see all errors, use --show-all-errors.");
-                            for e in validation_errors.iter().take(3) {
-                                error!("{}", e);
-                            }
-
-                            warn!("Hide {} validation errors.", validation_errors.len() - 3);
-                        } else {
-                            for e in validation_errors {
-                                error!("{}", e);
-                            }
-                        }
+                        show_errors(&validation_errors, arguments.show_all_errors);
                         warn!("Skipping {}...\n\n", filename);
                         continue;
                     } else {
