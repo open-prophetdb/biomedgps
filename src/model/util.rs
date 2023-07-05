@@ -21,6 +21,7 @@ pub fn get_delimiter(filepath: &PathBuf) -> Result<u8, Box<dyn Error>> {
 }
 
 pub async fn drop_table(pool: &sqlx::PgPool, table: &str) {
+    debug!("Dropping table {}...", table);
     sqlx::query(&format!(
         "
         DO $$ BEGIN

@@ -1,7 +1,8 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
 use super::util::{drop_table, get_delimiter, parse_csv_error};
-use crate::query::sql_builder::{ComposeQuery, QueryItem};
+use crate::pgvector::Vector;
+use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
@@ -21,7 +22,7 @@ lazy_static! {
     static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
     static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
     // 1.23|-4.56|7.89
-    static ref EMBEDDING_ARRAY_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
+    static ref EMBEDDING_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
 }
 
 #[derive(Debug)]
@@ -358,39 +359,154 @@ impl CheckData for Entity {
     }
 }
 
-fn text2array<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
+fn text2vector<'de, D>(deserializer: D) -> Result<Vector, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    s.split('|')
+    match s
+        .split('|')
         .map(|s| s.parse().map_err(serde::de::Error::custom))
-        .collect()
+        .collect::<Result<Vec<f32>, D::Error>>()
+    {
+        // More details on https://github.com/pgvector/pgvector-rust#sqlx
+        Ok(vec) => Ok(Vector::from(vec)),
+        Err(e) => Err(e),
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct EmbeddingRecordResponse<S>
+where
+    S: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync,
+{
+    /// data
+    pub records: Vec<S>,
+    /// total num
+    pub total: u64,
+    /// current page index
+    pub page: u64,
+    /// default 10
+    pub page_size: u64,
+}
+
+impl<
+        S: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+            + std::fmt::Debug
+            + std::marker::Unpin
+            + Send
+            + Sync,
+    > EmbeddingRecordResponse<S>
+{
+    pub async fn get_records(
+        pool: &sqlx::PgPool,
+        table_name: &str,
+        query: &Option<ComposeQuery>,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<EmbeddingRecordResponse<S>, anyhow::Error> {
+        let mut query_str = match query {
+            Some(ComposeQuery::QueryItem(item)) => item.format(),
+            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        };
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let pagination_str = if page.is_none() && page_size.is_none() {
+            "".to_string()
+        } else {
+            let page = match page {
+                Some(page) => page,
+                None => 1,
+            };
+
+            let page_size = match page_size {
+                Some(page_size) => page_size,
+                None => 10,
+            };
+
+            let limit = page_size;
+            let offset = (page - 1) * page_size;
+
+            format!("LIMIT {} OFFSET {}", limit, offset)
+        };
+
+        let sql_str = format!(
+            "SELECT * FROM {} WHERE {} {} {}",
+            table_name, query_str, order_by_str, pagination_str
+        );
+
+        let records = sqlx::query_as::<_, S>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!("SELECT COUNT(*) FROM {} WHERE {}", table_name, query_str);
+
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(EmbeddingRecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page.unwrap_or(0),
+            page_size: page_size.unwrap_or(0),
+        })
+    }
+}
+
+/// A struct for entity embedding, it is used for import entity embeddings into database from csv file.
+/// Only for internal use, not for api.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Validate)]
 pub struct EntityEmbedding {
     pub embedding_id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub entity_id: String,
 
-    #[oai(validator(max_length = 255))]
     #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     pub entity_name: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub entity_type: String,
 
-    #[serde(deserialize_with = "text2array")]
-    pub embedding_array: Vec<f32>,
+    #[serde(deserialize_with = "text2vector")]
+    pub embedding: Vector,
 }
 
 impl EntityEmbedding {
+    pub fn new(
+        embedding_id: i64,
+        entity_id: &str,
+        entity_name: &str,
+        entity_type: &str,
+        embedding: &Vec<f32>,
+    ) -> EntityEmbedding {
+        EntityEmbedding {
+            embedding_id: embedding_id,
+            entity_id: entity_id.to_string(),
+            entity_name: entity_name.to_string(),
+            entity_type: entity_type.to_string(),
+            embedding: Vector::from(embedding.clone()),
+        }
+    }
+
     pub async fn import_entity_embeddings(
         pool: &sqlx::PgPool,
         filepath: &PathBuf,
@@ -421,16 +537,16 @@ impl EntityEmbedding {
                 }
             };
 
-            let sql_str = format!(
-                "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding_array) VALUES ({}, '{}', '{}', '{}', ARRAY[{}]::FLOAT[])",
-                record.embedding_id,
-                record.entity_id,
-                record.entity_type,
-                record.entity_name,
-                record.embedding_array.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(",")
-            );
+            let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
 
-            match sqlx::query(&sql_str).execute(pool).await {
+            let query = sqlx::query(&sql_str)
+                .bind(record.embedding_id)
+                .bind(record.entity_id)
+                .bind(record.entity_type)
+                .bind(record.entity_name)
+                .bind(record.embedding);
+
+            match query.execute(pool).await {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(Box::new(e));
@@ -457,41 +573,36 @@ impl CheckData for EntityEmbedding {
             "entity_id".to_string(),
             "entity_type".to_string(),
             "entity_name".to_string(),
-            "embedding_array".to_string(),
+            "embedding".to_string(),
         ]
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+#[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Validate)]
 pub struct RelationEmbedding {
     pub embedding_id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[oai(validator(max_length = 64))]
     pub relation_type: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub source_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub source_id: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z]+$"))]
     pub target_type: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     #[validate(regex = "ENTITY_ID_REGEX")]
-    #[oai(validator(max_length = 64, pattern = "^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$"))]
     pub target_id: String,
 
-    #[serde(deserialize_with = "text2array")]
-    pub embedding_array: Vec<f32>,
+    #[serde(deserialize_with = "text2vector")]
+    pub embedding: Vector,
 }
 
 impl RelationEmbedding {
@@ -525,18 +636,18 @@ impl RelationEmbedding {
                 }
             };
 
-            let sql_str = format!(
-                "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, source_type, source_id, target_type, target_id, embedding_array) VALUES ({}, '{}', '{}', '{}', '{}', '{}', ARRAY[{}]::FLOAT[])",
-                record.embedding_id,
-                record.relation_type,
-                record.source_type,
-                record.source_id,
-                record.target_type,
-                record.target_id,
-                record.embedding_array.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(",")
-            );
+            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, source_type, source_id, target_type, target_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7)";
 
-            match sqlx::query(&sql_str).execute(pool).await {
+            let query = sqlx::query(&sql_str)
+                .bind(record.embedding_id)
+                .bind(record.relation_type)
+                .bind(record.source_type)
+                .bind(record.source_id)
+                .bind(record.target_type)
+                .bind(record.target_id)
+                .bind(record.embedding);
+
+            match query.execute(pool).await {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(Box::new(e));
@@ -571,7 +682,7 @@ impl CheckData for RelationEmbedding {
             "source_type".to_string(),
             "target_id".to_string(),
             "target_type".to_string(),
-            "embedding_array".to_string(),
+            "embedding".to_string(),
         ]
     }
 }

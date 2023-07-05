@@ -1,10 +1,9 @@
 //! KNN algorithm for finding nearest neighbours
 
-use crate::model::core::EntityEmbedding;
+use crate::{model::core::EntityEmbedding, pgvector::Vector};
 use kiddo::distance::squared_euclidean;
 use kiddo::KdTree;
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Entity {
@@ -36,9 +35,9 @@ impl NodeSimilarity {
         NodeSimilarity { source, targets }
     }
 
-    fn vec2array(vec: &Vec<f32>) -> [f32; LEN] {
+    fn vec2array(vec: &Vector) -> [f32; LEN] {
         let mut arr: [f32; LEN] = [0.0; LEN];
-        for (i, v) in vec.iter().enumerate() {
+        for (i, v) in vec.to_vec().iter().enumerate() {
             arr[i] = *v;
         }
         arr
@@ -47,12 +46,12 @@ impl NodeSimilarity {
     pub fn get_neighbours(&self, k: usize) -> Vec<Neighbour> {
         let mut tree: KdTree<f32, LEN> = KdTree::with_capacity(self.targets.len());
         for (index, target) in self.targets.iter().enumerate() {
-            let arr: [f32; LEN] = Self::vec2array(&target.embedding_array);
+            let arr: [f32; LEN] = Self::vec2array(&target.embedding);
 
             tree.add(&arr, index);
         }
 
-        let source_arr: [f32; LEN] = Self::vec2array(&self.source.embedding_array);
+        let source_arr: [f32; LEN] = Self::vec2array(&self.source.embedding);
         let neighbours = tree.nearest_n(&source_arr, k, &squared_euclidean);
         let mut result: Vec<Neighbour> = Vec::new();
         for neighbour in neighbours {
@@ -74,7 +73,7 @@ impl NodeSimilarity {
             };
 
             result.push(neighbour);
-        };
+        }
 
         result
     }
@@ -82,48 +81,62 @@ impl NodeSimilarity {
 
 #[cfg(test)]
 mod tests {
+    extern crate log;
+    extern crate stderrlog;
     use super::*;
-    use crate::model::core::EntityEmbedding;
+    use crate::model::core::{EmbeddingRecordResponse, EntityEmbedding};
+    use crate::{import_data, init_log, run_migrations};
+
+    // Setup the test database
+    async fn setup_test_db() -> sqlx::PgPool {
+        init_log();
+        // Get the database url from the environment variable
+        let database_url = match std::env::var("DATABASE_URL") {
+            Ok(v) => v,
+            Err(_) => {
+                println!("{}", "DATABASE_URL is not set.");
+                std::process::exit(1);
+            }
+        };
+        let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+
+        return pool;
+    }
+
+    #[tokio::test]
+    async fn test_get_neighbours() {
+        let pool = setup_test_db().await;
+
+        match EmbeddingRecordResponse::<EntityEmbedding>::get_records(
+            &pool,
+            "biomedgps_entity_embedding",
+            &None,
+            Some(1),
+            Some(10),
+            None,
+        )
+        .await
+        {
+            Ok(records) => {
+                assert!(records.records.len() > 0);
+                println!("records: {:?}", records);
+            }
+            Err(e) => {
+                println!("{}", e);
+                assert!(false);
+            }
+        }
+    }
 
     #[test]
     fn test_knn() {
-        let source = EntityEmbedding {
-            embedding_id: 1,
-            entity_id: "MESH:C0001".to_string(),
-            entity_name: "source1".to_string(),
-            entity_type: "Gene".to_string(),
-            embedding_array: vec![1.0, 2.0, 3.0],
-        };
+        let source = EntityEmbedding::new(1, "MESH:C0001", "source1", "Gene", &vec![1.0, 2.0, 3.0]);
 
         let targets = vec![
-            EntityEmbedding {
-                embedding_id: 1,
-                entity_id: "MESH:C0002".to_string(),
-                entity_name: "target1".to_string(),
-                entity_type: "Gene".to_string(),
-                embedding_array: vec![0.1, 0.2, 0.3],
-            },
-            EntityEmbedding {
-                embedding_id: 1,
-                entity_id: "MESH:C0003".to_string(),
-                entity_name: "target2".to_string(),
-                entity_type: "Gene".to_string(),
-                embedding_array: vec![0.4, 0.5, 0.6],
-            },
-            EntityEmbedding {
-                embedding_id: 1,
-                entity_id: "MESH:C0004".to_string(),
-                entity_name: "target3".to_string(),
-                entity_type: "Gene".to_string(),
-                embedding_array: vec![1.1, 1.2, 1.3],
-            },
-            EntityEmbedding {
-                embedding_id: 1,
-                entity_id: "MESH:C0005".to_string(),
-                entity_name: "target4".to_string(),
-                entity_type: "Gene".to_string(),
-                embedding_array: vec![2.1, 2.2, 2.3],
-            },
+            EntityEmbedding::new(1, "MESH:C0002", "target1", "Gene", &vec![0.1, 0.2, 0.3]),
+            EntityEmbedding::new(1, "MESH:C0003", "target2", "Gene", &vec![0.4, 0.5, 0.6]),
+            EntityEmbedding::new(1, "MESH:C0004", "target3", "Gene", &vec![1.1, 1.2, 1.3]),
+            EntityEmbedding::new(1, "MESH:C0005", "target4", "Gene", &vec![2.1, 2.2, 2.3]),
         ];
 
         let knn = NodeSimilarity::new(source, targets);

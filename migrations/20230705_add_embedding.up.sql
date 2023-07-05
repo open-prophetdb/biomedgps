@@ -14,7 +14,7 @@ CREATE TABLE
     entity_id VARCHAR(64) NOT NULL, -- The entity ID
     entity_type VARCHAR(64) NOT NULL, -- The entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     entity_name VARCHAR(255) NOT NULL, -- The entity name
-    embedding_array vector(400), -- The embedding array, the length of the embedding array is 400. It is related with the knowledge graph model, such as TransE, DistMult, etc.
+    embedding vector(400), -- The embedding array, the length of the embedding array is 400. It is related with the knowledge graph model, such as TransE, DistMult, etc.
     UNIQUE (entity_id, entity_type)
   );
 
@@ -27,7 +27,7 @@ CREATE TABLE
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
-    embedding_array vector(400), -- The embedding array
+    embedding vector(400), -- The embedding array
     UNIQUE (
       relation_type,
       source_id,

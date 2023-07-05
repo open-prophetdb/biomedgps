@@ -3,7 +3,8 @@
 pub mod algorithm;
 pub mod api;
 pub mod model;
-pub mod query;
+pub mod query_builder;
+pub mod pgvector;
 
 use crate::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
@@ -15,13 +16,12 @@ use crate::model::util::{
     update_relation_metadata,
 };
 
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use sqlx::migrate::Migrator;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use std::time;
 use tempfile::tempdir;
 
 const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");

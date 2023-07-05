@@ -6,7 +6,7 @@
 //!
 
 use crate::model::core::{Entity, RecordResponse, Relation};
-use crate::query::sql_builder::ComposeQuery;
+use crate::query_builder::sql_builder::ComposeQuery;
 use lazy_static::lazy_static;
 use log::{debug, error};
 use poem_openapi::Object;
@@ -621,23 +621,6 @@ impl Graph {
     ///
     /// * `Result<&Self, anyhow::Error>` - The result of fetching the nodes from the database
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sqlx::postgres::PgPool;
-    /// use biomedgps::model::graph::Graph;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
-    ///     let pool = PgPool::connect(database_url).await.unwrap();
-    ///     let mut graph = Graph::new();
-    ///     let node_ids = vec!["Compound::MESH:D0001", "Compound::MESH:D0002"];
-    ///
-    ///     assert!(graph.fetch_nodes_from_db(&pool, &node_ids).await.is_ok());
-    /// }
-    /// ```
-    ///
     async fn fetch_nodes_from_db(
         &self,
         pool: &sqlx::PgPool,
@@ -863,6 +846,34 @@ impl Graph {
     }
 
     /// Fetch the nodes from the database by node ids. It will update the nodes in the graph directly.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pool` - The database connection pool
+    /// * `node_ids` - The node ids, like `["Compound::MESH:D0001", "Compound::MESH:D0002"]`
+    /// 
+    /// # Returns
+    /// 
+    /// * `Ok(&Self)` - The graph
+    /// * `Err(ValidationError)` - The error message
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// use sqlx::postgres::PgPool;
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
+    ///     let pool = PgPool::connect(database_url).await.unwrap();
+    ///     let mut graph = Graph::new();
+    ///     let node_ids = vec!["Compound::MESH:D0001", "Compound::MESH:D0002"];
+    ///
+    ///     assert!(graph.fetch_nodes_by_ids(&pool, &node_ids).await.is_ok());
+    /// }
+    /// ```
+    ///
     pub async fn fetch_nodes_by_ids(
         &mut self,
         pool: &sqlx::PgPool,
@@ -943,7 +954,7 @@ mod tests {
     extern crate log;
     extern crate stderrlog;
     use super::*;
-    use crate::{import_data, init_log, run_migrations};
+    use crate::init_log;
     use regex::Regex;
 
     // Setup the test database
@@ -957,18 +968,6 @@ mod tests {
             }
         };
         let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
-
-        // Run the migrations
-        run_migrations(&database_url).await.unwrap();
-
-        // Import data file in examples folder into the database
-        let entity_data_file = "examples/entity.tsv";
-
-        import_data(&database_url, entity_data_file, "entity", true, true).await;
-
-        let relation_data_file = "examples/relation.tsv";
-
-        import_data(&database_url, relation_data_file, "relation", true, true).await;
 
         return pool;
     }
