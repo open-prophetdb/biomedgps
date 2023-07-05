@@ -18,11 +18,11 @@ use std::vec;
 use std::{error::Error, fmt};
 
 lazy_static! {
-    static ref COMPOSED_ENTITY_REGEX: Regex =
+    pub static ref COMPOSED_ENTITY_REGEX: Regex =
         Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
 }
 
-const COMPOSED_ENTITY_DELIMETER: &str = "::";
+pub const COMPOSED_ENTITY_DELIMETER: &str = "::";
 
 /// Custom Error type for the graph module
 #[derive(Debug)]

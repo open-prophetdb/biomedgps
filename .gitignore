@@ -28,3 +28,4 @@ resources/public/
 data
 assets/*
 !/assets/.gitkeep
+.VSCodeCounter

@@ -5,6 +5,10 @@ use kiddo::distance::squared_euclidean;
 use kiddo::KdTree;
 use serde::{Deserialize, Serialize};
 
+// The length of the embedding vector, if your embedding is 100 dimensional, then LEN = 100
+// You may need to change this value depending on your model
+const LEN: usize = 400;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Entity {
     pub embedding_id: i64,
@@ -19,10 +23,6 @@ pub struct Neighbour {
     pub target: Entity,
     pub distance: f32,
 }
-
-// The length of the embedding vector, if your embedding is 100 dimensional, then LEN = 100
-// You may need to change this value depending on your model
-const LEN: usize = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NodeSimilarity {
@@ -84,8 +84,10 @@ mod tests {
     extern crate log;
     extern crate stderrlog;
     use super::*;
+    use crate::init_log;
     use crate::model::core::{EmbeddingRecordResponse, EntityEmbedding};
-    use crate::{import_data, init_log, run_migrations};
+    use log::debug;
+    use serde::__private::de;
 
     // Setup the test database
     async fn setup_test_db() -> sqlx::PgPool {
@@ -119,10 +121,18 @@ mod tests {
         {
             Ok(records) => {
                 assert!(records.records.len() > 0);
-                println!("records: {:?}", records);
+
+                let source = records.records[0].clone();
+                let targets = records.records[1..].to_vec();
+
+                let knn = NodeSimilarity::new(source, targets);
+                let neighbours = knn.get_neighbours(3);
+
+                debug!("Neighbours: {:?}", neighbours);
+                assert_eq!(neighbours.len(), 3);
             }
             Err(e) => {
-                println!("{}", e);
+                debug!("{}", e);
                 assert!(false);
             }
         }

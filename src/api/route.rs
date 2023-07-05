@@ -1,5 +1,9 @@
 //! This module defines the routes of the API.
 
+use crate::api::schema::{
+    ApiTags, GetGraphResponse, GetRecordsResponse, GetWholeTableResponse, Pagination, PostResponse,
+    SimilarityNodeQuery, DeleteResponse
+};
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Subgraph,
@@ -7,110 +11,8 @@ use crate::model::core::{
 use crate::model::graph::Graph;
 use log::{debug, info, warn};
 use poem::web::Data;
-use poem_openapi::Object;
-use poem_openapi::{param::Path, param::Query, payload::Json, ApiResponse, OpenApi, Tags};
-use serde::{Deserialize, Serialize};
+use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::sync::Arc;
-
-#[derive(Tags)]
-enum ApiTags {
-    KnowledgeGraph,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
-struct ErrorMessage {
-    msg: String,
-}
-
-#[derive(ApiResponse)]
-enum GetGraphResponse {
-    #[oai(status = 200)]
-    Ok(Json<Graph>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetWholeTableResponse<
-    T: Serialize
-        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
-        + std::fmt::Debug
-        + std::marker::Unpin
-        + Send
-        + Sync
-        + poem_openapi::types::Type
-        + poem_openapi::types::ParseFromJSON
-        + poem_openapi::types::ToJSON,
-> {
-    #[oai(status = 200)]
-    Ok(Json<Vec<T>>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum GetRecordsResponse<
-    S: Serialize
-        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
-        + std::fmt::Debug
-        + std::marker::Unpin
-        + Send
-        + Sync
-        + poem_openapi::types::Type
-        + poem_openapi::types::ParseFromJSON
-        + poem_openapi::types::ToJSON,
-> {
-    #[oai(status = 200)]
-    Ok(Json<RecordResponse<S>>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum PostResponse<
-    S: Serialize
-        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
-        + std::fmt::Debug
-        + std::marker::Unpin
-        + Send
-        + Sync
-        + poem_openapi::types::Type
-        + poem_openapi::types::ParseFromJSON
-        + poem_openapi::types::ToJSON,
-> {
-    #[oai(status = 201)]
-    Created(Json<S>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-#[derive(ApiResponse)]
-enum DeleteResponse {
-    #[oai(status = 204)]
-    NoContent,
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
 
 pub struct BiomedgpsApi;
 
@@ -134,7 +36,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch entity metadata: {}", e);
                 warn!("{}", err);
-                return GetWholeTableResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetWholeTableResponse::bad_request(err);
             }
         }
     }
@@ -157,7 +59,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch relation metadata: {}", e);
                 warn!("{}", err);
-                return GetWholeTableResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetWholeTableResponse::bad_request(err);
             }
         }
     }
@@ -198,7 +100,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::bad_request(err);
                 }
             }
         };
@@ -217,7 +119,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }
@@ -258,7 +160,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::bad_request(err);
                 }
             }
         };
@@ -277,7 +179,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }
@@ -302,7 +204,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
-                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return PostResponse::bad_request(err);
             }
         }
     }
@@ -329,7 +231,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
-                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return PostResponse::bad_request(err);
             }
         }
     }
@@ -350,11 +252,11 @@ impl BiomedgpsApi {
         let id = id.0;
 
         match KnowledgeCuration::delete(&pool_arc, &id).await {
-            Ok(_) => DeleteResponse::NoContent,
+            Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete curated knowledge: {}", e);
                 warn!("{}", err);
-                DeleteResponse::NotFound(Json(ErrorMessage { msg: err }))
+                DeleteResponse::not_found(err)
             }
         }
     }
@@ -395,7 +297,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::bad_request(err);
                 }
             }
         };
@@ -414,7 +316,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }
@@ -455,7 +357,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::bad_request(err);
                 }
             }
         };
@@ -474,7 +376,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }
@@ -515,7 +417,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetRecordsResponse::bad_request(err);
                 }
             }
         };
@@ -534,7 +436,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch datasets: {}", e);
                 warn!("{}", err);
-                return GetRecordsResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }
@@ -559,7 +461,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
-                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return PostResponse::bad_request(err);
             }
         }
     }
@@ -586,7 +488,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to update curated knowledge: {}", e);
                 warn!("{}", err);
-                return PostResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return PostResponse::bad_request(err);
             }
         }
     }
@@ -611,7 +513,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to delete a subgraph: {}", e);
                 warn!("{}", err);
-                DeleteResponse::NotFound(Json(ErrorMessage { msg: err }))
+                DeleteResponse::not_found(err)
             }
         }
     }
@@ -643,7 +545,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch nodes: {}", e);
                 warn!("{}", err);
-                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetGraphResponse::bad_request(err);
             }
         }
     }
@@ -675,7 +577,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch nodes: {}", e);
                 warn!("{}", err);
-                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetGraphResponse::bad_request(err);
             }
         }
     }
@@ -716,7 +618,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                    return GetGraphResponse::bad_request(err);
                 }
             }
         };
@@ -730,8 +632,42 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch linked nodes: {}", e);
                 warn!("{}", err);
-                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                return GetGraphResponse::bad_request(err);
             }
         }
+    }
+
+    /// Call `/api/v1/similarity-nodes` with query params to fetch similarity nodes.
+    #[oai(
+        path = "/api/v1/similarity-nodes",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchSimilarityNodes"
+    )]
+    async fn fetch_similarity_nodes(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        node_id: Query<String>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+
+        let page = page.0;
+        let page_size = page_size.0;
+
+        let pagination = match Pagination::new(page, page_size) {
+            Ok(p) => p,
+            Err(e) => {
+                return GetGraphResponse::bad_request(e.to_string());
+            }
+        };
+
+        debug!("Pagination: {:?}", &pagination);
+
+        let mut graph = Graph::new();
+
+        GetGraphResponse::not_found("Not implemented yet.".to_string())
     }
 }

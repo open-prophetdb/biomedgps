@@ -1,0 +1,271 @@
+use crate::model::core::RecordResponse;
+use crate::model::graph::Graph;
+use crate::model::graph::COMPOSED_ENTITY_REGEX;
+use lazy_static::lazy_static;
+use log::{debug, info, warn};
+use poem_openapi::Object;
+use poem_openapi::{payload::Json, ApiResponse, Tags};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use validator::Validate;
+use validator::ValidationErrors;
+
+lazy_static! {
+    static ref JSON_REGEX: Regex =
+        Regex::new(r"^(\{.*\}|\[.*\])$").expect("Failed to compile regex");
+}
+
+#[derive(Tags)]
+pub enum ApiTags {
+    KnowledgeGraph,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
+pub struct ErrorMessage {
+    msg: String,
+}
+
+#[derive(ApiResponse)]
+pub enum GetGraphResponse {
+    #[oai(status = 200)]
+    Ok(Json<Graph>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetGraphResponse {
+    pub fn ok(graph: Graph) -> Self {
+        Self::Ok(Json(graph))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetWholeTableResponse<
+    T: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
+    #[oai(status = 200)]
+    Ok(Json<Vec<T>>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl<
+        T: Serialize
+            + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+            + std::fmt::Debug
+            + std::marker::Unpin
+            + Send
+            + Sync
+            + poem_openapi::types::Type
+            + poem_openapi::types::ParseFromJSON
+            + poem_openapi::types::ToJSON,
+    > GetWholeTableResponse<T>
+{
+    pub fn ok(vec_t: Vec<T>) -> Self {
+        Self::Ok(Json(vec_t))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetRecordsResponse<
+    S: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
+    #[oai(status = 200)]
+    Ok(Json<RecordResponse<S>>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl<
+        S: Serialize
+            + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+            + std::fmt::Debug
+            + std::marker::Unpin
+            + Send
+            + Sync
+            + poem_openapi::types::Type
+            + poem_openapi::types::ParseFromJSON
+            + poem_openapi::types::ToJSON,
+    > GetRecordsResponse<S>
+{
+    pub fn ok(record_response: RecordResponse<S>) -> Self {
+        Self::Ok(Json(record_response))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum PostResponse<
+    S: Serialize
+        + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
+    #[oai(status = 201)]
+    Created(Json<S>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl<
+        S: Serialize
+            + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+            + std::fmt::Debug
+            + std::marker::Unpin
+            + Send
+            + Sync
+            + poem_openapi::types::Type
+            + poem_openapi::types::ParseFromJSON
+            + poem_openapi::types::ToJSON,
+    > PostResponse<S>
+{
+    pub fn created(s: S) -> Self {
+        Self::Created(Json(s))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum DeleteResponse {
+    #[oai(status = 204)]
+    NoContent,
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl DeleteResponse {
+    pub fn no_content() -> Self {
+        Self::NoContent
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct SimilarityNodeQuery {
+    /// The ID of the object.
+    #[validate(regex(
+        path = "COMPOSED_ENTITY_REGEX",
+        message = "Invalid node id, it must be composed of entity type, ::, and entity id. e.g. Disease::MESH:D001"
+    ))]
+    pub node_id: String,
+
+    #[validate(regex(
+        path = "JSON_REGEX",
+        message = "Invalid query string, it must be a json string"
+    ))]
+    pub query_str: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct Pagination {
+    #[validate(range(min = 1, message = "Invalid page number, it must be greater than 0"))]
+    pub page: Option<u64>,
+
+    #[validate(range(min = 1, message = "Invalid page size, it must be greater than 0"))]
+    pub page_size: Option<u64>,
+}
+
+impl Pagination {
+    pub fn new(page: Option<u64>, page_size: Option<u64>) -> Result<Self, ValidationErrors> {
+        let pagination = match (page, page_size) {
+            (Some(page), Some(page_size)) => {
+                let p = Self {
+                    page: Some(page),
+                    page_size: Some(page_size),
+                };
+                match p.validate() {
+                    Ok(_) => p,
+                    Err(e) => {
+                        let err = format!("Invalid pagination: {}", e);
+                        warn!("{}", err);
+                        return Err(e)
+                    }
+                }
+            }
+            _ => Self {
+                page: Some(1),
+                page_size: Some(10),
+            },
+        };
+
+        Ok(pagination)
+    }
+}
