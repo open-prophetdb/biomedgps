@@ -90,36 +90,6 @@ CREATE TABLE
     UNIQUE (entity_id, entity_type)
   );
 
--- biomedgps_entity_embedding table is used to store the embedding of the entities for computing the similarity of the entities
-CREATE TABLE
-  IF NOT EXISTS biomedgps_entity_embedding (
-    embedding_id BIGINT PRIMARY KEY, -- The embedding ID
-    entity_id VARCHAR(64) NOT NULL, -- The entity ID
-    entity_type VARCHAR(64) NOT NULL, -- The entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    entity_name VARCHAR(255) NOT NULL, -- The entity name
-    embedding_array FLOAT[], -- The embedding array
-    UNIQUE (entity_id, entity_type)
-  );
-
--- biomedgps_relation_embedding table is used to store the embedding of the relations for predicting the relations
-CREATE TABLE
-  IF NOT EXISTS biomedgps_relation_embedding (
-    embedding_id BIGINT PRIMARY KEY, -- The embedding ID
-    relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
-    source_id VARCHAR(64) NOT NULL, -- The ID of the start entity
-    source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
-    target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
-    target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
-    embedding_array FLOAT[], -- The embedding array
-    UNIQUE (
-      relation_type,
-      source_id,
-      source_type,
-      target_id,
-      target_type
-    )
-  );
-
 -- biomedgps_subgraph table is used to store the subgraph which is created by the user
 CREATE TABLE
   IF NOT EXISTS biomedgps_subgraph (

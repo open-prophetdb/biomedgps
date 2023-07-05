@@ -4,6 +4,7 @@ use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Subgraph,
 };
+use crate::model::graph::Graph;
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::Object;
@@ -19,6 +20,18 @@ enum ApiTags {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
 struct ErrorMessage {
     msg: String,
+}
+
+#[derive(ApiResponse)]
+enum GetGraphResponse {
+    #[oai(status = 200)]
+    Ok(Json<Graph>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
 }
 
 #[derive(ApiResponse)]
@@ -599,6 +612,125 @@ impl BiomedgpsApi {
                 let err = format!("Failed to delete a subgraph: {}", e);
                 warn!("{}", err);
                 DeleteResponse::NotFound(Json(ErrorMessage { msg: err }))
+            }
+        }
+    }
+
+    /// Call `/api/v1/nodes` with query params to fetch nodes.
+    #[oai(
+        path = "/api/v1/nodes",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchNodes"
+    )]
+    async fn fetch_nodes(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        node_ids: Query<String>,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let node_ids = node_ids.0;
+
+        let mut graph = Graph::new();
+
+        if node_ids == "" {
+            return GetGraphResponse::Ok(Json(graph));
+        }
+
+        let node_ids: Vec<&str> = node_ids.split(",").collect();
+        match graph.fetch_nodes_by_ids(&pool_arc, &node_ids).await {
+            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Err(e) => {
+                let err = format!("Failed to fetch nodes: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/auto-connect-nodes` with query params to fetch edges which connect the input nodes.
+    #[oai(
+        path = "/api/v1/auto-connect-nodes",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEdgesAutoConnectNodes"
+    )]
+    async fn fetch_edges_auto_connect_nodes(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        node_ids: Query<String>,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let node_ids = node_ids.0;
+
+        let mut graph = Graph::new();
+
+        if node_ids == "" {
+            return GetGraphResponse::Ok(Json(graph));
+        }
+
+        let node_ids: Vec<&str> = node_ids.split(",").collect();
+        match graph.auto_connect_nodes(&pool_arc, &node_ids).await {
+            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Err(e) => {
+                let err = format!("Failed to fetch nodes: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+            }
+        }
+    }
+
+    /// Call `/api/v1/one-step-linked-nodes` with query params to fetch linked nodes with one step.
+    #[oai(
+        path = "/api/v1/one-step-linked-nodes",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchOneStepLinkedNodes"
+    )]
+    async fn fetch_one_step_linked_nodes(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
+                }
+            }
+        };
+
+        let mut graph = Graph::new();
+        match graph
+            .fetch_linked_nodes(&pool_arc, &query, page, page_size, None)
+            .await
+        {
+            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Err(e) => {
+                let err = format!("Failed to fetch linked nodes: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::BadRequest(Json(ErrorMessage { msg: err }));
             }
         }
     }

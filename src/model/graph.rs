@@ -3,9 +3,10 @@
 //! NOTICE:
 //! - The graph data structure is different from the Entity struct. The Entity struct is used to represent the entity data in the database. The graph data structure is used to represent the graph data which can be used by the frontend to render the graph.
 //! - The module is used to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
-//! 
+//!
 
-use crate::model::core::{Entity, Relation};
+use crate::model::core::{Entity, RecordResponse, Relation};
+use crate::query::sql_builder::ComposeQuery;
 use lazy_static::lazy_static;
 use log::{debug, error};
 use poem_openapi::Object;
@@ -13,6 +14,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::vec;
 use std::{error::Error, fmt};
 
 lazy_static! {
@@ -407,6 +409,25 @@ impl Graph {
         }
     }
 
+    /// Get the graph from the nodes and edges.
+    /// It will dedup the nodes and edges, and check if the related nodes are in the graph if the strict_mode is true.
+    ///
+    /// # Arguments
+    ///
+    /// * `strict_mode` - If the strict_mode is true, it will check if the related nodes are in the graph. Otherwise, it will not check it and just return the graph. If you don't care about the nodes, you can set it to false. Otherwise, you should set it to true, catch the error and get the missed nodes from the error by accessing the `error.data`. And then you can fetch the missed nodes by calling the `fetch_nodes_from_db` method of the `Graph` struct.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Graph, ValidationError>` - The graph or the error
+    ///
+    /// NOTE: If you don't care about the duplicated or missed nodes and edges, you can just call the `graph.to_owned()` method to get the graph.
+    pub fn get_graph(&mut self, strict_mode: Option<bool>) -> Result<Graph, ValidationError> {
+        match self.get_edges(strict_mode) {
+            Ok(_) => Ok(self.to_owned()),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Get the nodes in the graph
     ///
     /// # Returns
@@ -434,6 +455,8 @@ impl Graph {
         // Dedup the edges
         self.edges.sort_by(|a, b| a.relid.cmp(&b.relid));
         self.edges.dedup_by(|a, b| a.relid == b.relid);
+
+        self.nodes = self.get_nodes().to_vec();
 
         if strict_mode.is_some() {
             // Ensure the related nodes are in the graph
@@ -517,6 +540,18 @@ impl Graph {
     ///
     pub fn add_edge(&mut self, edge: Edge) {
         self.edges.push(edge);
+    }
+
+    /// Get the node ids from the edges, it contains the source and target node ids
+    pub fn get_node_ids_from_edges(&self) -> Vec<String> {
+        let mut node_ids: Vec<String> = vec![];
+        for edge in &self.edges {
+            node_ids.push(edge.source.clone());
+            node_ids.push(edge.target.clone());
+        }
+        node_ids.sort();
+        node_ids.dedup();
+        node_ids
     }
 
     /// Generate a query string to get the nodes from the database
@@ -603,11 +638,11 @@ impl Graph {
     /// }
     /// ```
     ///
-    pub async fn fetch_nodes_from_db(
-        &mut self,
+    async fn fetch_nodes_from_db(
+        &self,
         pool: &sqlx::PgPool,
         node_ids: &Vec<&str>,
-    ) -> Result<&Self, anyhow::Error> {
+    ) -> Result<Vec<Node>, anyhow::Error> {
         let query_str = Self::gen_entity_query_from_node_ids(node_ids);
 
         debug!("query_str: {}", query_str);
@@ -617,15 +652,14 @@ impl Graph {
             .await
         {
             Ok(records) => {
-                for record in records {
-                    let node = Node::new(&record);
-                    self.add_node(node);
-                }
-
-                Ok(self)
+                let nodes = records
+                    .iter()
+                    .map(|record| Node::new(&record))
+                    .collect::<Vec<Node>>();
+                Ok(nodes)
             }
             Err(e) => {
-                error!("Error in auto_connect_nodes: {}", e);
+                error!("Error in fetch_nodes_from_db: {}", e);
                 Err(e.into())
             }
         }
@@ -807,7 +841,11 @@ impl Graph {
         };
 
         match self.fetch_nodes_from_db(pool, node_ids).await {
-            Ok(_) => {}
+            Ok(nodes) => {
+                for node in nodes {
+                    self.add_node(node);
+                }
+            }
             Err(e) => {
                 error_msg = format!(
                     "{}\n{}",
@@ -824,8 +862,77 @@ impl Graph {
         }
     }
 
-    // Fetch the linked nodes with some relation types or other conditions
-    pub async fn fetch_linked_nodes() {}
+    /// Fetch the nodes from the database by node ids. It will update the nodes in the graph directly.
+    pub async fn fetch_nodes_by_ids(
+        &mut self,
+        pool: &sqlx::PgPool,
+        node_ids: &Vec<&str>,
+    ) -> Result<&Self, ValidationError> {
+        let nodes = match self.fetch_nodes_from_db(pool, node_ids).await {
+            Ok(nodes) => nodes,
+            Err(e) => {
+                return Err(ValidationError::new(
+                    &format!("Error in fetch_nodes_from_db: {}", e),
+                    vec![],
+                ))
+            }
+        };
+
+        for node in nodes {
+            self.add_node(node);
+        }
+
+        Ok(self)
+    }
+
+    /// Fetch the linked nodes with some relation types or other conditions, but only one step
+    pub async fn fetch_linked_nodes(
+        &mut self,
+        pool: &sqlx::PgPool,
+        query: &Option<ComposeQuery>,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<&Self, ValidationError> {
+        match RecordResponse::<Relation>::get_records(
+            pool,
+            "biomedgps_relation",
+            query,
+            page,
+            page_size,
+            order_by,
+        )
+        .await
+        {
+            Ok(records) => {
+                for record in records.records {
+                    let edge = Edge::new(&record);
+                    self.add_edge(edge);
+                }
+
+                // Fetch the nodes
+                let node_ids = self.get_node_ids_from_edges();
+                let node_ids_str = &node_ids.iter().map(|id| id.as_str()).collect();
+                match self.fetch_nodes_from_db(pool, node_ids_str).await {
+                    Ok(nodes) => {
+                        for node in nodes {
+                            self.add_node(node);
+                        }
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Error in fetch_nodes_from_db: {}", e);
+                        return Err(ValidationError::new(&error_msg, vec![]));
+                    }
+                };
+
+                Ok(self)
+            }
+            Err(e) => {
+                let error_msg = format!("Error in fetch_linked_nodes: {}", e);
+                Err(ValidationError::new(&error_msg, vec![]))
+            }
+        }
+    }
 
     // Fetch the linked nodes within n steps with some relation types or other conditions
     pub async fn fetch_linked_nodes_within_steps() {}
