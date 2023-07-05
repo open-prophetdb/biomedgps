@@ -1,5 +1,9 @@
-//! Graph module is used to define the graph data structure and its related functions. You can use it to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
+//! Graph module is used to define the graph data structure and its related functions.
 //!
+//! NOTICE:
+//! - The graph data structure is different from the Entity struct. The Entity struct is used to represent the entity data in the database. The graph data structure is used to represent the graph data which can be used by the frontend to render the graph.
+//! - The module is used to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
+//! 
 
 use crate::model::core::{Entity, Relation};
 use lazy_static::lazy_static;
@@ -15,6 +19,8 @@ lazy_static! {
     static ref COMPOSED_ENTITY_REGEX: Regex =
         Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
 }
+
+const COMPOSED_ENTITY_DELIMETER: &str = "::";
 
 /// Custom Error type for the graph module
 #[derive(Debug)]
@@ -58,6 +64,7 @@ const NODE_COLORS: [&str; 12] = [
     "#cab2d6", "#6a3d9a", "#ffff99", "#b15928",
 ];
 
+/// A NodeKeyShape struct for the node rendering.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct NodeKeyShape {
     pub fill: String,
@@ -68,6 +75,7 @@ pub struct NodeKeyShape {
 }
 
 impl NodeKeyShape {
+    /// Create a NodeKeyShape according to the node label.
     pub fn new(node_label: &str) -> Self {
         let color = Self::match_color(node_label);
 
@@ -79,7 +87,7 @@ impl NodeKeyShape {
         }
     }
 
-    // We have a set of colors and we want to match a color to a node label in a deterministic way.
+    /// We have a set of colors and we want to match a color to a node label in a deterministic way.
     fn match_color(node_label: &str) -> String {
         let mut hasher = DefaultHasher::new();
         node_label.hash(&mut hasher);
@@ -89,6 +97,7 @@ impl NodeKeyShape {
     }
 }
 
+/// A icon struct for the node rendering.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Icon {
     pub r#type: String,
@@ -99,9 +108,9 @@ pub struct Icon {
 }
 
 impl Icon {
+    /// Get the first character of the node label and convert it to a uppercase letter.
+    /// We use this letter as the icon value.
     pub fn new(node_label: &str) -> Self {
-        // Get the first character of the node label and convert it to a uppercase letter.
-        // We use this letter as the icon value.
         let first_char = node_label
             .chars()
             .next()
@@ -119,6 +128,7 @@ impl Icon {
     }
 }
 
+/// A style struct for the node rendering.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct NodeStyle {
     pub label: String,
@@ -127,6 +137,7 @@ pub struct NodeStyle {
 }
 
 impl NodeStyle {
+    /// Create a NodeStyle according to the node label.
     pub fn new(node_label: &str) -> Self {
         NodeStyle {
             label: node_label.to_string(),
@@ -144,6 +155,7 @@ where
     Ok(opt.or_else(|| Some("".to_string())))
 }
 
+/// A node struct. It is same with Entity struct but for the frontend to render.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct NodeData {
     pub identity: String,
@@ -157,6 +169,7 @@ pub struct NodeData {
 }
 
 impl NodeData {
+    /// Create a NodeData from an Entity.
     pub fn new(entity: &Entity) -> Self {
         NodeData {
             identity: entity.id.clone(),
@@ -169,9 +182,26 @@ impl NodeData {
     }
 }
 
+/// A node struct for the frontend to render.
+///
+/// NOTICE: Node - frontend, Entity - backend
+///
+/// Please follow the Graphin format to define the fields. more details on https://graphin.antv.vision/graphin/render/data
+///
+/// * `comboId` - We don't use the combo feature in the current stage, so we set the combo_id to None. It's just compatible with the Graphin format.
+/// * `id` - The id of the node. It's a combination of the node label and the node id. For example, "Disease::MESH:D0001". It must match the COMPOSED_ENTITY_REGEX regex. Different label can have the same entity id, so we need to add the label to the entity id and make a composed id for uniqueness.
+/// * `label` - The label of the node. It is same with the node id. For example, "Disease::MESH:D0001".
+/// * `nlabel` - The label of the entity. For example, "Disease".
+/// * `degree` - The degree of the node. It is used to determine the node size. For example, 10. In the current stage, we don't use this field.
+/// * `style` - The style of the node. It contains the label, keyshape and icon. The label is the node label. The keyshape is the node shape. The icon is the node icon. For example, {"label": "Disease", "keyshape": {"fill": "#a6cee3", "stroke": "#a6cee3", "opacity": 0.95, "fill_opacity": 0.95}, "icon": {"type": "text", "value": "D", "fill": "#000", "size": 15, "color": "#000"}}.
+/// * `category` - The category of the node. It must be "node".
+/// * `cluster` - In the current stage, we can use the label as the cluster to group the nodes. In future, maybe we can find other better ways to group the nodes. In that case, we can use the update_cluster method to update the cluster information.
+/// * `type` - The type of the node. It must be "graphin-circle".
+/// * `x` - The x coordinate of the node. It is used to determine the node position. For example, 100. In the currect stage, we use the tsne algorithm to calculate the node position. If you want to set x and y, you need to use the update_position method.
+/// * `y` - Same with x.
+/// * `data` - The data of the node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Node {
-    // Please follow the Graphin format to define the fields. more details on https://graphin.antv.vision/graphin/render/data
     #[serde(rename = "comboId")]
     pub combo_id: Option<String>,
     pub id: String,
@@ -188,19 +218,17 @@ pub struct Node {
 }
 
 impl Node {
+    /// Create a new node from an entity for the frontend to render.
     pub fn new(entity: &Entity) -> Self {
         let identity = Self::format_id(&entity.label, &entity.id);
         Node {
-            // We don't use the combo feature in the current stage, so we set the combo_id to None. It's just compatible with the Graphin format.
             combo_id: None,
-            // Different labels can have the same id, so we need to add the label to the id
             id: identity.clone(),
             label: identity,
             nlabel: entity.label.clone(),
             degree: None,
             style: NodeStyle::new(&entity.label),
             category: "node".to_string(),
-            // In the current stage, we can use the label as the cluster to group the nodes. In future, maybe we can find other better ways to group the nodes. In that case, we can use the update_cluster method to update the cluster information.
             cluster: Some(entity.label.clone()),
             r#type: "graphin-circle".to_string(),
             x: None,
@@ -209,40 +237,47 @@ impl Node {
         }
     }
 
+    /// Parse the node id to get the label and entity id.
     pub fn parse_id(id: &str) -> (String, String) {
-        let parts: Vec<&str> = id.split('-').collect();
+        let parts: Vec<&str> = id.split(COMPOSED_ENTITY_DELIMETER).collect();
         (parts[0].to_string(), parts[1].to_string())
     }
 
-    pub fn format_id(label: &str, id: &str) -> String {
-        format!("{}-{}", label, id)
+    /// Format the node id, we use the label and entity id to format the node id.
+    pub fn format_id(label: &str, entity_id: &str) -> String {
+        format!("{}{}{}", label, COMPOSED_ENTITY_DELIMETER, entity_id)
     }
 
-    // Update the node position
-    // We will use the tsne coordinates to update the node position, so we need to set the method to update the node position
+    /// Update the node position
+    /// We will use the tsne coordinates to update the node position, so we need to set the method to update the node position
     pub fn update_position(&mut self, x: f64, y: f64) {
         self.x = Some(x);
         self.y = Some(y);
     }
 
-    // Update the node degree
-    // TODO: We need to find a value as the degree of the node
+    /// Update the node degree.
+    ///
+    /// TODO: We need to find a value as the degree of the node
     pub fn update_degree(&mut self, degree: i32) {
         self.degree = Some(degree);
     }
 
-    // Update the node cluster
-    // Some layout algorithms will use the cluster information to group the nodes.
+    /// Update the node cluster.
+    ///
+    /// Some layout algorithms will use the cluster information to group the nodes.
     pub fn update_cluster(&mut self, cluster: String) {
         self.cluster = Some(cluster);
     }
 }
 
+/// The EdgeLabel struct is used to store the edge label information. The value will be displayed on the edge.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeLabel {
     pub value: String,
 }
 
+/// The EdgeKeyShape struct is used to store the edge key shape information.
+/// In the current stage, we use the default value for the edge key shape. In future, we can add more fields to the EdgeKeyShape struct to customize the edge key shape.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeKeyShape {
     #[serde(rename = "lineDash")]
@@ -253,7 +288,7 @@ pub struct EdgeKeyShape {
 }
 
 impl EdgeKeyShape {
-    // In the current stage, we use the default value for the edge key shape. In future, we can add more fields to the EdgeKeyShape struct to customize the edge key shape.
+    /// Create a new key shape for the edge.
     pub fn new() -> Self {
         EdgeKeyShape {
             line_dash: [5, 5],
@@ -263,6 +298,7 @@ impl EdgeKeyShape {
     }
 }
 
+/// The EdgeStyle struct is used to store the edge style information. The frontend will use these information to render the edge.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeStyle {
     pub label: EdgeLabel,
@@ -270,6 +306,7 @@ pub struct EdgeStyle {
 }
 
 impl EdgeStyle {
+    /// Create a new style for the edge.
     pub fn new(relation_type: &str) -> Self {
         EdgeStyle {
             label: EdgeLabel {
@@ -280,6 +317,7 @@ impl EdgeStyle {
     }
 }
 
+/// The Edge struct is used to store the edge information. The frontend will use these information.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeData {
     pub relation_type: String,
@@ -290,10 +328,11 @@ pub struct EdgeData {
     pub score: f64,
     pub key_sentence: String,
     pub resource: String,
-    // In future, we can add more fields here after we add additional fields for the Entity struct
+    // In future, we can add more fields here after we add additional fields for the Relation struct
 }
 
 impl EdgeData {
+    /// Create a new EdgeData struct from a Relation struct
     pub fn new(relation: &Relation) -> Self {
         EdgeData {
             relation_type: relation.relation_type.clone(),
@@ -308,10 +347,18 @@ impl EdgeData {
     }
 }
 
+/// The edge struct which is compatible with the Graphin format
+///
+/// * `relid` - The id of the edge. It's the combination of the source id, the relation type and the target id.
+/// * `source` - The source and target fields are the id of the node. It must be the same as the id field of the Node struct. Otherwise, the edge will not be connected to the node.
+/// * `category` - The category of the edge. It must be "edge".
+/// * `target` - Same as the source field.
+/// * `reltype` - The relation type of the edge. Such as "Inhibitor::Gene:Gene".
+/// * `style` - The style of the edge. It contains the label and the keyshape. More details can be found in the [`EdgeStyle`](struct.EdgeStyle.html) struct.
+/// * `data` - The data of the edge. It contains the relation information. Its fields are the same as the [`Relation`](struct.Relation.html) struct.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Edge {
     pub relid: String,
-    // The source and target fields are the id of the node, not the label or entity id of the node. It must be the same as the id field of the Node struct. Otherwise, the edge will not be connected to the node.
     pub source: String,
     pub category: String,
     pub target: String,
@@ -321,6 +368,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Create a new edge. It will convert the [`Relation`](struct.Relation.html) struct to the [`Edge`](struct.Edge.html) struct.
     pub fn new(relation: &Relation) -> Self {
         let relid = format!(
             "{}-{}-{}",
@@ -338,6 +386,7 @@ impl Edge {
     }
 }
 
+/// The graph struct, which contains the nodes and edges
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Graph {
     nodes: Vec<Node>,
@@ -345,6 +394,12 @@ pub struct Graph {
 }
 
 impl Graph {
+    /// Create a new graph
+    ///
+    /// # Returns
+    ///
+    /// * `Graph` - The new graph
+    ///
     pub fn new() -> Self {
         Graph {
             nodes: vec![],
@@ -352,7 +407,12 @@ impl Graph {
         }
     }
 
-    // Get the nodes in the graph
+    /// Get the nodes in the graph
+    ///
+    /// # Returns
+    ///
+    /// * `&Vec<Node>` - The nodes in the graph
+    ///
     pub fn get_nodes(&mut self) -> &Vec<Node> {
         // Dedup the nodes
         self.nodes.sort_by(|a, b| a.id.cmp(&b.id));
@@ -363,6 +423,13 @@ impl Graph {
     /// Get the edges in the graph and check if the related nodes are in the graph if the strict_mode is true. It will return the missed nodes here instead of fetching the missed nodes in the get_nodes function.
     ///
     /// # Arguments
+    ///
+    /// * `strict_mode` - If the strict_mode is true, it will check if the related nodes are in the graph. Otherwise, it will not check the related nodes.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<&Vec<Edge>, ValidationError>` - If the strict_mode is true, it will return the missed nodes in the graph.
+    ///
     pub fn get_edges(&mut self, strict_mode: Option<bool>) -> Result<&Vec<Edge>, ValidationError> {
         // Dedup the edges
         self.edges.sort_by(|a, b| a.relid.cmp(&b.relid));
@@ -499,7 +566,8 @@ impl Graph {
             return "".to_string();
         } else {
             let query_str = format!(
-                "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '::' || COALESCE(id, '') in ('{}');",
+                "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '{}' || COALESCE(id, '') in ('{}');",
+                COMPOSED_ENTITY_DELIMETER,
                 filtered_node_ids.join("', '")
             );
 
@@ -662,9 +730,11 @@ impl Graph {
             let query_str = format!(
                 "SELECT * 
                  FROM biomedgps_relation
-                 WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('{}') AND 
-                       COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('{}');",
+                 WHERE COALESCE(source_type, '') || '{}' || COALESCE(source_id, '') in ('{}') AND 
+                       COALESCE(target_type, '') || '{}' || COALESCE(target_id, '') in ('{}');",
+                COMPOSED_ENTITY_DELIMETER,
                 filtered_node_ids.join("', '"),
+                COMPOSED_ENTITY_DELIMETER,
                 filtered_node_ids.join("', '"),
             );
 
@@ -766,7 +836,7 @@ mod tests {
     extern crate log;
     extern crate stderrlog;
     use super::*;
-    use crate::{import_data, run_migrations, init_log};
+    use crate::{import_data, init_log, run_migrations};
     use regex::Regex;
 
     // Setup the test database
