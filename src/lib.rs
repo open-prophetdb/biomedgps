@@ -3,26 +3,27 @@
 pub mod algorithm;
 pub mod api;
 pub mod model;
-pub mod query_builder;
 pub mod pgvector;
+pub mod query_builder;
 
 use crate::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
     Subgraph,
 };
-
 use crate::model::util::{
     drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
     update_relation_metadata,
 };
-
-use log::{error, info, warn, debug};
+use log::{debug, error, info, warn};
 use sqlx::migrate::Migrator;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use tempfile::tempdir;
+use url::form_urlencoded;
+use std::collections::HashMap;
+use serde_json::Value;
 
 const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");
 
@@ -339,4 +340,60 @@ pub fn init_log() {
         .verbosity(5)
         .timestamp(stderrlog::Timestamp::Second)
         .init();
+}
+
+// Setup the test database
+pub async fn setup_test_db() -> sqlx::PgPool {
+    // Get the database url from the environment variable
+    let database_url = match std::env::var("DATABASE_URL") {
+        Ok(v) => v,
+        Err(_) => {
+            println!("{}", "DATABASE_URL is not set.");
+            std::process::exit(1);
+        }
+    };
+    let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+
+    return pool;
+}
+
+pub fn jsonstr2urlstr(json_str: &str) -> String {
+    // // This is your JSON string.
+    // let json_str = r#"{
+    //     "key1": "value1",
+    //     "key2": "value2"
+    // }"#;
+
+    // Parse the JSON string into a serde_json::Value.
+    let v: Value = serde_json::from_str(json_str).expect("Failed to parse JSON");
+
+    // Convert the Value into a HashMap.
+    let map: HashMap<String, String> = v
+        .as_object()
+        .expect("Expected JSON to be an Object")
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.clone(),
+                v.as_str()
+                    .expect("Expected value to be a String")
+                    .to_string(),
+            )
+        })
+        .collect();
+
+    // Convert the HashMap into a URL-encoded string.
+    let encoded: String = form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(map)
+        .finish();
+
+    return encoded;
+}
+
+pub fn kv2urlstr(key: &str, value: &str) -> String {
+    let encoded: String = form_urlencoded::Serializer::new(String::new())
+        .append_pair(key, value)
+        .finish();
+
+    return encoded;
 }

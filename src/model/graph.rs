@@ -6,23 +6,47 @@
 //!
 
 use crate::model::core::{Entity, RecordResponse, Relation};
-use crate::query_builder::sql_builder::ComposeQuery;
+use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
 use log::{debug, error};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::vec;
 use std::{error::Error, fmt};
 
+// The delimiter is defined here, if we want to change it, please change it here.
+pub const COMPOSED_ENTITY_DELIMITER: &str = "::";
+
 lazy_static! {
     pub static ref COMPOSED_ENTITY_REGEX: Regex =
         Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
-}
 
-pub const COMPOSED_ENTITY_DELIMETER: &str = "::";
+    // There is a comma between the composed entitys, each composed entity must be composed of entity type, ::, and entity id. e.g. Disease::MESH:D001755,Drug::CHEMBL:CHEMBL88
+    pub static ref COMPOSED_ENTITIES_REGEX: Regex =
+        Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+(,[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+)*$").unwrap();
+
+    // Only for predicted edge
+    pub static ref PREDICTED_EDGE_COLOR_MAP: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        // #FF0000 is red
+        m.insert("SimilarityNode", "#FF0000");
+        // #ccc is gray
+        m.insert("Default", "#ccc");
+        // ...add more pairs here
+        m
+    };
+
+    pub static ref PREDICTED_EDGE_TYPES: Vec<&'static str> = {
+        let mut v = Vec::new();
+        v.push("SimilarityNode");
+        v.push("Default");
+        v
+    };
+}
 
 /// Custom Error type for the graph module
 #[derive(Debug)]
@@ -67,12 +91,15 @@ const NODE_COLORS: [&str; 12] = [
 ];
 
 /// A NodeKeyShape struct for the node rendering.
+///
+/// Need to rename the field `fill_opacity` to `fillOpacity` in the frontend. More details on https://docs.rs/poem-openapi/latest/poem_openapi/derive.Object.html
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct NodeKeyShape {
     pub fill: String,
     pub stroke: String,
     pub opacity: f64,
-    #[serde(rename = "fillOpacity")]
+    #[oai(rename = "fillOpacity")]
+    #[serde(rename(serialize = "fillOpacity", deserialize = "fill_opacity"))]
     pub fill_opacity: f64,
 }
 
@@ -204,7 +231,8 @@ impl NodeData {
 /// * `data` - The data of the node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Node {
-    #[serde(rename = "comboId")]
+    #[oai(rename = "comboId")]
+    #[serde(rename(serialize = "comboId", deserialize = "combo_id"))]
     pub combo_id: Option<String>,
     pub id: String,
     pub label: String,
@@ -241,13 +269,13 @@ impl Node {
 
     /// Parse the node id to get the label and entity id.
     pub fn parse_id(id: &str) -> (String, String) {
-        let parts: Vec<&str> = id.split(COMPOSED_ENTITY_DELIMETER).collect();
+        let parts: Vec<&str> = id.split(COMPOSED_ENTITY_DELIMITER).collect();
         (parts[0].to_string(), parts[1].to_string())
     }
 
     /// Format the node id, we use the label and entity id to format the node id.
     pub fn format_id(label: &str, entity_id: &str) -> String {
-        format!("{}{}{}", label, COMPOSED_ENTITY_DELIMETER, entity_id)
+        format!("{}{}{}", label, COMPOSED_ENTITY_DELIMITER, entity_id)
     }
 
     /// Update the node position
@@ -278,23 +306,33 @@ pub struct EdgeLabel {
     pub value: String,
 }
 
-/// The EdgeKeyShape struct is used to store the edge key shape information.
+/// The EdgeKeyShape struct is used to store the edge key shape information. Only for the predicted edges.
 /// In the current stage, we use the default value for the edge key shape. In future, we can add more fields to the EdgeKeyShape struct to customize the edge key shape.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeKeyShape {
-    #[serde(rename = "lineDash")]
+    #[oai(rename = "lineDash")]
+    #[serde(rename(serialize = "lineDash", deserialize = "line_dash"))]
     pub line_dash: [i32; 2],
+
     pub stroke: String,
-    #[serde(rename = "lineWidth")]
+
+    #[oai(rename = "lineWidth")]
+    #[serde(rename(serialize = "lineWidth", deserialize = "line_width"))]
     pub line_width: i32,
 }
 
 impl EdgeKeyShape {
     /// Create a new key shape for the edge.
-    pub fn new() -> Self {
+    pub fn new(relation_type: &str) -> Self {
+        let color = if relation_type == "SimilarityNode" {
+            PREDICTED_EDGE_COLOR_MAP.get("SimilarityNode").unwrap()
+        } else {
+            PREDICTED_EDGE_COLOR_MAP.get("Default").unwrap()
+        };
+
         EdgeKeyShape {
             line_dash: [5, 5],
-            stroke: "#ccc".to_string(),
+            stroke: color.to_string(),
             line_width: 2,
         }
     }
@@ -304,17 +342,27 @@ impl EdgeKeyShape {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct EdgeStyle {
     pub label: EdgeLabel,
-    pub keyshape: EdgeKeyShape,
+    #[oai(skip_serializing_if_is_none)]
+    pub keyshape: Option<EdgeKeyShape>,
 }
 
 impl EdgeStyle {
-    /// Create a new style for the edge.
+    /// Create a new style for the edge. Keyshape is only for the predicted edges.
     pub fn new(relation_type: &str) -> Self {
-        EdgeStyle {
-            label: EdgeLabel {
-                value: relation_type.to_string(),
-            },
-            keyshape: EdgeKeyShape::new(),
+        if PREDICTED_EDGE_TYPES.contains(&relation_type) {
+            EdgeStyle {
+                label: EdgeLabel {
+                    value: relation_type.to_string(),
+                },
+                keyshape: Some(EdgeKeyShape::new(relation_type)),
+            }
+        } else {
+            EdgeStyle {
+                label: EdgeLabel {
+                    value: relation_type.to_string(),
+                },
+                keyshape: None,
+            }
         }
     }
 }
@@ -370,8 +418,39 @@ pub struct Edge {
 }
 
 impl Edge {
-    /// Create a new edge. It will convert the [`Relation`](struct.Relation.html) struct to the [`Edge`](struct.Edge.html) struct.
-    pub fn new(relation: &Relation) -> Self {
+    /// Create a new edge.
+    pub fn new(
+        relation_type: &str,
+        source_id: &str,
+        source_type: &str,
+        target_id: &str,
+        target_type: &str,
+        distance: Option<f64>,
+    ) -> Self {
+        let relid = format!("{}-{}-{}", source_id, relation_type, target_id);
+
+        Edge {
+            relid: relid.clone(),
+            source: Node::format_id(source_type, source_id),
+            category: "edge".to_string(),
+            target: Node::format_id(target_type, target_id),
+            reltype: relation_type.to_string(),
+            style: EdgeStyle::new(relation_type),
+            data: EdgeData {
+                relation_type: relation_type.to_string(),
+                source_id: source_id.to_string(),
+                source_type: source_type.to_string(),
+                target_id: target_id.to_string(),
+                target_type: target_type.to_string(),
+                score: distance.unwrap_or(0.0),
+                key_sentence: "".to_string(),
+                resource: "".to_string(),
+            },
+        }
+    }
+
+    /// It will convert the [`Relation`](struct.Relation.html) struct to the [`Edge`](struct.Edge.html) struct.
+    pub fn from_relation(relation: &Relation) -> Self {
         let relid = format!(
             "{}-{}-{}",
             relation.source_id, relation.relation_type, relation.target_id
@@ -384,6 +463,113 @@ impl Edge {
             reltype: relation.relation_type.clone(),
             style: EdgeStyle::new(&relation.relation_type),
             data: EdgeData::new(relation),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow)]
+struct SimilarityNode {
+    node_id: String,
+    distance: Option<f64>,
+}
+
+impl SimilarityNode {
+    /// Fetch the similar nodes from the database by node id. It is based on the node embeddings.
+    /// We will use the pgvector extension to calculate the similarity between the node embeddings.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - The database connection pool.
+    /// * `node_id` - The id of the node. It is the combination of the node type and the node id. Such as "Gene::ENTREZ:123".
+    /// * `query` - The query to filter the nodes. It is a compose query. More details on the compose query can be found in the [`ComposeQuery`](struct.ComposeQuery.html) struct.
+    /// * `topk` - The number of the similar nodes to be fetched. default is 10.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Vec<Self>, ValidationError>` - The similar nodes.
+    ///
+    pub async fn fetch_similarity_nodes(
+        pool: &sqlx::PgPool,
+        node_id: &str,
+        query: &Option<ComposeQuery>,
+        topk: Option<u64>,
+    ) -> Result<Vec<Self>, ValidationError> {
+        let default_query = ComposeQuery::QueryItem(QueryItem::new(
+            format!(
+                "COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '')",
+                COMPOSED_ENTITY_DELIMITER
+            ),
+            Value::String(node_id.to_string()),
+            "<>".to_string(),
+        ));
+
+        let query_str = match query {
+            Some(query) => ComposeQueryItem::new("and")
+                .add_item(query.clone())
+                .add_item(default_query)
+                .format(),
+            None => ComposeQueryItem::default().add_item(default_query).format(),
+        };
+
+        // The first one is the node itself, so we need to add 1 to the topk
+        let topk = match topk {
+            Some(topk) => topk,
+            None => 10,
+        };
+
+        // Example:
+        // SELECT COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') AS node_id,
+        //         embedding <-> (SELECT embedding FROM biomedgps_entity_embedding
+        // 					      WHERE COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') = 'Chemical::MESH:C000601183') AS distance
+        // FROM biomedgps_entity_embedding
+        // WHERE entity_type = 'Chemical' AND COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') <> 'Chemical::MESH:C000601183'
+        // ORDER BY distance ASC
+        // LIMIT 5;
+
+        let sql_str = format!(
+            "SELECT COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '') AS node_id, 
+                    embedding <-> (SELECT embedding FROM biomedgps_entity_embedding 
+                                   WHERE COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '') = $1) AS distance 
+             FROM biomedgps_entity_embedding 
+             WHERE {}
+             ORDER BY distance ASC
+             LIMIT {};",
+            COMPOSED_ENTITY_DELIMITER, COMPOSED_ENTITY_DELIMITER, query_str, topk
+        );
+
+        debug!(
+            "sql_str: {} with arguments $1: `{}`, $2: `{}`",
+            sql_str, node_id, query_str
+        );
+
+        match sqlx::query_as::<_, Self>(sql_str.as_str())
+            .bind(node_id)
+            .fetch_all(pool)
+            .await
+        {
+            Ok(similarity_nodes) => {
+                let filtered_similarity_nodes = similarity_nodes
+                    .into_iter()
+                    .filter(|node| node.distance.is_some())
+                    .collect::<Vec<Self>>();
+
+                if filtered_similarity_nodes.is_empty() {
+                    error!("No similar nodes found, you may need to check the node id {} or check if the embedding database matches the entity database", node_id);
+                    return Err(ValidationError::new(
+                        "No similar nodes found, please check your input.",
+                        vec![],
+                    ));
+                } else {
+                    return Ok(filtered_similarity_nodes);
+                }
+            }
+            Err(err) => {
+                error!("Failed to fetch similarity nodes from database: {}", err);
+                Err(ValidationError::new(
+                    "Failed to fetch similarity nodes from database, please check your input.",
+                    vec![],
+                ))
+            }
         }
     }
 }
@@ -531,7 +717,7 @@ impl Graph {
     /// };
     ///
     /// let mut graph = Graph::new();
-    /// let edge = Edge::new(&relation);
+    /// let edge = Edge::from_relation(&relation);
     /// graph.add_edge(edge);
     ///
     /// let edges = graph.get_edges(None).unwrap();
@@ -578,10 +764,6 @@ impl Graph {
     /// assert_eq!(query, expected_query);
     /// ```
     pub fn gen_entity_query_from_node_ids(node_ids: &Vec<&str>) -> String {
-        // SELECT *
-        // FROM (SELECT *, COALESCE(label, '') || '::' || COALESCE(id, '') AS full_name FROM biomedgps_entity) as T
-        // WHERE full_name in ('Compound::MESH:002', 'Compound::MESH:D0001');
-
         debug!("Raw node_ids: {:?}", node_ids);
 
         // Remove invalid node ids
@@ -602,7 +784,7 @@ impl Graph {
         } else {
             let query_str = format!(
                 "SELECT * FROM biomedgps_entity WHERE COALESCE(label, '') || '{}' || COALESCE(id, '') in ('{}');",
-                COMPOSED_ENTITY_DELIMETER,
+                COMPOSED_ENTITY_DELIMITER,
                 filtered_node_ids.join("', '")
             );
 
@@ -749,9 +931,9 @@ impl Graph {
                  FROM biomedgps_relation
                  WHERE COALESCE(source_type, '') || '{}' || COALESCE(source_id, '') in ('{}') AND 
                        COALESCE(target_type, '') || '{}' || COALESCE(target_id, '') in ('{}');",
-                COMPOSED_ENTITY_DELIMETER,
+                COMPOSED_ENTITY_DELIMITER,
                 filtered_node_ids.join("', '"),
-                COMPOSED_ENTITY_DELIMETER,
+                COMPOSED_ENTITY_DELIMITER,
                 filtered_node_ids.join("', '"),
             );
 
@@ -814,7 +996,7 @@ impl Graph {
         {
             Ok(records) => {
                 for record in records {
-                    let edge = Edge::new(&record);
+                    let edge = Edge::from_relation(&record);
                     self.add_edge(edge);
                 }
             }
@@ -846,17 +1028,17 @@ impl Graph {
     }
 
     /// Fetch the nodes from the database by node ids. It will update the nodes in the graph directly.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `pool` - The database connection pool
     /// * `node_ids` - The node ids, like `["Compound::MESH:D0001", "Compound::MESH:D0002"]`
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(&Self)` - The graph
     /// * `Err(ValidationError)` - The error message
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -896,6 +1078,128 @@ impl Graph {
         Ok(self)
     }
 
+    /// Fetch the similar nodes from the database by node id and convert them to nodes and edges in the graph.
+    ///
+    /// NOTICE: All edges are not real edges, they are just used to show the similarity between nodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - The database connection pool
+    /// * `node_id` - The node id, like `Compound::MESH:D0001`
+    /// * `query` - The query to filter the nodes
+    /// * `topk` - The number of nodes to return
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(&Self)` - The graph
+    /// * `Err(ValidationError)` - The error message
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqlx::postgres::PgPool;
+    /// use biomedgps::model::graph::Graph;
+    /// use biomedgps::query_builder::sql_builder::ComposeQuery;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
+    ///     let pool = PgPool::connect(database_url).await.unwrap();
+    ///     let mut graph = Graph::new();
+    ///     let node_id = "Chemical::MESH:C000601183";
+    ///     let query = None;
+    ///     let topk = Some(10);
+    ///
+    ///     match graph.fetch_similarity_nodes(&pool, &node_id, &query, topk).await {
+    ///         Ok(graph) => {
+    ///             println!("graph: {:?}", graph);
+    ///         }
+    ///         Err(e) => {
+    ///             println!("Error: {}", e);
+    ///         }
+    ///     }
+    /// }
+    pub async fn fetch_similarity_nodes(
+        &mut self,
+        pool: &sqlx::PgPool,
+        node_id: &str,
+        query: &Option<ComposeQuery>,
+        topk: Option<u64>,
+    ) -> Result<&Self, ValidationError> {
+        match SimilarityNode::fetch_similarity_nodes(pool, node_id, query, topk).await {
+            Ok(similarity_nodes) => {
+                let mut node_ids = similarity_nodes
+                    .iter()
+                    .map(|similarity_node| similarity_node.node_id.as_str())
+                    .collect::<Vec<&str>>();
+
+                node_ids.push(node_id);
+
+                // Convert similarity nodes to a hashmap which key is node id and value is distance.
+                let similarity_node_map = similarity_nodes
+                    .iter()
+                    .map(|similarity_node| {
+                        (
+                            similarity_node.node_id.as_str(),
+                            similarity_node.distance.unwrap(),
+                        )
+                    })
+                    .collect::<HashMap<&str, f64>>();
+
+                let edges = match self.fetch_nodes_by_ids(pool, &node_ids).await {
+                    Ok(graph) => {
+                        let nodes = &graph.nodes;
+                        let source_node = nodes.iter().find(|node| node.id == node_id).unwrap();
+
+                        let mut edges = vec![];
+                        for node in nodes {
+                            let distance = similarity_node_map.get(node.id.as_str());
+                            match distance {
+                                Some(&d) => {
+                                    if node.id == source_node.id {
+                                        continue;
+                                    }
+
+                                    let edge = Edge::new(
+                                        "SimilarityNode",
+                                        source_node.data.id.as_str(),
+                                        source_node.data.label.as_str(),
+                                        node.data.id.as_str(),
+                                        node.data.label.as_str(),
+                                        Some(d),
+                                    );
+
+                                    edges.push(edge);
+                                }
+                                None => {
+                                    continue;
+                                }
+                            }
+                        }
+
+                        edges
+                    }
+                    Err(e) => {
+                        return Err(ValidationError::new(
+                            &format!("Error in fetch_nodes_by_ids: {}", e),
+                            vec![],
+                        ))
+                    }
+                };
+
+                for edge in edges {
+                    self.add_edge(edge);
+                }
+
+                Ok(self)
+            }
+            Err(e) => Err(ValidationError::new(
+                &format!("Error in fetch_similarity_nodes: {}", e),
+                vec![],
+            )),
+        }
+    }
+
     /// Fetch the linked nodes with some relation types or other conditions, but only one step
     pub async fn fetch_linked_nodes(
         &mut self,
@@ -917,7 +1221,7 @@ impl Graph {
         {
             Ok(records) => {
                 for record in records.records {
-                    let edge = Edge::new(&record);
+                    let edge = Edge::from_relation(&record);
                     self.add_edge(edge);
                 }
 
@@ -954,23 +1258,8 @@ mod tests {
     extern crate log;
     extern crate stderrlog;
     use super::*;
-    use crate::init_log;
+    use crate::{init_log, setup_test_db};
     use regex::Regex;
-
-    // Setup the test database
-    async fn setup_test_db() -> sqlx::PgPool {
-        // Get the database url from the environment variable
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(v) => v,
-            Err(_) => {
-                println!("{}", "DATABASE_URL is not set.");
-                std::process::exit(1);
-            }
-        };
-        let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
-
-        return pool;
-    }
 
     #[test]
     fn test_parse_composed_node_ids() {
@@ -1040,5 +1329,30 @@ mod tests {
         println!("graph: {:?}", graph);
         assert_eq!(graph.nodes.len(), 3);
         assert_eq!(graph.edges.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_similarity_nodes() {
+        init_log();
+
+        let mut graph = Graph::new();
+
+        let pool = setup_test_db().await;
+
+        let node_id = "Chemical::MESH:C000601183";
+        let query = None;
+        let topk = Some(10);
+
+        match graph
+            .fetch_similarity_nodes(&pool, &node_id, &query, topk)
+            .await
+        {
+            Ok(graph) => {
+                debug!("graph: {:?}", graph);
+            }
+            Err(e) => {
+                error!("Error: {}", e);
+            }
+        }
     }
 }

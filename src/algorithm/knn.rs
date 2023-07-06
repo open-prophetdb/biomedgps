@@ -84,26 +84,9 @@ mod tests {
     extern crate log;
     extern crate stderrlog;
     use super::*;
-    use crate::init_log;
+    use crate::{init_log, setup_test_db};
     use crate::model::core::{EmbeddingRecordResponse, EntityEmbedding};
     use log::debug;
-    use serde::__private::de;
-
-    // Setup the test database
-    async fn setup_test_db() -> sqlx::PgPool {
-        init_log();
-        // Get the database url from the environment variable
-        let database_url = match std::env::var("DATABASE_URL") {
-            Ok(v) => v,
-            Err(_) => {
-                println!("{}", "DATABASE_URL is not set.");
-                std::process::exit(1);
-            }
-        };
-        let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
-
-        return pool;
-    }
 
     #[tokio::test]
     async fn test_get_neighbours() {

@@ -1,8 +1,8 @@
 //! This module defines the routes of the API.
 
 use crate::api::schema::{
-    ApiTags, GetGraphResponse, GetRecordsResponse, GetWholeTableResponse, Pagination, PostResponse,
-    SimilarityNodeQuery, DeleteResponse
+    ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetWholeTableResponse,
+    NodeIdQuery, NodeIdsQuery, Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
@@ -13,6 +13,7 @@ use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::sync::Arc;
+use validator::Validate;
 
 pub struct BiomedgpsApi;
 
@@ -142,6 +143,15 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
 
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
             None => {
@@ -171,7 +181,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
-            Some("relation_id ASC"),
+            Some("id ASC"),
         )
         .await
         {
@@ -199,6 +209,15 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let payload = payload.0;
 
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
         match payload.insert(&pool_arc).await {
             Ok(kc) => PostResponse::Created(Json(kc)),
             Err(e) => {
@@ -220,13 +239,22 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         payload: Json<KnowledgeCuration>,
-        id: Path<String>,
+        id: Path<i64>,
     ) -> PostResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
         let payload = payload.0;
         let id = id.0;
 
-        match payload.update(&pool_arc, &id).await {
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match payload.update(&pool_arc, id).await {
             Ok(kc) => PostResponse::Created(Json(kc)),
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
@@ -246,12 +274,12 @@ impl BiomedgpsApi {
     async fn delete_curated_knowledge(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        id: Path<String>,
+        id: Path<i64>,
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let id = id.0;
 
-        match KnowledgeCuration::delete(&pool_arc, &id).await {
+        match KnowledgeCuration::delete(&pool_arc, id).await {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete curated knowledge: {}", e);
@@ -278,6 +306,15 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        };
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -339,6 +376,15 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
 
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
             None => {
@@ -399,6 +445,15 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
 
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
             None => {
@@ -456,6 +511,15 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let payload = payload.0;
 
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate subgraph: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
         match payload.insert(&pool_arc).await {
             Ok(kc) => PostResponse::Created(Json(kc)),
             Err(e) => {
@@ -468,7 +532,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/subgraphs/:id` with payload to update a subgraph.
     #[oai(
-        path = "/api/v1/subgraphs",
+        path = "/api/v1/subgraphs/:id",
         method = "put",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "putSubgraph"
@@ -483,10 +547,19 @@ impl BiomedgpsApi {
         let id = id.0;
         let payload = payload.0;
 
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate subgraph: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
         match payload.update(&pool_arc, &id).await {
             Ok(kc) => PostResponse::Created(Json(kc)),
             Err(e) => {
-                let err = format!("Failed to update curated knowledge: {}", e);
+                let err = format!("Failed to update subgraph: {}", e);
                 warn!("{}", err);
                 return PostResponse::bad_request(err);
             }
@@ -507,6 +580,15 @@ impl BiomedgpsApi {
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let id = id.0;
+
+        match NodeIdQuery::new(&id) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate subgraph id: {}", e);
+                warn!("{}", err);
+                return DeleteResponse::bad_request(err);
+            }
+        }
 
         match Subgraph::delete(&pool_arc, &id).await {
             Ok(_) => DeleteResponse::NoContent,
@@ -532,6 +614,15 @@ impl BiomedgpsApi {
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
         let node_ids = node_ids.0;
+
+        match NodeIdsQuery::new(&node_ids) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate node ids: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
 
         let mut graph = Graph::new();
 
@@ -564,6 +655,15 @@ impl BiomedgpsApi {
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
         let node_ids = node_ids.0;
+
+        match NodeIdsQuery::new(&node_ids) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate node ids: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
 
         let mut graph = Graph::new();
 
@@ -599,6 +699,15 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -648,26 +757,189 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         node_id: Query<String>,
-        page: Query<Option<u64>>,
-        page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        topk: Query<Option<u64>>,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
 
-        let page = page.0;
-        let page_size = page_size.0;
-
-        let pagination = match Pagination::new(page, page_size) {
-            Ok(p) => p,
+        match SimilarityNodeQuery::new(&node_id.0, &query_str.0, topk.0) {
+            Ok(query) => query,
             Err(e) => {
-                return GetGraphResponse::bad_request(e.to_string());
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
             }
         };
 
-        debug!("Pagination: {:?}", &pagination);
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let topk = topk.0;
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetGraphResponse::bad_request(err);
+                }
+            }
+        };
 
         let mut graph = Graph::new();
+        match graph
+            .fetch_similarity_nodes(&pool_arc, &node_id, &query, topk)
+            .await
+        {
+            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Err(e) => {
+                let err = format!("Failed to fetch similarity nodes: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        }
+    }
+}
 
-        GetGraphResponse::not_found("Not implemented yet.".to_string())
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::graph::Node;
+    use crate::{init_log, kv2urlstr, setup_test_db};
+    use log::{debug, error};
+    use poem::middleware::{AddData, AddDataEndpoint};
+    use poem::test::TestClient;
+    use poem::{
+        http::{StatusCode, Uri},
+        Endpoint, EndpointExt, Request, Route,
+    };
+    use poem_openapi::OpenApiService;
+    use sqlx::{Pool, Postgres};
+
+    async fn init_app() -> AddDataEndpoint<Route, Arc<Pool<Postgres>>> {
+        init_log();
+        let pool = setup_test_db().await;
+
+        let arc_pool = Arc::new(pool);
+        let shared_rb = AddData::new(arc_pool.clone());
+        let service = OpenApiService::new(BiomedgpsApi, "BioMedGPS", "v0.1.0");
+        let app = Route::new().nest("/", service).with(shared_rb);
+        app
+    }
+
+    #[tokio::test]
+    async fn test_fetch_entities() {
+        let app = init_app().await;
+        let cli = TestClient::new(app);
+
+        let resp = cli.get("/api/v1/entities").send().await;
+        resp.assert_status_is_ok();
+
+        let json = resp.json().await;
+        let entity_records = json.value().deserialize::<RecordResponse<Entity>>();
+        assert!(entity_records.records.len() > 0);
+        let resp = cli.get("/api/v1/entities?page=1&page_size=10").send().await;
+        resp.assert_status_is_ok();
+
+        let json = resp.json().await;
+        let entity_records = json.value().deserialize::<RecordResponse<Entity>>();
+        assert!(entity_records.records.len() == 10);
+
+        let query_json_str = r#"{"operator": "=", "field": "id", "value": "DOID:2022"}"#;
+        let query_str = kv2urlstr("query_str", &query_json_str.to_string());
+        debug!("Query string: {}", query_str);
+
+        let resp = cli
+            .get(format!(
+                "/api/v1/entities?page=1&page_size=10&{}",
+                query_str
+            ))
+            .send()
+            .await;
+        resp.assert_status_is_ok();
+
+        let json = resp.json().await;
+        let entity_records = json.value().deserialize::<RecordResponse<Entity>>();
+        assert!(entity_records.records.len() == 1);
+
+        let query_json_str = r#"{
+            "operator": "and", "items": [
+                {"operator": "=", "field": "id", "value": "DOID:2022"},
+                {"operator": "=", "field": "label", "value": "Disease"}
+            ]
+        }"#;
+        let query_str = kv2urlstr("query_str", &query_json_str.to_string());
+        debug!("Query string: {}", query_str);
+
+        let resp = cli
+            .get(format!(
+                "/api/v1/entities?page=1&page_size=10&{}",
+                query_str
+            ))
+            .send()
+            .await;
+        resp.assert_status_is_ok();
+
+        let json = resp.json().await;
+        let entity_records = json.value().deserialize::<RecordResponse<Entity>>();
+        assert!(entity_records.records.len() == 1);
+
+        let query_json_str = r#"{
+            "operator": "and", "items": [
+                {"operator": "=", "field": "id", "value": "NOT-FOUND:2022"},
+                {"operator": "=", "field": "label", "value": "NOT-FOUND"}
+            ]
+        }"#;
+        let query_str = kv2urlstr("query_str", &query_json_str.to_string());
+        debug!("Query string: {}", query_str);
+
+        let resp = cli
+            .get(format!(
+                "/api/v1/entities?page=1&page_size=10&{}",
+                query_str
+            ))
+            .send()
+            .await;
+        resp.assert_status_is_ok();
+
+        let json = resp.json().await;
+        let entity_records = json.value().deserialize::<RecordResponse<Entity>>();
+        assert!(entity_records.records.len() == 0);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_similarity_nodes() {
+        let app = init_app().await;
+        let cli = TestClient::new(app);
+
+        let resp = cli.get("/api/v1/similarity-nodes").send().await;
+        resp.assert_status(StatusCode::BAD_REQUEST);
+
+        let resp = cli
+            .get("/api/v1/similarity-nodes?node_id=Chemical::MESH:C000601183")
+            .send()
+            .await;
+        let json = resp.json().await;
+        let nodes = json
+            .value()
+            .object()
+            .get("nodes");
+        nodes.assert_not_null();
+
+        // TODO: Cannot deserialize Graph, because we cannot rename the field lineWidth to line_width when deserializing. 
+        // The poem-openapi crate does not support to rename a field when deserializing.
+        // 
+        // let mut records = json.value().deserialize::<Graph>();
+        // assert!(records.get_nodes().len() == 10);
     }
 }

@@ -26,24 +26,24 @@ pub struct QueryItem {
 
 impl QueryItem {
     pub fn new(field: String, value: Value, operator: String) -> Self {
-        let allowed_operators = vec!["=", "!=", "like", "not like", "in", "not in"];
+        let allowed_operators = vec!["=", "!=", "like", "not like", "in", "not in", "<>", "<", ">", "<=", ">="];
         if !allowed_operators.contains(&operator.as_str()) {
             panic!("Invalid operator: {}", operator);
         }
 
         match value {
             Value::Int(_) => {
-                if !vec!["=", "!="].contains(&operator.as_str()) {
+                if !vec!["=", "!=", ">", "<", "<=", ">="].contains(&operator.as_str()) {
                     panic!("Invalid operator: {}", operator);
                 }
             }
             Value::Float(_) => {
-                if !vec!["=", "!="].contains(&operator.as_str()) {
+                if !vec!["=", "!=", ">", "<", "<=", ">="].contains(&operator.as_str()) {
                     panic!("Invalid operator: {}", operator);
                 }
             }
             Value::String(_) => {
-                if !vec!["=", "!=", "like", "not like"].contains(&operator.as_str()) {
+                if !vec!["=", "!=", "like", "not like", "<>"].contains(&operator.as_str()) {
                     panic!("Invalid operator: {}", operator);
                 }
             }
@@ -158,8 +158,9 @@ impl ComposeQueryItem {
 
     // Why ComposeQuery here?
     // Because we can have nested ComposeQueryItem, it maybe a QueryItem or ComposeQueryItem
-    pub fn add_item(&mut self, item: ComposeQuery) {
+    pub fn add_item(&mut self, item: ComposeQuery) -> &mut Self {
         self.items.push(item);
+        self
     }
 
     pub fn default() -> Self {

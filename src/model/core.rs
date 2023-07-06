@@ -19,11 +19,11 @@ const DEFAULT_MAX_LENGTH: u64 = 64;
 const DEFAULT_MIN_LENGTH: u64 = 1;
 
 lazy_static! {
-    static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
-    static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
+    pub static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
+    pub static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
     // 1.23|-4.56|7.89
-    static ref EMBEDDING_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
-    static ref SUBGRAPH_UUID: Regex = Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
+    pub static ref EMBEDDING_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
+    pub static ref SUBGRAPH_UUID_REGEX: Regex = Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
 }
 
 #[derive(Debug)]
@@ -793,7 +793,9 @@ impl RelationMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct KnowledgeCuration {
-    pub relation_id: i32,
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    id: i64,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     pub relation_type: String,
@@ -834,9 +836,9 @@ pub struct KnowledgeCuration {
 
 impl KnowledgeCuration {
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_id, relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, created_at, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11) RETURNING *";
+        let sql_str = "INSERT INTO biomedgps_knowledge_curation (id, relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, created_at, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11) RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
-            .bind(&self.relation_id)
+            .bind(&self.id)
             .bind(&self.relation_type)
             .bind(&self.source_name)
             .bind(&self.source_type)
@@ -856,7 +858,7 @@ impl KnowledgeCuration {
     pub async fn update(
         &self,
         pool: &sqlx::PgPool,
-        id: &str,
+        id: i64,
     ) -> Result<KnowledgeCuration, anyhow::Error> {
         let sql_str = "UPDATE biomedgps_knowledge_curation SET relation_type = $1, source_name = $2, source_type = $3, source_id = $4, target_name = $5, target_type = $6, target_id = $7, key_sentence = $8, created_at = now(), pmid = $9 WHERE id = $10 RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
@@ -876,7 +878,7 @@ impl KnowledgeCuration {
         AnyOk(knowledge_curation)
     }
 
-    pub async fn delete(pool: &sqlx::PgPool, id: &str) -> Result<KnowledgeCuration, anyhow::Error> {
+    pub async fn delete(pool: &sqlx::PgPool, id: i64) -> Result<KnowledgeCuration, anyhow::Error> {
         let sql_str = "DELETE FROM biomedgps_knowledge_curation WHERE id = $1 RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
             .bind(id)
@@ -1035,7 +1037,7 @@ impl CheckData for Entity2D {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Subgraph {
-    #[validate(regex = "SUBGRAPH_UUID")]
+    #[validate(regex = "SUBGRAPH_UUID_REGEX")]
     pub id: String,
 
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
@@ -1070,7 +1072,7 @@ pub struct Subgraph {
     ))]
     pub db_version: String,
 
-    #[validate(regex = "SUBGRAPH_UUID")]
+    #[validate(regex = "SUBGRAPH_UUID_REGEX")]
     pub parent: Option<String>, // parent subgraph id, it is same as id if it is a root subgraph (no parent), otherwise it is the parent subgraph id
 }
 

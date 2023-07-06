@@ -41,7 +41,7 @@ CREATE TABLE
 -- biomedgps_knowledge_curation table is used to store the knowledges which are curated by the curators from the literature
 CREATE TABLE
   IF NOT EXISTS biomedgps_knowledge_curation (
-    relation_id BIGSERIAL PRIMARY KEY, -- The knowledge curation ID
+    id BIGSERIAL PRIMARY KEY, -- The knowledge curation ID
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
     source_name VARCHAR(255) NOT NULL, -- The name of the start entity
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.

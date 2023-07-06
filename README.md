@@ -157,11 +157,11 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -d, --database-url <database-url>    Database url, such as postgres:://user:pass@host:port/dbname. You can also set
+    -d, --database-url <database-url>    Database url, such as postgres://user:pass@host:port/dbname. You can also set
                                          it with env var: DATABASE_URL
     -H, --host <host>                    127.0.0.1 or 0.0.0.0 [default: 127.0.0.1]  [possible values: 127.0.0.1,
                                          0.0.0.0]
-    -g, --neo4j-url <neo4j-url>          Graph Database url, such as neo4j:://user:pass@host:port/dbname. You can also
+    -g, --neo4j-url <neo4j-url>          Graph Database url, such as neo4j://user:pass@host:port/dbname. You can also
                                          set it with env var: NEO4J_URL
     -p, --port <port>                    Which port [default: 3000]
 ```
