@@ -192,6 +192,7 @@ pub struct NodeData {
     pub label: String,
     pub name: String,
     #[serde(deserialize_with = "convert_null_to_empty_string")]
+    #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
     pub resource: String,
     // In future, we can add more fields here after we add additional fields for the Entity struct
@@ -233,6 +234,7 @@ impl NodeData {
 pub struct Node {
     #[oai(rename = "comboId")]
     #[serde(rename(serialize = "comboId", deserialize = "combo_id"))]
+    #[oai(skip_serializing_if_is_none)]
     pub combo_id: Option<String>,
     pub id: String,
     pub label: String,
@@ -240,6 +242,7 @@ pub struct Node {
     pub degree: Option<i32>, // Map degree to node size
     pub style: NodeStyle,
     pub category: String, // node or edge
+    #[oai(skip_serializing_if_is_none)]
     pub cluster: Option<String>,
     pub r#type: String, // "graphin-circle"
     pub x: Option<f64>,

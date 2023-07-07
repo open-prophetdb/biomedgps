@@ -332,6 +332,7 @@ pub struct Entity {
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     pub resource: String,
 
+    #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
 }
 
@@ -782,7 +783,7 @@ impl RelationMetadata {
     pub async fn get_relation_metadata(
         pool: &sqlx::PgPool,
     ) -> Result<Vec<RelationMetadata>, anyhow::Error> {
-        let sql_str = "SELECT * FROM bioemdgps_relation_metadata";
+        let sql_str = "SELECT * FROM biomedgps_relation_metadata";
         let relation_metadata = sqlx::query_as::<_, RelationMetadata>(sql_str)
             .fetch_all(pool)
             .await?;
@@ -946,8 +947,10 @@ pub struct Relation {
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     pub target_type: String,
 
+    #[oai(skip_serializing_if_is_none)]
     pub score: Option<f64>,
 
+    #[oai(skip_serializing_if_is_none)]
     pub key_sentence: Option<String>,
 
     pub resource: String,
@@ -1043,6 +1046,7 @@ pub struct Subgraph {
     #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
     pub name: String,
 
+    #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
 
     pub payload: String, // json string, e.g. {"nodes": [], "edges": []}. how to validate json string?
