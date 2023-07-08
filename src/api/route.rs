@@ -2,7 +2,7 @@
 
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetWholeTableResponse,
-    NodeIdQuery, NodeIdsQuery, Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery,
+    NodeIdsQuery, Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery, SubgraphIdQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
@@ -118,7 +118,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
+                let err = format!("Failed to fetch entities: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }
@@ -187,7 +187,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
+                let err = format!("Failed to fetch curated knowledges: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }
@@ -245,6 +245,12 @@ impl BiomedgpsApi {
         let payload = payload.0;
         let id = id.0;
 
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
         match payload.validate() {
             Ok(_) => {}
             Err(e) => {
@@ -278,6 +284,12 @@ impl BiomedgpsApi {
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let id = id.0;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        }
 
         match KnowledgeCuration::delete(&pool_arc, id).await {
             Ok(_) => DeleteResponse::no_content(),
@@ -351,7 +363,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
+                let err = format!("Failed to fetch relations: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }
@@ -420,7 +432,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
+                let err = format!("Failed to fetch entity2ds: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }
@@ -489,7 +501,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
             Err(e) => {
-                let err = format!("Failed to fetch datasets: {}", e);
+                let err = format!("Failed to fetch subgraphs: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }
@@ -547,6 +559,15 @@ impl BiomedgpsApi {
         let id = id.0;
         let payload = payload.0;
 
+        match SubgraphIdQuery::new(&id) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse subgraph id: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
         match payload.validate() {
             Ok(_) => {}
             Err(e) => {
@@ -581,7 +602,7 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let id = id.0;
 
-        match NodeIdQuery::new(&id) {
+        match SubgraphIdQuery::new(&id) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to validate subgraph id: {}", e);
@@ -930,15 +951,12 @@ mod tests {
             .send()
             .await;
         let json = resp.json().await;
-        let nodes = json
-            .value()
-            .object()
-            .get("nodes");
+        let nodes = json.value().object().get("nodes");
         nodes.assert_not_null();
 
-        // TODO: Cannot deserialize Graph, because we cannot rename the field lineWidth to line_width when deserializing. 
+        // TODO: Cannot deserialize Graph, because we cannot rename the field lineWidth to line_width when deserializing.
         // The poem-openapi crate does not support to rename a field when deserializing.
-        // 
+        //
         // let mut records = json.value().deserialize::<Graph>();
         // assert!(records.get_nodes().len() == 10);
     }

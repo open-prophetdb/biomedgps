@@ -5,6 +5,8 @@ use std::cmp::PartialEq;
 use std::convert::TryInto;
 use std::error::Error;
 
+/// A vector struct for storing embedding vector. It is a wrapper around `Vec<f32>`.
+/// It can be used with `pgvector` extension for Postgres.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Vector(Vec<f32>);
 

@@ -24,6 +24,7 @@ lazy_static! {
     // 1.23|-4.56|7.89
     pub static ref EMBEDDING_REGEX: Regex = Regex::new(r"^(?:-?\d+(?:\.\d+)?\|)*-?\d+(?:\.\d+)?$").unwrap();
     pub static ref SUBGRAPH_UUID_REGEX: Regex = Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
+    pub static ref JSON_REGEX: Regex = Regex::new(r"^(\{.*\}|\[.*\])$").expect("Failed to compile regex");
 }
 
 #[derive(Debug)]
@@ -316,20 +317,40 @@ impl<
 pub struct Entity {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub idx: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of id should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The entity id is invalid. It should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D000001'."
+    ))]
     pub id: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "ENTITY_NAME_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of name should be between 1 and 64."
+    ))]
     pub name: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of label should be between 1 and 64."
+    ))]
     #[validate(regex = "ENTITY_LABEL_REGEX")]
     pub label: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource should be between 1 and 64."
+    ))]
     pub resource: String,
 
     #[oai(skip_serializing_if_is_none)]
@@ -472,15 +493,33 @@ impl<
 pub struct EntityEmbedding {
     pub embedding_id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_id should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The entity id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
+    ))]
     pub entity_id: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "ENTITY_NAME_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_name should be between 1 and 64."
+    ))]
     pub entity_name: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The entity type should match ^[A-Za-z]+$. Such as Disease."
+    ))]
     pub entity_type: String,
 
     #[serde(deserialize_with = "text2vector")]
@@ -579,23 +618,55 @@ impl CheckData for EntityEmbedding {
 pub struct RelationEmbedding {
     pub embedding_id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type should be between 1 and 64."
+    ))]
     pub relation_type: String,
 
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The relation type should match ^[A-Za-z]+$. Such as Disease."
+    ))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_type should be between 1 and 64."
+    ))]
     pub source_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_id should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The source id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
+    ))]
     pub source_id: String,
 
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The relation type should match ^[A-Za-z]+$. Such as Disease."
+    ))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of target_type should be between 1 and 64."
+    ))]
     pub target_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of target_id should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The target id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
+    ))]
     pub target_id: String,
 
     #[serde(deserialize_with = "text2vector")]
@@ -688,13 +759,25 @@ impl CheckData for RelationEmbedding {
 pub struct EntityMetadata {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource should be between 1 and 64."
+    ))]
     pub resource: String,
 
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The entity type should match ^[A-Za-z]+$. Such as Disease."
+    ))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type should be between 1 and 64."
+    ))]
     pub entity_type: String,
 
     pub entity_count: i64,
@@ -735,22 +818,39 @@ impl EntityMetadata {
 pub struct RelationMetadata {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource should be between 1 and 64."
+    ))]
     pub resource: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type should be between 1 and 64."
+    ))]
     pub relation_type: String,
 
     pub relation_count: i64,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of start_entity_type should be between 1 and 64."
+    ))]
     pub start_entity_type: String,
 
     #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of end_entity_type should be between 1 and 64."
+    ))]
     pub end_entity_type: String,
 }
 
@@ -796,42 +896,89 @@ impl RelationMetadata {
 pub struct KnowledgeCuration {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
+    #[oai(read_only)]
     id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource must be between 1 and 64."
+    ))]
     pub relation_type: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "ENTITY_NAME_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
     pub source_name: String,
 
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The source_type must be a valid entity type. The regex pattern is `^[A-Za-z]+$`, such as `Gene`."
+    ))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_type must be between 1 and 64."
+    ))]
     pub source_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_id must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The source_id must match the pattern `^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$`. Such as `UniProtKB:P12345`."
+    ))]
     pub source_id: String,
 
-    #[validate(length(max = "ENTITY_NAME_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "ENTITY_NAME_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of target_name must be between 1 and 64."
+    ))]
     pub target_name: String,
 
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The target_type must be a valid entity label. The regex pattern is `^[A-Za-z]+$`, such as `Gene`."
+    ))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of target_type must be between 1 and 64."
+    ))]
     pub target_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of target_id must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The target_id must match the pattern `^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$`. Such as `UniProtKB:P12345`."
+    ))]
     pub target_id: String,
 
     pub key_sentence: String,
 
     #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
     pub created_at: DateTime<Utc>,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of curator must be between 1 and 64."
+    ))]
     pub curator: String,
 
+    #[validate(range(min = 1, message = "pmid must be greater than 0"))]
     pub pmid: i64,
 }
 
@@ -926,25 +1073,58 @@ impl CheckData for KnowledgeCuration {
 pub struct Relation {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type must be between 1 and 64."
+    ))]
     pub relation_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The source_id must match the ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$ pattern. eg: UniProtKB:P12345"
+    ))]
     pub source_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The source_type must match the ^[A-Za-z]+$ pattern."
+    ))]
     pub source_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The source_id must match the ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$ pattern. eg: UniProtKB:P12345"
+    ))]
     pub target_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The target_type must match the ^[A-Za-z]+$ pattern."
+    ))]
     pub target_type: String,
 
     #[oai(skip_serializing_if_is_none)]
@@ -989,15 +1169,33 @@ impl CheckData for Relation {
 pub struct Entity2D {
     pub embedding_id: i64,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_ID_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_id must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The entity_id must match the ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$ pattern. eg: UniProtKB:P12345"
+    ))]
     pub entity_id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
-    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The entity_type must match the ^[A-Za-z]+$ pattern."
+    ))]
     pub entity_type: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_name must be between 1 and 64."
+    ))]
     pub entity_name: String,
 
     pub umap_x: f64,
@@ -1040,19 +1238,28 @@ impl CheckData for Entity2D {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Subgraph {
-    #[validate(regex = "SUBGRAPH_UUID_REGEX")]
+    #[oai(read_only)]
     pub id: String,
 
-    #[validate(length(max = "DEFAULT_MAX_LENGTH", min = "DEFAULT_MIN_LENGTH"))]
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of name must be between 1 and 64."
+    ))]
     pub name: String,
 
     #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
 
+    #[validate(regex(
+        path = "JSON_REGEX",
+        message = "The payload must be a valid json string."
+    ))]
     pub payload: String, // json string, e.g. {"nodes": [], "edges": []}. how to validate json string?
 
     #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
     pub created_time: DateTime<Utc>,
 
     #[validate(length(
@@ -1076,7 +1283,10 @@ pub struct Subgraph {
     ))]
     pub db_version: String,
 
-    #[validate(regex = "SUBGRAPH_UUID_REGEX")]
+    #[validate(regex(
+        path = "SUBGRAPH_UUID_REGEX",
+        message = "The parent must match the ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ pattern."
+    ))]
     pub parent: Option<String>, // parent subgraph id, it is same as id if it is a root subgraph (no parent), otherwise it is the parent subgraph id
 }
 

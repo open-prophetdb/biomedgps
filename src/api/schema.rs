@@ -1,21 +1,13 @@
 use crate::model::core::RecordResponse;
-use crate::model::core::SUBGRAPH_UUID_REGEX;
+use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX};
-use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use poem_openapi::Object;
 use poem_openapi::{payload::Json, ApiResponse, Tags};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
-use sqlx::query;
 use validator::Validate;
 use validator::ValidationErrors;
-
-lazy_static! {
-    static ref JSON_REGEX: Regex =
-        Regex::new(r"^(\{.*\}|\[.*\])$").expect("Failed to compile regex");
-}
 
 #[derive(Tags)]
 pub enum ApiTags {

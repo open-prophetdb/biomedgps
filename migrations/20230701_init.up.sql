@@ -50,7 +50,7 @@ CREATE TABLE
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
     key_sentence TEXT NOT NULL, -- The key sentence of the relation
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- The created time of the relation
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- The created time of the relation
     curator VARCHAR(64) NOT NULL, -- The curator of the relation
     pmid BIGINT NOT NULL -- The PMID of the relation
   );
@@ -97,7 +97,7 @@ CREATE TABLE
     name VARCHAR(64) NOT NULL,
     description TEXT,
     payload TEXT NOT NULL,
-    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     owner VARCHAR(36) NOT NULL,
     version VARCHAR(36) NOT NULL,
     db_version VARCHAR(36) NOT NULL,

@@ -1,6 +1,8 @@
 //! pgvector support for Rust
 //!
-//! [View the docs](https://github.com/pgvector/pgvector-rust)
+//! More details on [pgvector](https://github.com/pgvector/pgvector)
+
+#![doc = include_str!("./README.md")]
 
 mod vector;
 pub use vector::Vector;

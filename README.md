@@ -1,4 +1,4 @@
-<h2 align="center">BioMedGPS</h2>
+<h2 align="center">BioMedGPS Platform</h2>
 <p align="center">A knowledge graph system with graph neural network for drug discovery, disease mechanism and biomarker screening.</p>
 
 <p align="center">
@@ -11,42 +11,140 @@
 
 <p align="center">NOTE: NOT READY FOR PRODUCTION YET.</p>
 
-## Requirements
+## For Users
 
-### Server
+If you want to use the platform, please follow the instructions below. You can also join us to develop the platform, see [here](#join-us).
+
+`Step 1`: You will need to install PostgreSQL and Neo4j. You can also use docker to launch the database, see [here](#install-docker-and-docker-compose). After that, you can run the following command to launch the database server.
+
+```bash
+mkdir biomedgps && cd biomedgps
+wget -O docker-compose.yml https://raw.githubusercontent.com/biomedgps/biomedgps/master/docker-compose.yml
+
+docker-compose up -d
+```
+
+`Step 2`: Download the latest release from [here](https://github.com/biomedgps/biomedgps/releases). You can also build the platform from source code, see [here](#for-developers).
+
+`Step 3`: Init Database, Check and Import Data
+
+```bash
+# Init database
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli initdb
+
+# Check and import data, -t is the table name, -f is the data file path, -D is the delete flag
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity -t entity -D
+```
+
+`Step 4`: Launch the platform, see more details on usage [here](#usage).
+
+```bash
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && export NEO4J_URL=neo4j://neo4j:password@localhost:7687/test_biomedgps && biomedgps -H
+```
+
+### Usage
+
+Run the following command to see the usage.
+
+```bash
+$ biomedgps --help
+biomedgps 0.1.0
+Jingcheng Yang <yjcyxky@163.com>
+BioMedGPS backend server
+
+USAGE:
+    biomedgps [FLAGS] [OPTIONS]
+
+FLAGS:
+    --debug          Activate debug mode short and long flags (--debug) will be deduced from the field's name
+    -h, --help       Prints help information
+    -o, --openapi    Activate openapi mode
+    -u, --ui         Activate ui mode
+    -V, --version    Prints version information
+
+OPTIONS:
+    -d, --database-url <database-url>    Database url, such as postgres://user:pass@host:port/dbname. You can also set
+                                         it with env var: DATABASE_URL
+    -H, --host <host>                    127.0.0.1 or 0.0.0.0 [default: 127.0.0.1]  [possible values: 127.0.0.1,
+                                         0.0.0.0]
+    -g, --neo4j-url <neo4j-url>          Graph Database url, such as neo4j://user:pass@host:port/dbname. You can also
+                                         set it with env var: NEO4J_URL
+    -p, --port <port>                    Which port [default: 3000]
+```
+
+### Example
+
+If you want to launch the server with openapi and ui mode, run the following command.
+
+```bash
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps -H 0.0.0.0 -p 8888 --openapi --ui
+```
+
+### For Linux with systemd
+
+```bash
+# You need to place the binary file in /opt/local/bin/biomedgps and all data files in /opt/local/data/biomedgps.
+# Or you can change the path in the service file.
+sudo cp build/biomedgps.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable biomedgps
+sudo systemctl start biomedgps
+```
+
+### Install Docker and Docker Compose
+
+```bash
+# For MacOSx
+brew install docker docker-compose
+
+# For Linux [https://docs.docker.com/engine/install/debian/]
+```
+
+## For Developers
+
+If you want to build the platform from source code, please follow the instructions below. You can also join us to develop the platform, see [here](#join-us).
+
+### Requirements
+
+#### Server
+
 - Rust
 - Cargo
 - PostgreSQL
 - Neo4j
 
-### Frontend
+#### Frontend
 
 - nodejs == 16.13.1
 - yarn
+- Reactjs
+- Ant Design
+- Plotly.js
+- G6 - Graph Visualization Engine
 
-## Installation (Development) for Server
+### Installation (Development) for Server
 
-### 1. Install Rust and Cargo
+#### 1. Install Rust and Cargo
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### 2. Install PostgreSQL (use docker)
+#### 2. Install PostgreSQL (use docker)
 
 ```bash
 make test-db
 ```
 
-### 3. Run the server
+#### 3. Run the server
 
 ```bash
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run -- -H 0.0.0.0 -p 8888 --openapi --debug
 ```
 
-## Installation (Development) for Frontend
+### Installation (Development) for Frontend
 
-### 1. Install nodejs and yarn
+#### 1. Install nodejs and yarn
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
@@ -54,22 +152,22 @@ sudo apt-get install -y nodejs
 npm install -g yarn
 ```
 
-### 2. Install dependencies
+#### 2. Install dependencies
 
 ```bash
 cd studio
 yarn install
 ```
 
-### 3. Run the frontend
+#### 3. Run the frontend
 
 ```bash
 yarn start:local-dev
 ```
 
-## Build for Production
+### Build for Production
 
-### Compile the `biomedgps` and `biomedgps-cli` binaries
+#### Compile the `biomedgps` and `biomedgps-cli` binaries
 
 After installing the dependencies, run the following command to build the frontend and backend. The output will be in `target/release` folder. You will get a binary file named `biomedgps`.
 
@@ -81,7 +179,7 @@ make build-mac
 make build-linux
 ```
 
-### Install docker and docker-compose
+#### Install docker and docker-compose
 
 ```bash
 # For MacOSx
@@ -90,7 +188,7 @@ brew install docker docker-compose
 # For Linux [https://docs.docker.com/engine/install/debian/]
 ```
 
-### Launch the database and server
+#### Launch the database and server
 
 1. Download docker directory
 2. Run `docker-compose up -d` to launch the database
@@ -136,59 +234,14 @@ brew install docker docker-compose
     systemctl restart nginx
     ```
 
-## Usage
-
-Run the following command to see the usage.
-
-```bash
-$ biomedgps --help
-biomedgps 0.1.0
-Jingcheng Yang <yjcyxky@163.com>
-BioMedGPS backend server
-
-USAGE:
-    biomedgps [FLAGS] [OPTIONS]
-
-FLAGS:
-    --debug          Activate debug mode short and long flags (--debug) will be deduced from the field's name
-    -h, --help       Prints help information
-    -o, --openapi    Activate openapi mode
-    -u, --ui         Activate ui mode
-    -V, --version    Prints version information
-
-OPTIONS:
-    -d, --database-url <database-url>    Database url, such as postgres://user:pass@host:port/dbname. You can also set
-                                         it with env var: DATABASE_URL
-    -H, --host <host>                    127.0.0.1 or 0.0.0.0 [default: 127.0.0.1]  [possible values: 127.0.0.1,
-                                         0.0.0.0]
-    -g, --neo4j-url <neo4j-url>          Graph Database url, such as neo4j://user:pass@host:port/dbname. You can also
-                                         set it with env var: NEO4J_URL
-    -p, --port <port>                    Which port [default: 3000]
-```
-
-## Example
-
-If you want to launch the server with openapi and ui mode, run the following command.
-
-```bash
-export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps -H 0.0.0.0 -p 8888 --openapi --ui
-```
-
-## For Linux with systemd
-
-```bash
-# You need to place the binary file in /opt/local/bin/biomedgps and all data files in /opt/local/data/biomedgps.
-# Or you can change the path in the service file.
-sudo cp build/biomedgps.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable biomedgps
-sudo systemctl start biomedgps
-```
+## Join Us
 
 ## Contributing
+
 Comming soon...
 
 ## License
+
 Copyright © 2022 Jingcheng Yang
 
 Distributed under the terms of the GNU Affero General Public License v3.0.

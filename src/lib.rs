@@ -1,5 +1,6 @@
-//! BioMedGPS library for knowledge graph construction and analysis.
+#![doc = include_str!("../README.md")]
 
+//! BioMedGPS library for knowledge graph construction and analysis.
 pub mod algorithm;
 pub mod api;
 pub mod model;

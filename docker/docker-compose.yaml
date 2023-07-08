@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: postgres: 15.3
+    image: nordata/postgre_postgresml:14-57693aa
     volumes:
       - ./data:/var/lib/postgresql/data
     environment:
