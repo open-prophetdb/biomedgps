@@ -67,7 +67,7 @@ pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
 
 pub async fn import_data(
     database_url: &str,
-    filepath: &str,
+    filepath: &Option<String>,
     table: &str,
     drop: bool,
     show_all_errors: bool,
@@ -83,7 +83,16 @@ pub async fn import_data(
     } else if table == "entity_metadata" {
         update_entity_metadata(&pool, true).await.unwrap();
         return;
-    } else if table == "entity_embedding" || table == "relation_embedding" {
+    }
+    
+    let filepath = match filepath {
+        Some(f) => f,
+        None => {
+            error!("Please specify the file path.");
+            return;
+        }
+    };
+    if table == "entity_embedding" || table == "relation_embedding" {
         let file = PathBuf::from(filepath);
 
         if file.is_dir() {

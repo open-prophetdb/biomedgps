@@ -123,17 +123,9 @@ async fn main() {
                 return;
             };
 
-            let file = match arguments.filepath {
-                Some(file) => file,
-                None => {
-                    error!("Please specify the file path.");
-                    return;
-                }
-            };
-
             import_data(
                 &database_url,
-                &file,
+                &arguments.filepath,
                 &arguments.table,
                 arguments.drop,
                 arguments.show_all_errors,

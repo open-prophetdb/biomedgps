@@ -1144,9 +1144,9 @@ pub struct Entity2D {
     pub entity_type: String,
 
     #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
+        max = "ENTITY_NAME_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
-        message = "The length of entity_name must be between 1 and 64."
+        message = "The length of entity_name must be between 1 and 255."
     ))]
     pub entity_name: String,
 
