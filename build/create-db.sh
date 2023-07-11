@@ -21,7 +21,3 @@ CREATE DATABASE $database OWNER postgres;
 EOSQL
 
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps
-echo "Migrate database..."
-sqlx database setup --source ${SCRIPT_DIR}/../migrations/
-
-$POSTGRES -d ${database} -f ${SCRIPT_DIR}/example.sql

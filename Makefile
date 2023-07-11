@@ -4,13 +4,19 @@ test: clean-test-db test-db
 	@printf "\nRunning unittest...\n"
 	DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps cargo test
 
-test-db: clean-test-db
+test-db: clean-test-db create-docker create-db
+
+create-docker:
 	@printf "\nLaunch postgres database...(default password: password)\n"
 	# Make it compatible with mac and linux, the temp folder is different, so we need to mount both
 	@docker run -v /tmp:/tmp -v /var/folders:/var/folders --name biomedgps -e POSTGRES_PASSWORD=password -e POSTGRES_USER=postgres -p 5432:5432 -d nordata/postgre_postgresml:14-57693aa
 	@sleep 3
+
+create-db:
 	@echo "Create database: test_biomedgps"
 	@bash build/create-db.sh test_biomedgps 5432
+	@echo "Migrate database: test_biomedgps"
+	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v initdb
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/entity.tsv -t entity
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/relation.tsv -t relation
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/entity_embedding.tsv -t entity_embedding

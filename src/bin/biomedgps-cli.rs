@@ -100,7 +100,10 @@ async fn main() {
                 database_url.unwrap()
             };
 
-            run_migrations(&database_url).await.unwrap();
+            match run_migrations(&database_url).await {
+                Ok(_) => info!("Init database successfully."),
+                Err(e) => error!("Init database failed: {}", e),
+            }
         }
         SubCommands::ImportDB(arguments) => {
             let database_url = if arguments.database_url.is_none() {
