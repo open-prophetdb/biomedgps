@@ -625,50 +625,6 @@ pub struct RelationEmbedding {
     ))]
     pub relation_type: String,
 
-    #[validate(regex(
-        path = "ENTITY_LABEL_REGEX",
-        message = "The relation type should match ^[A-Za-z]+$. Such as Disease."
-    ))]
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of source_type should be between 1 and 64."
-    ))]
-    pub source_type: String,
-
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of source_id should be between 1 and 64."
-    ))]
-    #[validate(regex(
-        path = "ENTITY_ID_REGEX",
-        message = "The source id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
-    ))]
-    pub source_id: String,
-
-    #[validate(regex(
-        path = "ENTITY_LABEL_REGEX",
-        message = "The relation type should match ^[A-Za-z]+$. Such as Disease."
-    ))]
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of target_type should be between 1 and 64."
-    ))]
-    pub target_type: String,
-
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of target_id should be between 1 and 64."
-    ))]
-    #[validate(regex(
-        path = "ENTITY_ID_REGEX",
-        message = "The target id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
-    ))]
-    pub target_id: String,
-
     #[serde(deserialize_with = "text2vector")]
     pub embedding: Vector,
 }
@@ -704,15 +660,11 @@ impl RelationEmbedding {
                 }
             };
 
-            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, source_type, source_id, target_type, target_id, embedding) VALUES ($1, $2, $3, $4, $5, $6, $7)";
+            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
 
             let query = sqlx::query(&sql_str)
                 .bind(record.embedding_id)
                 .bind(record.relation_type)
-                .bind(record.source_type)
-                .bind(record.source_id)
-                .bind(record.target_type)
-                .bind(record.target_id)
                 .bind(record.embedding);
 
             match query.execute(pool).await {

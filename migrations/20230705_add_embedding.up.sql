@@ -23,16 +23,8 @@ CREATE TABLE
   IF NOT EXISTS biomedgps_relation_embedding (
     embedding_id BIGINT PRIMARY KEY, -- The embedding ID
     relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
-    source_id VARCHAR(64) NOT NULL, -- The ID of the start entity
-    source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
-    target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
-    target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     embedding vector(400), -- The embedding array
     UNIQUE (
-      relation_type,
-      source_id,
-      source_type,
-      target_id,
-      target_type
+      relation_type
     )
   );
