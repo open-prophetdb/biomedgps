@@ -1,4 +1,4 @@
-use crate::model::core::RecordResponse;
+use crate::model::core::{RecordResponse, Statistics, RelationCount};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX};
@@ -34,6 +34,59 @@ pub enum GetGraphResponse {
 impl GetGraphResponse {
     pub fn ok(graph: Graph) -> Self {
         Self::Ok(Json(graph))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetRelationCountResponse {
+    #[oai(status = 200)]
+    Ok(Json<Vec<RelationCount>>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetRelationCountResponse {
+    pub fn ok(relation_counts: Vec<RelationCount>) -> Self {
+        Self::Ok(Json(relation_counts))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+
+#[derive(ApiResponse)]
+pub enum GetStatisticsResponse {
+    #[oai(status = 200)]
+    Ok(Json<Statistics>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetStatisticsResponse {
+    pub fn ok(statistics: Statistics) -> Self {
+        Self::Ok(Json(statistics))
     }
 
     pub fn bad_request(msg: String) -> Self {

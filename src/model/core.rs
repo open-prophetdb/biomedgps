@@ -271,7 +271,7 @@ impl<
         };
 
         let pagination_str = if page.is_none() && page_size.is_none() {
-            "".to_string()
+            "LIMIT 10 OFFSET 0".to_string()
         } else {
             let page = match page {
                 Some(page) => page,
@@ -307,8 +307,8 @@ impl<
         AnyOk(RecordResponse {
             records: records,
             total: total.0 as u64,
-            page: page.unwrap_or(0),
-            page_size: page_size.unwrap_or(0),
+            page: page.unwrap_or(1),
+            page_size: page_size.unwrap_or(10),
         })
     }
 }
@@ -445,7 +445,7 @@ impl<
         };
 
         let pagination_str = if page.is_none() && page_size.is_none() {
-            "".to_string()
+            "LIMIT 10 OFFSET 0".to_string()
         } else {
             let page = match page {
                 Some(page) => page,
@@ -481,8 +481,8 @@ impl<
         AnyOk(EmbeddingRecordResponse {
             records: records,
             total: total.0 as u64,
-            page: page.unwrap_or(0),
-            page_size: page_size.unwrap_or(0),
+            page: page.unwrap_or(1),
+            page_size: page_size.unwrap_or(10),
         })
     }
 }
@@ -704,6 +704,24 @@ impl CheckData for RelationEmbedding {
             "target_type".to_string(),
             "embedding".to_string(),
         ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct Statistics {
+    entity_stat: Vec<EntityMetadata>,
+    relation_stat: Vec<RelationMetadata>,
+}
+
+impl Statistics {
+    pub fn new(
+        entity_stat: Vec<EntityMetadata>,
+        relation_stat: Vec<RelationMetadata>,
+    ) -> Statistics {
+        Statistics {
+            entity_stat: entity_stat,
+            relation_stat: relation_stat,
+        }
     }
 }
 
@@ -1114,6 +1132,46 @@ impl CheckData for Relation {
             "key_sentence".to_string(),
             "resource".to_string(),
         ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct RelationCount {
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type must be between 1 and 64."
+    ))]
+    pub relation_type: String,
+
+    pub ncount: i64,
+}
+
+impl RelationCount {
+    pub async fn get_records(
+        pool: &sqlx::PgPool,
+        query: &Option<ComposeQuery>,
+    ) -> Result<Vec<RelationCount>, anyhow::Error> {
+        let mut query_str = match query {
+            Some(ComposeQuery::QueryItem(item)) => item.format(),
+            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        };
+
+        let sql_str = format!(
+            "SELECT relation_type, COUNT(*) as ncount FROM biomedgps_relation WHERE {} GROUP BY relation_type",
+            query_str
+        );
+
+        let records = sqlx::query_as::<_, RelationCount>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
     }
 }
 

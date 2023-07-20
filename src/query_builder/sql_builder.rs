@@ -21,12 +21,12 @@ pub enum Value {
 pub struct QueryItem {
     pub field: String,
     pub value: Value,
-    pub operator: String, // =, !=, like, not like, in, not in
+    pub operator: String, // =, !=, like, not like, ilike, in, not in
 }
 
 impl QueryItem {
     pub fn new(field: String, value: Value, operator: String) -> Self {
-        let allowed_operators = vec!["=", "!=", "like", "not like", "in", "not in", "<>", "<", ">", "<=", ">="];
+        let allowed_operators = vec!["=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">="];
         if !allowed_operators.contains(&operator.as_str()) {
             panic!("Invalid operator: {}", operator);
         }
@@ -43,7 +43,7 @@ impl QueryItem {
                 }
             }
             Value::String(_) => {
-                if !vec!["=", "!=", "like", "not like", "<>"].contains(&operator.as_str()) {
+                if !vec!["=", "!=", "like", "not like", "ilike", "<>"].contains(&operator.as_str()) {
                     panic!("Invalid operator: {}", operator);
                 }
             }

@@ -1,12 +1,13 @@
 //! This module defines the routes of the API.
 
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetWholeTableResponse,
-    NodeIdsQuery, Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery, SubgraphIdQuery,
+    ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetStatisticsResponse,
+    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
+    SimilarityNodeQuery, SubgraphIdQuery, GetRelationCountResponse
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
-    RelationMetadata, Subgraph,
+    RelationMetadata, Statistics, Subgraph, RelationCount,
 };
 use crate::model::graph::Graph;
 use log::{debug, info, warn};
@@ -19,6 +20,39 @@ pub struct BiomedgpsApi;
 
 #[OpenApi]
 impl BiomedgpsApi {
+    /// Call `/api/v1/statistics` with query params to fetch all entity & relation metadata.
+    #[oai(
+        path = "/api/v1/statistics",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchStatistics"
+    )]
+    async fn fetch_statistics(&self, pool: Data<&Arc<sqlx::PgPool>>) -> GetStatisticsResponse {
+        let pool_arc = pool.clone();
+
+        let entity_metadata = match EntityMetadata::get_entity_metadata(&pool_arc).await {
+            Ok(entity_metadata) => entity_metadata,
+            Err(e) => {
+                let err = format!("Failed to fetch entity metadata: {}", e);
+                warn!("{}", err);
+                return GetStatisticsResponse::bad_request(err);
+            }
+        };
+
+        let relation_metadata = match RelationMetadata::get_relation_metadata(&pool_arc).await {
+            Ok(relation_metadata) => relation_metadata,
+            Err(e) => {
+                let err = format!("Failed to fetch relation metadata: {}", e);
+                warn!("{}", err);
+                return GetStatisticsResponse::bad_request(err);
+            }
+        };
+
+        let statistics = Statistics::new(entity_metadata, relation_metadata);
+
+        GetStatisticsResponse::ok(statistics)
+    }
+
     /// Call `/api/v1/entity-metadata` with query params to fetch all entity metadata.
     #[oai(
         path = "/api/v1/entity-metadata",
@@ -33,7 +67,7 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
 
         match EntityMetadata::get_entity_metadata(&pool_arc).await {
-            Ok(entity_metadata) => GetWholeTableResponse::Ok(Json(entity_metadata)),
+            Ok(entity_metadata) => GetWholeTableResponse::ok(entity_metadata),
             Err(e) => {
                 let err = format!("Failed to fetch entity metadata: {}", e);
                 warn!("{}", err);
@@ -56,7 +90,7 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
 
         match RelationMetadata::get_relation_metadata(&pool_arc).await {
-            Ok(relation_metadata) => GetWholeTableResponse::Ok(Json(relation_metadata)),
+            Ok(relation_metadata) => GetWholeTableResponse::ok(relation_metadata),
             Err(e) => {
                 let err = format!("Failed to fetch relation metadata: {}", e);
                 warn!("{}", err);
@@ -116,7 +150,7 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch entities: {}", e);
                 warn!("{}", err);
@@ -185,7 +219,7 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch curated knowledges: {}", e);
                 warn!("{}", err);
@@ -361,11 +395,63 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch relations: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/relation-counts` with query params to fetch relation counts.
+    #[oai(
+        path = "/api/v1/relation-counts",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchRelationCounts"
+    )]
+    async fn fetch_relation_counts(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        query_str: Query<Option<String>>,
+    ) -> GetRelationCountResponse {
+        let pool_arc = pool.clone();
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRelationCountResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RelationCount::get_records(
+            &pool_arc,
+            &query
+        )
+        .await
+        {
+            Ok(entities) => GetRelationCountResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch relations: {}", e);
+                warn!("{}", err);
+                return GetRelationCountResponse::bad_request(err);
             }
         }
     }
@@ -430,7 +516,7 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch entity2ds: {}", e);
                 warn!("{}", err);
@@ -499,7 +585,7 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::Ok(Json(entities)),
+            Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch subgraphs: {}", e);
                 warn!("{}", err);
@@ -648,12 +734,12 @@ impl BiomedgpsApi {
         let mut graph = Graph::new();
 
         if node_ids == "" {
-            return GetGraphResponse::Ok(Json(graph));
+            return GetGraphResponse::ok(graph)
         }
 
         let node_ids: Vec<&str> = node_ids.split(",").collect();
         match graph.fetch_nodes_by_ids(&pool_arc, &node_ids).await {
-            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
                 let err = format!("Failed to fetch nodes: {}", e);
                 warn!("{}", err);
@@ -689,12 +775,12 @@ impl BiomedgpsApi {
         let mut graph = Graph::new();
 
         if node_ids == "" {
-            return GetGraphResponse::Ok(Json(graph));
+            return GetGraphResponse::ok(graph);
         }
 
         let node_ids: Vec<&str> = node_ids.split(",").collect();
         match graph.auto_connect_nodes(&pool_arc, &node_ids).await {
-            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
                 let err = format!("Failed to fetch nodes: {}", e);
                 warn!("{}", err);
@@ -758,7 +844,7 @@ impl BiomedgpsApi {
             .fetch_linked_nodes(&pool_arc, &query, page, page_size, None)
             .await
         {
-            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
                 let err = format!("Failed to fetch linked nodes: {}", e);
                 warn!("{}", err);
@@ -822,7 +908,7 @@ impl BiomedgpsApi {
             .fetch_similarity_nodes(&pool_arc, &node_id, &query, topk)
             .await
         {
-            Ok(graph) => GetGraphResponse::Ok(Json(graph.to_owned().get_graph(None).unwrap())),
+            Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
                 let err = format!("Failed to fetch similarity nodes: {}", e);
                 warn!("{}", err);
