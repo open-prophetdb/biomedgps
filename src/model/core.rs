@@ -1,6 +1,7 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
 use super::util::{drop_table, get_delimiter, parse_csv_error};
+use crate::model::util::match_color;
 use crate::pgvector::Vector;
 use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
@@ -10,7 +11,7 @@ use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use poem_openapi::Object;
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{error::Error, fmt, path::PathBuf};
 use validator::Validate;
 
@@ -1144,6 +1145,30 @@ pub struct RelationCount {
     ))]
     pub relation_type: String,
 
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The target_type must match the ^[A-Za-z]+$ pattern."
+    ))]
+    pub target_type: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of source_name must be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_LABEL_REGEX",
+        message = "The source_type must match the ^[A-Za-z]+$ pattern."
+    ))]
+    pub source_type: String,
+
+    pub resource: String,
+
     pub ncount: i64,
 }
 
@@ -1163,7 +1188,7 @@ impl RelationCount {
         };
 
         let sql_str = format!(
-            "SELECT relation_type, COUNT(*) as ncount FROM biomedgps_relation WHERE {} GROUP BY relation_type",
+            "SELECT relation_type, source_type, target_type, resource, COUNT(*) as ncount FROM biomedgps_relation WHERE {} GROUP BY relation_type, source_type, target_type, resource",
             query_str
         );
 

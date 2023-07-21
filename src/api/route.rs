@@ -3,13 +3,14 @@
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetStatisticsResponse,
     GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
-    SimilarityNodeQuery, SubgraphIdQuery, GetRelationCountResponse
+    SimilarityNodeQuery, SubgraphIdQuery, GetRelationCountResponse, GetEntityColorMapResponse
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
     RelationMetadata, Statistics, Subgraph, RelationCount,
 };
 use crate::model::graph::Graph;
+use crate::model::util::match_color;
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
@@ -74,6 +75,36 @@ impl BiomedgpsApi {
                 return GetWholeTableResponse::bad_request(err);
             }
         }
+    }
+
+    /// Call `/api/v1/entity-colormap` with query params to fetch all entity colormap.
+    #[oai(
+        path = "/api/v1/entity-colormap",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityColorMap"
+    )]
+    async fn fetch_entity_colormap(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+    ) -> GetEntityColorMapResponse {
+        let pool_arc = pool.clone();
+
+        let entity_metadata = match EntityMetadata::get_entity_metadata(&pool_arc).await {
+            Ok(entity_metadata) => entity_metadata,
+            Err(e) => {
+                let err = format!("Failed to fetch entity metadata: {}", e);
+                warn!("{}", err);
+                return GetEntityColorMapResponse::bad_request(err);
+            }
+        };
+
+        let color_map = entity_metadata
+            .iter()
+            .map(|em| (em.entity_type.clone(), match_color(&em.entity_type)))
+            .collect();
+
+        return GetEntityColorMapResponse::ok(color_map);
     }
 
     /// Call `/api/v1/relation-metadata` with query params to fetch all relation metadata.
@@ -518,7 +549,7 @@ impl BiomedgpsApi {
         {
             Ok(entities) => GetRecordsResponse::ok(entities),
             Err(e) => {
-                let err = format!("Failed to fetch entity2ds: {}", e);
+                let err = format!("Failed to fetch entity2d: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }

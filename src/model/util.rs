@@ -1,7 +1,27 @@
 //! Utility functions for the model module. Contains functions to import data from CSV files into the database, and to update the metadata tables.
 
 use log::{debug, error, info, warn};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::{error::Error, path::PathBuf};
+
+/// A color map for the node labels.
+/// More details on https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=12
+/// Don't change the order of the colors. It is important to keep the colors consistent.
+/// In future, we may specify a color for each node label when we can know all the node labels.
+const NODE_COLORS: [&str; 12] = [
+    "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
+    "#cab2d6", "#6a3d9a", "#ffff99", "#b15928",
+];
+
+/// We have a set of colors and we want to match a color to a node label in a deterministic way.
+pub fn match_color(entity_type: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    entity_type.hash(&mut hasher);
+    let hash = hasher.finish();
+    let index = hash % NODE_COLORS.len() as u64;
+    NODE_COLORS[index as usize].to_string()
+}
 
 pub fn get_delimiter(filepath: &PathBuf) -> Result<u8, Box<dyn Error>> {
     let suffix = match filepath.extension() {
@@ -48,7 +68,10 @@ pub async fn import_file_in_loop(
     unique_columns: &Vec<String>,
     delimiter: u8,
 ) -> Result<(), Box<dyn Error>> {
-    match sqlx::query("DROP TABLE IF EXISTS staging").execute(pool).await {
+    match sqlx::query("DROP TABLE IF EXISTS staging")
+        .execute(pool)
+        .await
+    {
         Ok(_) => {}
         Err(_) => {}
     }
@@ -91,7 +114,10 @@ pub async fn import_file_in_loop(
 
     tx.commit().await?;
 
-    match sqlx::query("DROP TABLE IF EXISTS staging").execute(pool).await {
+    match sqlx::query("DROP TABLE IF EXISTS staging")
+        .execute(pool)
+        .await
+    {
         Ok(_) => {}
         Err(_) => {}
     };

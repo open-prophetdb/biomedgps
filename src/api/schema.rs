@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::model::core::{RecordResponse, Statistics, RelationCount};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::graph::Graph;
@@ -34,6 +36,32 @@ pub enum GetGraphResponse {
 impl GetGraphResponse {
     pub fn ok(graph: Graph) -> Self {
         Self::Ok(Json(graph))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetEntityColorMapResponse {
+    #[oai(status = 200)]
+    Ok(Json<HashMap<String, String>>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetEntityColorMapResponse {
+    pub fn ok(h: HashMap<String, String>) -> Self {
+        Self::Ok(Json(h))
     }
 
     pub fn bad_request(msg: String) -> Self {

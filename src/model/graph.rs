@@ -12,9 +12,8 @@ use log::{debug, error};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use crate::model::util::match_color;
 use std::vec;
 use std::{error::Error, fmt};
 
@@ -81,15 +80,6 @@ impl Error for ValidationError {
     }
 }
 
-/// A color map for the node labels.
-/// More details on https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=12
-/// Don't change the order of the colors. It is important to keep the colors consistent.
-/// In future, we may specify a color for each node label when we can know all the node labels.
-const NODE_COLORS: [&str; 12] = [
-    "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
-    "#cab2d6", "#6a3d9a", "#ffff99", "#b15928",
-];
-
 /// A NodeKeyShape struct for the node rendering.
 ///
 /// Need to rename the field `fill_opacity` to `fillOpacity` in the frontend. More details on https://docs.rs/poem-openapi/latest/poem_openapi/derive.Object.html
@@ -105,8 +95,8 @@ pub struct NodeKeyShape {
 
 impl NodeKeyShape {
     /// Create a NodeKeyShape according to the node label.
-    pub fn new(node_label: &str) -> Self {
-        let color = Self::match_color(node_label);
+    pub fn new(entity_type: &str) -> Self {
+        let color = match_color(entity_type);
 
         NodeKeyShape {
             fill: color.clone(),
@@ -114,15 +104,6 @@ impl NodeKeyShape {
             opacity: 0.95,
             fill_opacity: 0.95,
         }
-    }
-
-    /// We have a set of colors and we want to match a color to a node label in a deterministic way.
-    fn match_color(node_label: &str) -> String {
-        let mut hasher = DefaultHasher::new();
-        node_label.hash(&mut hasher);
-        let hash = hasher.finish();
-        let index = hash % NODE_COLORS.len() as u64;
-        NODE_COLORS[index as usize].to_string()
     }
 }
 
@@ -139,8 +120,8 @@ pub struct Icon {
 impl Icon {
     /// Get the first character of the node label and convert it to a uppercase letter.
     /// We use this letter as the icon value.
-    pub fn new(node_label: &str) -> Self {
-        let first_char = node_label
+    pub fn new(entity_type: &str) -> Self {
+        let first_char = entity_type
             .chars()
             .next()
             .unwrap()
@@ -157,21 +138,47 @@ impl Icon {
     }
 }
 
+/// A label struct for the node rendering.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct Label {
+    pub value: String,
+    pub fill: String,
+    #[oai(rename = "fontSize")]
+    #[serde(rename(serialize = "fontSize", deserialize = "font_size"))]
+    pub font_size: i32,
+    pub offset: i32,
+    pub position: String, // "top" or "bottom"
+}
+
+impl Label {
+    /// Get the first character of the node label and convert it to a uppercase letter.
+    /// We use this letter as the icon value.
+    pub fn new(entity: &Entity) -> Self {
+        Label {
+            value: entity.name.to_string(),
+            fill: "#000".to_string(),
+            font_size: 12,
+            offset: 0,
+            position: "bottom".to_string(),
+        }
+    }
+}
+
 /// A style struct for the node rendering.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct NodeStyle {
-    pub label: String,
+    pub label: Label,
     pub keyshape: NodeKeyShape,
     pub icon: Icon,
 }
 
 impl NodeStyle {
     /// Create a NodeStyle according to the node label.
-    pub fn new(node_label: &str) -> Self {
+    pub fn new(entity: &Entity) -> Self {
         NodeStyle {
-            label: node_label.to_string(),
-            keyshape: NodeKeyShape::new(node_label),
-            icon: Icon::new(node_label),
+            label: Label::new(entity),
+            keyshape: NodeKeyShape::new(entity.label.as_str()),
+            icon: Icon::new(entity.label.as_str()),
         }
     }
 }
@@ -201,14 +208,27 @@ pub struct NodeData {
 impl NodeData {
     /// Create a NodeData from an Entity.
     pub fn new(entity: &Entity) -> Self {
+        // The identity is same with the id in the graph database.
+        let identity = Self::format_id(&entity.label, &entity.id);
         NodeData {
-            identity: entity.id.clone(),
+            identity: identity.clone(),
             id: entity.id.clone(),
             label: entity.label.clone(),
             name: entity.name.clone(),
             description: entity.description.clone(),
             resource: entity.resource.clone(),
         }
+    }
+
+    /// Parse the node id to get the label and entity id.
+    pub fn parse_id(id: &str) -> (String, String) {
+        let parts: Vec<&str> = id.split(COMPOSED_ENTITY_DELIMITER).collect();
+        (parts[0].to_string(), parts[1].to_string())
+    }
+
+    /// Format the node id, we use the label and entity id to format the node id.
+    pub fn format_id(label: &str, entity_id: &str) -> String {
+        format!("{}{}{}", label, COMPOSED_ENTITY_DELIMITER, entity_id)
     }
 }
 
@@ -237,6 +257,7 @@ pub struct Node {
     #[oai(skip_serializing_if_is_none)]
     pub combo_id: Option<String>,
     pub id: String,
+    // For showing a name in the frontend
     pub label: String,
     pub nlabel: String,
     pub degree: Option<i32>, // Map degree to node size
@@ -257,10 +278,10 @@ impl Node {
         Node {
             combo_id: None,
             id: identity.clone(),
-            label: identity,
+            label: entity.id.clone(),
             nlabel: entity.label.clone(),
             degree: None,
-            style: NodeStyle::new(&entity.label),
+            style: NodeStyle::new(&entity),
             category: "node".to_string(),
             cluster: Some(entity.label.clone()),
             r#type: "graphin-circle".to_string(),
