@@ -24,19 +24,19 @@
 
 ### Ask questions with chatbot
 
-![chatbot](./studio/assets/chatbot.png)
+![chatbot](https://github.com/yjcyxky/biomedgps-studio/blob/master/assets/chatbot.png?raw=true)
 
 ### Find similar diseases with your queried disease
 
-![disease](./studio/assets/disease-similarities.png)
+![disease](https://github.com/yjcyxky/biomedgps-studio/blob/master/assets/disease-similarities.png?raw=true)
 
 ### Predict drugs and related genes for your queried disease
 
-![disease](./studio/assets/drug-targets-genes.png)
+![disease](https://github.com/yjcyxky/biomedgps-studio/blob/master/assets/drug-targets-genes.png?raw=true)
 
 ### Find potential paths between two nodes
 
-![path](./studio/assets/path.png)
+![path](https://github.com/yjcyxky/biomedgps-studio/blob/master/assets/path.png?raw=true)
 
 ## For Users
 
