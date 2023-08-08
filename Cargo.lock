@@ -203,6 +203,7 @@ dependencies = [
  "poem",
  "poem-openapi",
  "postgres",
+ "pubchem",
  "regex",
  "rust-embed",
  "serde",
@@ -1514,7 +1515,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "poem-derive",
- "quick-xml",
+ "quick-xml 0.26.0",
  "regex",
  "rfc7239",
  "rust-embed",
@@ -1560,7 +1561,7 @@ dependencies = [
  "num-traits",
  "poem",
  "poem-openapi-derive",
- "quick-xml",
+ "quick-xml 0.26.0",
  "regex",
  "serde",
  "serde_json",
@@ -1691,6 +1692,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dec2b086b7a862cf4de201096214fa870344cf922b2b30c167badb3af3195406"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pubchem"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6b8f434b94cc2fd043a8ed097ce38a44fd9d9b0ff1dda07bb3a352baede9266"
+dependencies = [
+ "form_urlencoded",
+ "quick-xml 0.22.0",
+ "thiserror",
+ "ureq",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -2709,6 +2731,21 @@ name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
+
+[[package]]
+name = "ureq"
+version = "2.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b11c96ac7ee530603dcdf68ed1557050f374ce55a5a07193ebf8cbc9f8927e9"
+dependencies = [
+ "base64 0.21.2",
+ "log",
+ "once_cell",
+ "rustls 0.21.2",
+ "rustls-webpki",
+ "url",
+ "webpki-roots 0.23.1",
+]
 
 [[package]]
 name = "url"

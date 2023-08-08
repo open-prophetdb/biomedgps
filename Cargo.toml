@@ -63,3 +63,6 @@ url = "2.4.0"
 
 # Algorithms
 kiddo = "2.1.1" # for KNN
+
+# Databases
+pubchem = "0.1.1" # for PubChem

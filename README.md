@@ -11,6 +11,33 @@
 
 <p align="center">NOTE: NOT READY FOR PRODUCTION YET.</p>
 
+## Features
+
+- [x] Knowledge graph studio for graph query, visualization and analysis.
+- [x] Graph neural network for drug discovery, disease mechanism, biomarker screening and discovering response to toxicant exposure.
+- [x] Support customized knowledge graph schema and data source.
+- [x] Support customized graph neural network model.
+- [x] Support customized omics datasets.
+- [x] Integrated large language models (such as vicuna, rwkv, chatgpt etc. more details on [chat-publications](https://github.com/yjcyxky/chat-publications)) for answering questions.
+
+## Demo
+
+### Ask questions with chatbot
+
+![chatbot](./studio/assets/chatbot.png)
+
+### Find similar diseases with your queried disease
+
+![disease](./studio/assets/disease-similarities.png)
+
+### Predict drugs and related genes for your queried disease
+
+![disease](./studio/assets/drug-targets-genes.png)
+
+### Find potential paths between two nodes
+
+![path](./studio/assets/path.png)
+
 ## For Users
 
 If you want to use the platform, please follow the instructions below. You can also join us to develop the platform, see [here](#join-us).
