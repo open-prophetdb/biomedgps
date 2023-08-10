@@ -27,8 +27,12 @@ clean-test-db:
 	@printf "Clean "
 	@-docker rm biomedgps
 
+clean-studio:
+	@printf "Clean studio...\n"
+	@cd studio && rm -rf node_modules && rm -rf dist && yarn cache clean && cd ..
+
 build-studio:
-	@cd studio && yarn && yarn openapi && yarn build:embed && cd ..
+	@cd studio && yarn && yarn openapi || (yarn build:embed && cd ..)
 
 build-biomedgps:
 	@cargo build --release
