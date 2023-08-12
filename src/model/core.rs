@@ -356,6 +356,18 @@ pub struct Entity {
 
     #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
+
+    #[oai(skip_serializing_if_is_none)]
+    pub taxid: Option<String>,
+
+    #[oai(skip_serializing_if_is_none)]
+    pub synonyms: Option<String>,
+
+    #[oai(skip_serializing_if_is_none)]
+    pub pmids: Option<String>,
+
+    #[oai(skip_serializing_if_is_none)]
+    pub xrefs: Option<String>,
 }
 
 impl CheckData for Entity {
@@ -374,6 +386,10 @@ impl CheckData for Entity {
             "label".to_string(),
             "resource".to_string(),
             "description".to_string(),
+            "taxid".to_string(),
+            "synonyms".to_string(),
+            "pmids".to_string(),
+            "xrefs".to_string(),
         ]
     }
 }
@@ -1105,6 +1121,9 @@ pub struct Relation {
     pub key_sentence: Option<String>,
 
     pub resource: String,
+
+    #[oai(skip_serializing_if_is_none)]
+    pub pmids: Option<String>,
 }
 
 impl CheckData for Relation {
@@ -1132,6 +1151,7 @@ impl CheckData for Relation {
             "score".to_string(),
             "key_sentence".to_string(),
             "resource".to_string(),
+            "pmids".to_string(),
         ]
     }
 }

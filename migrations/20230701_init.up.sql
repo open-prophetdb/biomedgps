@@ -8,6 +8,10 @@ CREATE TABLE
     label VARCHAR(64) NOT NULL, -- The label of the entity, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the entity, such as UBERON, DOID, HGNC, CHEBI, GO, etc.
     description TEXT, -- The description of the entity
+    taxid VARCHAR(64), -- The taxonomy ID of the entity
+    synonyms TEXT, -- The synonyms of the entity
+    pmids TEXT, -- The PMIDs which mentions the entity
+    xrefs TEXT, -- The cross references of the entity
     UNIQUE (id, label) -- The unique constraint of the entity
   );
 
@@ -66,6 +70,7 @@ CREATE TABLE
     target_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the relation
     key_sentence TEXT, -- The key sentence of the relation
+    pmids TEXT, -- The PMIDs which mentions the relation
     score FLOAT, -- The score of the relation
     UNIQUE (
       relation_type,
