@@ -971,9 +971,8 @@ pub struct KnowledgeCuration {
 
 impl KnowledgeCuration {
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "INSERT INTO biomedgps_knowledge_curation (id, relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, created_at, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11) RETURNING *";
+        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
-            .bind(&self.id)
             .bind(&self.relation_type)
             .bind(&self.source_name)
             .bind(&self.source_type)
@@ -1382,7 +1381,7 @@ impl Subgraph {
             self.parent.clone().unwrap()
         };
 
-        let sql_str = "INSERT INTO biomedgps_subgraph (id, name, description, payload, created_time, owner, version, db_version, parent) VALUES ($1, $2, $3, $4, now(), $5, $6, $7, $8) RETURNING *";
+        let sql_str = "INSERT INTO biomedgps_subgraph (id, name, description, payload, owner, version, db_version, parent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *";
         let subgraph = sqlx::query_as::<_, Subgraph>(sql_str)
             .bind(id)
             .bind(&self.name)
