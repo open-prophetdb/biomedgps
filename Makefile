@@ -32,7 +32,10 @@ clean-studio:
 	@cd studio && rm -rf node_modules && rm -rf dist && yarn cache clean && cd ..
 
 build-studio:
-	@cd studio && yarn && yarn openapi || (yarn build:embed && cd ..)
+	@printf "Building studio based on openapi...\n"
+	@mkdir -p assets
+	@cd studio && yarn && yarn openapi || true
+	@cd studio && yarn build:embed && cd ..
 
 build-biomedgps:
 	@cargo build --release
@@ -41,10 +44,13 @@ build-biomedgps-linux:
 	@cargo build --release --target=x86_64-unknown-linux-musl
 
 build-mac: build-studio build-biomedgps
-	@printf "\nBuilding...\n"
+	@printf "\nDone!\n"
 
-build-linux: build-studio build-biomedgps-linux
-	@printf "\nBuilding...\n"
+build-linux: build-studio build-biomedgps
+	@printf "\nDone!\n"
+
+build-linux-on-mac: build-studio build-biomedgps-linux
+	@printf "\nDone!\n"
 
 # You must run `make build-service` to build new api spec for studio when you change the api spec
 build-service:

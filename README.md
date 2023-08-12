@@ -177,12 +177,29 @@ export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps &
 curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
 sudo apt-get install -y nodejs
 npm install -g yarn
+
+# Check the version. Make sure the nodejs version is 16.x.x. Other versions may not work.
+node -v
 ```
 
 #### 2. Install dependencies
 
 ```bash
 cd studio
+git submodule update --init --recursive
+
+# Install the biominer-components package
+cd ../../
+git clone https://github.com/yjcyxky/biominer-components.git
+cd biominer-components
+## Install the dependencies
+yarn
+## Install the package locally
+npm i -g yalc
+yalc publish
+
+cd ../biomedgps/studio
+yalc add biominer-components
 yarn install
 ```
 
