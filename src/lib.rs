@@ -220,7 +220,9 @@ pub async fn import_data(
             };
 
             // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
-            let temp_file = tempfile::NamedTempFile::new().unwrap();
+            let pardir = file.parent().unwrap();
+            let tempdir = tempfile::tempdir_in(pardir).unwrap();
+            let temp_file = tempfile::NamedTempFile::new_in(tempdir).unwrap();
             let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
             let results = if table == "entity" {
                 Entity::select_expected_columns(&file, &temp_filepath)
