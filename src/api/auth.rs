@@ -29,7 +29,7 @@ async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
     let jwt_secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key) => {
             if key.is_empty() {
-                warn!("You don't set JWT_SECRET_KEY environment variable, so we will skip JWT verification, but users also nedd to set the Authorization header to access the API.");
+                warn!("You don't set JWT_SECRET_KEY environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
                 return default_user;
             }
             key

@@ -89,6 +89,12 @@ struct Opt {
     /// You can also set it with env var: NEO4J_URL.
     #[structopt(name = "neo4j-url", short = "g", long = "neo4j-url")]
     neo4j_url: Option<String>,
+
+    /// JWT secret key.
+    /// You can also set it with env var: JWT_SECRET_KEY.
+    /// If you don't set it, the server will disable JWT verification. You can use the API with Authorization header and set it to any value.
+    #[structopt(name = "jwt-secret-key", short = "k", long="jwt-secret-key")]
+    jwt_secret_key: Option<String>,
 }
 
 #[derive(RustEmbed)]
@@ -126,7 +132,7 @@ async fn main() -> Result<(), std::io::Error> {
     let args = Opt::from_args();
 
     let log_result = if args.debug {
-        init_logger("biomedgps", LevelFilter::Trace)
+        init_logger("biomedgps", LevelFilter::Debug)
     } else {
         init_logger("biomedgps", LevelFilter::Info)
     };
@@ -157,6 +163,26 @@ async fn main() -> Result<(), std::io::Error> {
         }
     } else {
         database_url.unwrap()
+    };
+
+    if args.jwt_secret_key.is_none() {
+        match std::env::var("JWT_SECRET_KEY") {
+            Ok(v) => {
+                if v.is_empty() {
+                    warn!("You don't set JWT_SECRET_KEY environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                    None
+                } else {
+                    Some(v)
+                }
+            }
+            Err(_) => {
+                warn!("You don't set JWT_SECRET_KEY environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                None
+            }
+        }
+    } else {
+        std::env::set_var("JWT_SECRET_KEY", args.jwt_secret_key.unwrap());
+        None
     };
 
     // let neo4j_url = args.neo4j_url;
