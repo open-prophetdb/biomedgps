@@ -60,6 +60,9 @@ byteorder = "1"
 bytes = "1"
 postgres = { version = "0.19.5" }
 url = "2.4.0"
+jwt = "0.16.0"
+hmac = "0.12.1"
+sha2 = "0.10.7"
 
 # Algorithms
 kiddo = "2.1.1" # for KNN

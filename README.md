@@ -166,7 +166,7 @@ make test-db
 #### 3. Run the server
 
 ```bash
-export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run -- -H 0.0.0.0 -p 8888 --openapi --debug
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps -- -H 0.0.0.0 -p 8888 --openapi --debug
 ```
 
 ### Installation (Development) for Frontend

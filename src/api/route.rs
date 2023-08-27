@@ -1,16 +1,17 @@
 //! This module defines the routes of the API.
 
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetGraphResponse, GetRecordsResponse, GetStatisticsResponse,
-    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
-    SimilarityNodeQuery, SubgraphIdQuery, GetRelationCountResponse, GetEntityColorMapResponse
+    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetRecordsResponse,
+    GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery,
+    Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery, SubgraphIdQuery,
 };
 use crate::model::core::{
-    Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
-    RelationMetadata, Statistics, Subgraph, RelationCount,
+    Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
+    RelationMetadata, Statistics, Subgraph,
 };
 use crate::model::graph::Graph;
 use crate::model::util::match_color;
+use crate::api::auth::CustomSecurityScheme;
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
@@ -28,7 +29,12 @@ impl BiomedgpsApi {
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchStatistics"
     )]
-    async fn fetch_statistics(&self, pool: Data<&Arc<sqlx::PgPool>>) -> GetStatisticsResponse {
+    async fn fetch_statistics(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        _token: CustomSecurityScheme,
+    ) -> GetStatisticsResponse {
+        info!("Username: {}", _token.0.username);
         let pool_arc = pool.clone();
 
         let entity_metadata = match EntityMetadata::get_entity_metadata(&pool_arc).await {
@@ -64,6 +70,7 @@ impl BiomedgpsApi {
     async fn fetch_entity_metadata(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
+        _token: CustomSecurityScheme,
     ) -> GetWholeTableResponse<EntityMetadata> {
         let pool_arc = pool.clone();
 
@@ -87,6 +94,7 @@ impl BiomedgpsApi {
     async fn fetch_entity_colormap(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
+        _token: CustomSecurityScheme,
     ) -> GetEntityColorMapResponse {
         let pool_arc = pool.clone();
 
@@ -117,6 +125,7 @@ impl BiomedgpsApi {
     async fn fetch_relation_metadata(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
+        _token: CustomSecurityScheme,
     ) -> GetWholeTableResponse<RelationMetadata> {
         let pool_arc = pool.clone();
 
@@ -143,6 +152,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Entity> {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -203,6 +213,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -270,6 +281,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         payload: Json<KnowledgeCuration>,
+        _token: CustomSecurityScheme,
     ) -> PostResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
         let payload = payload.0;
@@ -305,6 +317,7 @@ impl BiomedgpsApi {
         pool: Data<&Arc<sqlx::PgPool>>,
         payload: Json<KnowledgeCuration>,
         id: Path<i64>,
+        _token: CustomSecurityScheme,
     ) -> PostResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
         let payload = payload.0;
@@ -346,6 +359,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         id: Path<i64>,
+        _token: CustomSecurityScheme,
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let id = id.0;
@@ -379,6 +393,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Relation> {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -446,6 +461,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRelationCountResponse {
         let pool_arc = pool.clone();
 
@@ -472,12 +488,7 @@ impl BiomedgpsApi {
             }
         };
 
-        match RelationCount::get_records(
-            &pool_arc,
-            &query
-        )
-        .await
-        {
+        match RelationCount::get_records(&pool_arc, &query).await {
             Ok(entities) => GetRelationCountResponse::ok(entities),
             Err(e) => {
                 let err = format!("Failed to fetch relations: {}", e);
@@ -500,6 +511,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Entity2D> {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -569,6 +581,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Subgraph> {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -636,6 +649,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         payload: Json<Subgraph>,
+        _token: CustomSecurityScheme,
     ) -> PostResponse<Subgraph> {
         let pool_arc = pool.clone();
         let payload = payload.0;
@@ -671,6 +685,7 @@ impl BiomedgpsApi {
         pool: Data<&Arc<sqlx::PgPool>>,
         id: Path<String>,
         payload: Json<Subgraph>,
+        _token: CustomSecurityScheme,
     ) -> PostResponse<Subgraph> {
         let pool_arc = pool.clone();
         let id = id.0;
@@ -715,6 +730,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         id: Path<String>,
+        _token: CustomSecurityScheme,
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let id = id.0;
@@ -749,6 +765,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         node_ids: Query<String>,
+        _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
         let node_ids = node_ids.0;
@@ -765,7 +782,7 @@ impl BiomedgpsApi {
         let mut graph = Graph::new();
 
         if node_ids == "" {
-            return GetGraphResponse::ok(graph)
+            return GetGraphResponse::ok(graph);
         }
 
         let node_ids: Vec<&str> = node_ids.split(",").collect();
@@ -790,6 +807,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         node_ids: Query<String>,
+        _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
         let node_ids = node_ids.0;
@@ -833,6 +851,7 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
         let page = page.0;
@@ -897,6 +916,7 @@ impl BiomedgpsApi {
         node_id: Query<String>,
         query_str: Query<Option<String>>,
         topk: Query<Option<u64>>,
+        _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
 
