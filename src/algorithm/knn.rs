@@ -82,9 +82,8 @@ impl NodeSimilarity {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    extern crate stderrlog;
     use super::*;
-    use crate::{init_log, setup_test_db};
+    use crate::{init_logger, setup_test_db};
     use crate::model::core::{EmbeddingRecordResponse, EntityEmbedding};
     use log::debug;
 

@@ -12,7 +12,7 @@ use log::{debug, error, info, warn};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{error::Error, fmt, path::PathBuf};
+use std::{error::Error, fmt, option::Option, path::PathBuf};
 use validator::Validate;
 
 const ENTITY_NAME_MAX_LENGTH: u64 = 255;
@@ -143,11 +143,13 @@ pub trait CheckData {
         out_filepath: &PathBuf,
     ) -> Result<(), Box<dyn Error>> {
         let delimiter = get_delimiter(in_filepath)?;
+        debug!("The delimiter is: {:?}", delimiter as char);
         let mut reader = csv::ReaderBuilder::new()
             .delimiter(delimiter)
             .from_path(in_filepath)?;
 
         let headers = reader.headers()?.clone();
+        debug!("The headers are: {:?}", headers);
 
         // Identify the indices of the columns to keep
         let indices_to_keep: Vec<usize> = headers
@@ -162,6 +164,7 @@ pub trait CheckData {
             })
             .collect();
 
+        debug!("The indices of the columns to keep are: {:?}", indices_to_keep);
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(delimiter)
             .from_writer(std::fs::File::create(out_filepath)?);
@@ -879,6 +882,12 @@ impl RelationMetadata {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Object, PartialEq, Eq)]
+pub struct Payload {
+    pub project_id: String,
+    pub organization_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct KnowledgeCuration {
     // Ignore this field when deserialize from json
@@ -967,11 +976,32 @@ pub struct KnowledgeCuration {
 
     #[validate(range(min = 1, message = "pmid must be greater than 0"))]
     pub pmid: i64,
+
+    // The payload field is a jsonb field which contains the project_id and organization_id.
+    pub payload: Option<serde_json::Value>,
 }
 
 impl KnowledgeCuration {
+    fn get_value(key: &str, json: &serde_json::Value) -> Result<String, anyhow::Error> {
+        match json[key].as_str() {
+            Some(value) => Ok(value.to_string()),
+            None => Err(anyhow::anyhow!("The {} field is missing.", key)),
+        }
+    }
+
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, curator, pmid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *";
+        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, curator, pmid, payload) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: KnowledgeCuration::get_value("project_id", payload)?,
+                organization_id: KnowledgeCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
             .bind(&self.relation_type)
             .bind(&self.source_name)
@@ -983,6 +1013,7 @@ impl KnowledgeCuration {
             .bind(&self.key_sentence)
             .bind(&self.curator)
             .bind(&self.pmid)
+            .bind(&payload)
             .fetch_one(pool)
             .await?;
 

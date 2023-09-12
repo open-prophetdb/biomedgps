@@ -26,7 +26,9 @@ pub struct QueryItem {
 
 impl QueryItem {
     pub fn new(field: String, value: Value, operator: String) -> Self {
-        let allowed_operators = vec!["=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">="];
+        let allowed_operators = vec![
+            "=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">=",
+        ];
         if !allowed_operators.contains(&operator.as_str()) {
             panic!("Invalid operator: {}", operator);
         }
@@ -43,7 +45,8 @@ impl QueryItem {
                 }
             }
             Value::String(_) => {
-                if !vec!["=", "!=", "like", "not like", "ilike", "<>"].contains(&operator.as_str()) {
+                if !vec!["=", "!=", "like", "not like", "ilike", "<>"].contains(&operator.as_str())
+                {
                     panic!("Invalid operator: {}", operator);
                 }
             }
@@ -83,6 +86,18 @@ impl QueryItem {
             field,
             value,
             operator,
+        }
+    }
+
+    pub fn get_field(&self) -> &str {
+        &self.field
+    }
+
+    pub fn get_field_value_pair(&self) -> Option<(String, String)> {
+        // Only return a string value
+        match &self.value {
+            Value::String(v) => Some((self.field.clone(), v.clone())),
+            _ => None,
         }
     }
 
@@ -156,6 +171,42 @@ impl ComposeQueryItem {
         }
     }
 
+    pub fn get_fields(&self, fields: &mut Vec<String>) {
+        for item in &self.items {
+            match item {
+                ComposeQuery::QueryItem(query_item) => {
+                    // Check if the field is not already in the Vec and add it
+                    if !fields.contains(&query_item.field) {
+                        fields.push(query_item.field.clone());
+                    }
+                }
+                ComposeQuery::ComposeQueryItem(compose_query_item) => {
+                    // Recursively traverse nested ComposeQueryItem
+                    compose_query_item.get_fields(fields);
+                }
+            }
+        }
+    }
+
+    pub fn get_field_value_pairs(&self, pairs: &mut Vec<(String, String)>) {
+        for item in &self.items {
+            match item {
+                ComposeQuery::QueryItem(query_item) => {
+                    // Check if the field is not already in the Vec and add it
+                    if let Some(pair) = query_item.get_field_value_pair() {
+                        if !pairs.contains(&pair) {
+                            pairs.push(pair);
+                        }
+                    }
+                }
+                ComposeQuery::ComposeQueryItem(compose_query_item) => {
+                    // Recursively traverse nested ComposeQueryItem
+                    compose_query_item.get_field_value_pairs(pairs);
+                }
+            }
+        }
+    }
+
     // Why ComposeQuery here?
     // Because we can have nested ComposeQueryItem, it maybe a QueryItem or ComposeQueryItem
     pub fn add_item(&mut self, item: ComposeQuery) -> &mut Self {
@@ -195,13 +246,77 @@ impl ComposeQueryItem {
     }
 }
 
+pub fn get_all_fields(query: &ComposeQuery) -> Vec<String> {
+    match query {
+        ComposeQuery::QueryItem(query_item) => {
+            let mut fields = Vec::new();
+            fields.push(query_item.get_field().to_string());
+            return fields;
+        }
+        ComposeQuery::ComposeQueryItem(query) => {
+            let mut fields = Vec::new();
+            query.get_fields(&mut fields);
+            return fields;
+        }
+    }
+}
+
+pub fn get_all_field_pairs(query: &ComposeQuery) -> Vec<(String, String)> {
+    match query {
+        ComposeQuery::QueryItem(query_item) => {
+            let mut pairs = Vec::new();
+            if let Some(pair) = query_item.get_field_value_pair() {
+                pairs.push(pair);
+            }
+            return pairs;
+        }
+        ComposeQuery::ComposeQueryItem(query) => {
+            let mut pairs = Vec::new();
+            query.get_field_value_pairs(&mut pairs);
+            return pairs;
+        }
+    }
+}
+
+pub fn make_order_clause(fields: Vec<String>) -> String {
+    let mut order_by = String::new();
+    for (i, field) in fields.iter().enumerate() {
+        if i > 0 {
+            order_by.push_str(", ");
+        }
+        order_by.push_str(field);
+    }
+    order_by
+}
+
+pub fn make_order_clause_by_pairs(pairs: Vec<(String, String)>) -> String {
+    let mut order_by = String::new();
+    for (i, pair) in pairs.iter().enumerate() {
+        if i > 0 {
+            order_by.push_str(", ");
+        }
+
+        // Trim all special characters in the head and tail of the string
+        let patterns: &[_] = &[
+            '~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '=', '{', '}', '[',
+            ']', '|', '\\', ':', ';', '"', '\'', '<', '>', ',', '.', '?', '/', ' ',
+        ];
+        let cleaned_str = pair.1.trim_matches(patterns);
+        order_by.push_str(&format!("similarity({}, '{}') DESC", pair.0, cleaned_str));
+    }
+    order_by
+}
+
 // Test code
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::init_logger;
+    use log::LevelFilter;
 
     #[test]
     fn test_compose_query() {
+        let _ = init_logger("sql-builder-test", LevelFilter::Debug);
         let mut query = ComposeQueryItem::new("and");
         query.add_item(ComposeQuery::QueryItem(QueryItem::new(
             "id".to_string(),
@@ -232,5 +347,15 @@ mod tests {
             query.format(),
             "id = 1 and name like 'test' and (id = 2 or name like 'test2')"
         );
+
+        let mut fields = Vec::new();
+        query.get_fields(&mut fields);
+        debug!("fields: {:?}", fields);
+        assert_eq!(2, fields.len());
+
+        let mut pairs = Vec::new();
+        query.get_field_value_pairs(&mut pairs);
+        debug!("pairs: {:?}", pairs);
+        assert_eq!(2, pairs.len());
     }
 }

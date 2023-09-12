@@ -1,7 +1,6 @@
 extern crate log;
-extern crate stderrlog;
 
-use biomedgps::{import_data, run_migrations};
+use biomedgps::{import_data, run_migrations, init_logger};
 use log::*;
 use structopt::StructOpt;
 
@@ -9,18 +8,10 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name = "A cli for biomedgps service.", author="Jingcheng Yang <yjcyxky@163.com>;")]
 struct Opt {
-    /// A flag which control whether show more messages, true if used in the command line
-    #[structopt(short = "q", long = "quiet")]
-    quiet: bool,
-
-    /// The number of occurrences of the `v/verbose` flag
-    /// Verbose mode (-v/Debug, -vv/Trace, etc.)
-    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
-    verbose: usize,
-
-    /// Timestamp (sec, ms, ns, none)
-    #[structopt(short = "t", long = "timestamp")]
-    ts: Option<stderrlog::Timestamp>,
+    /// Activate debug mode
+    /// short and long flags (--debug) will be deduced from the field's name
+    #[structopt(name = "debug", long = "debug")]
+    debug: bool,
 
     #[structopt(subcommand)]
     cmd: SubCommands,
@@ -74,15 +65,11 @@ pub struct ImportDBArguments {
 async fn main() {
     let opt = Opt::from_args();
 
-    stderrlog::new()
-        .module(module_path!())
-        .module("biomedgps")
-        .quiet(opt.quiet)
-        .show_module_names(true)
-        .verbosity(opt.verbose + 2)
-        .timestamp(opt.ts.unwrap_or(stderrlog::Timestamp::Second))
-        .init()
-        .unwrap();
+    let log_result = if opt.debug {
+        init_logger("biomedgps-cli", LevelFilter::Debug)
+    } else {
+        init_logger("biomedgps-cli", LevelFilter::Info)
+    };
 
     match opt.cmd {
         SubCommands::InitDB(arguments) => {

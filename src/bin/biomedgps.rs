@@ -3,12 +3,10 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
+use log::LevelFilter;
+use biomedgps::init_logger;
+use biomedgps::api::route::BiomedgpsApi;
 use dotenv::dotenv;
-use log::{error, LevelFilter};
-use log4rs;
-use log4rs::append::console::ConsoleAppender;
-use log4rs::config::{Appender, Config, Logger, Root};
-use log4rs::encode::pattern::PatternEncoder;
 use poem::middleware::AddData;
 use poem::EndpointExt;
 use poem::{
@@ -20,40 +18,12 @@ use poem::{
     Endpoint, Request, Response, Result, Route, Server,
 };
 use poem_openapi::OpenApiService;
-use biomedgps::api::route::BiomedgpsApi;
 use rust_embed::RustEmbed;
 use sqlx::postgres::PgPoolOptions;
-use std::error::Error;
 use std::sync::Arc;
 // use tokio::{self, time::Duration};
 
 use structopt::StructOpt;
-
-fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle, String> {
-    let stdout = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(
-            &(format!("[{}]", tag_name) + " {d} - {h({l} - {t} - {m}{n})}"),
-        )))
-        .build();
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .logger(
-            Logger::builder()
-                .appender("stdout")
-                .additive(false)
-                .build("stdout", level),
-        )
-        .build(Root::builder().appender("stdout").build(level))
-        .unwrap();
-
-    log4rs::init_config(config).map_err(|e| {
-        format!(
-            "couldn't initialize log configuration. Reason: {}",
-            e.description()
-        )
-    })
-}
 
 /// BioMedGPS backend server.
 #[derive(Debug, PartialEq, StructOpt)]
@@ -93,7 +63,7 @@ struct Opt {
     /// JWT secret key.
     /// You can also set it with env var: JWT_SECRET_KEY.
     /// If you don't set it, the server will disable JWT verification. You can use the API with Authorization header and set it to any value.
-    #[structopt(name = "jwt-secret-key", short = "k", long="jwt-secret-key")]
+    #[structopt(name = "jwt-secret-key", short = "k", long = "jwt-secret-key")]
     jwt_secret_key: Option<String>,
 }
 
@@ -145,11 +115,7 @@ async fn main() -> Result<(), std::io::Error> {
     let host = args.host;
     let port = args.port;
 
-    println!(
-        "\n\t\t*** Launch biomedgps on {}:{} ***",
-        host,
-        port
-    );
+    println!("\n\t\t*** Launch biomedgps on {}:{} ***", host, port);
 
     let database_url = args.database_url;
 
@@ -221,7 +187,7 @@ async fn main() -> Result<(), std::io::Error> {
         .server(format!("http://{}:{}", host, port));
     let openapi = api_service.swagger_ui();
     let mut spec = api_service.spec();
-    
+
     // Remove charset=utf-8 from spec for compatibility with Apifox.
     spec = spec.replace("; charset=utf-8", "");
 
@@ -231,19 +197,17 @@ async fn main() -> Result<(), std::io::Error> {
         info!("OpenApi mode is enabled. You can access the OpenApi spec at /openapi.");
         route
             .nest("/openapi", openapi)
-            .at(
-                "/spec",
-                poem::endpoint::make_sync(move |_| spec.clone()),
-            )
+            .at("/spec", poem::endpoint::make_sync(move |_| spec.clone()))
     } else {
         warn!("OpenApi mode is disabled. If you need the OpenApi, please use `--openapi` flag.");
         route
     };
-    
+
     let route = if args.ui {
         info!("UI mode is enabled.");
-        route.nest("/index.html", HtmlEmbed)
-             .nest("/assets", EmbeddedFilesEndpoint::<Assets>::new())
+        route
+            .nest("/index.html", HtmlEmbed)
+            .nest("/assets", EmbeddedFilesEndpoint::<Assets>::new())
     } else {
         warn!("UI mode is disabled. If you need the UI, please use `--ui` flag.");
         route

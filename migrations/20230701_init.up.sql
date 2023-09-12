@@ -3,7 +3,7 @@
 CREATE TABLE
   IF NOT EXISTS biomedgps_entity (
     idx BIGSERIAL PRIMARY KEY, -- The entity index
-    id VARCHAR(64), -- The entity ID
+    id VARCHAR(64) NOT NULL, -- The entity ID
     name VARCHAR(255) NOT NULL, -- The name of the entity
     label VARCHAR(64) NOT NULL, -- The label of the entity, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     resource VARCHAR(64) NOT NULL, -- The resource of the entity, such as UBERON, DOID, HGNC, CHEBI, GO, etc.

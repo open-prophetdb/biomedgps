@@ -7,6 +7,13 @@ pub mod model;
 pub mod pgvector;
 pub mod query_builder;
 
+use log::{debug, error, info, warn, LevelFilter};
+use log4rs;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::config::{Appender, Config, Logger, Root};
+use log4rs::encode::pattern::PatternEncoder;
+use std::error::Error;
+
 use crate::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
     Subgraph,
@@ -15,16 +22,16 @@ use crate::model::util::{
     drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
     update_relation_metadata,
 };
-use log::{debug, error, info, warn};
+
+use serde_json::Value;
 use sqlx::migrate::Migrator;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use tempfile::tempdir;
 use url::form_urlencoded;
-use std::collections::HashMap;
-use serde_json::Value;
 
 const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");
 
@@ -84,7 +91,7 @@ pub async fn import_data(
         update_entity_metadata(&pool, true).await.unwrap();
         return;
     }
-    
+
     let filepath = match filepath {
         Some(f) => f,
         None => {
@@ -214,16 +221,18 @@ pub async fn import_data(
             let expected_columns = match expected_columns {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Invalid file: {}, reason: {}", filename, e);
+                    error!("Fn: get_column_names, Invalid file: {}, reason: {}", filename, e);
                     continue;
                 }
             };
 
+            debug!("Expected columns which will be imported: {:?}", expected_columns);
+
             // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
             let pardir = file.parent().unwrap();
-            let tempdir = tempfile::tempdir_in(pardir).unwrap();
-            let temp_file = tempfile::NamedTempFile::new_in(tempdir).unwrap();
+            let temp_file = tempfile::NamedTempFile::new_in(pardir).unwrap();
             let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
+            debug!("Data file: {:?}, Temp file: {:?}", file, temp_filepath);
             let results = if table == "entity" {
                 Entity::select_expected_columns(&file, &temp_filepath)
             } else if table == "entity2d" {
@@ -242,7 +251,7 @@ pub async fn import_data(
             let file = match results {
                 Ok(_) => temp_filepath,
                 Err(e) => {
-                    error!("Invalid file: {}, reason: {}", filename, e);
+                    error!("Fn: select_expected_columns, Invalid file: {}, reason: {}", filename, e);
                     continue;
                 }
             };
@@ -344,16 +353,6 @@ pub async fn import_data(
     }
 }
 
-// Init log for each test
-pub fn init_log() {
-    let _ = stderrlog::new()
-        .module(module_path!())
-        .module("biomedgps")
-        .verbosity(5)
-        .timestamp(stderrlog::Timestamp::Second)
-        .init();
-}
-
 // Setup the test database
 pub async fn setup_test_db() -> sqlx::PgPool {
     // Get the database url from the environment variable
@@ -408,4 +407,30 @@ pub fn kv2urlstr(key: &str, value: &str) -> String {
         .finish();
 
     return encoded;
+}
+
+pub fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle, String> {
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            &(format!("[{}]", tag_name) + " {d} - {h({l} - {t} - {m}{n})}"),
+        )))
+        .build();
+
+    let config = Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .logger(
+            Logger::builder()
+                .appender("stdout")
+                .additive(false)
+                .build("stdout", level),
+        )
+        .build(Root::builder().appender("stdout").build(level))
+        .unwrap();
+
+    log4rs::init_config(config).map_err(|e| {
+        format!(
+            "couldn't initialize log configuration. Reason: {}",
+            e.description()
+        )
+    })
 }

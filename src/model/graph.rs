@@ -1280,14 +1280,14 @@ impl Graph {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    extern crate stderrlog;
+    use log::LevelFilter;
     use super::*;
-    use crate::{init_log, setup_test_db};
+    use crate::{init_logger, setup_test_db};
     use regex::Regex;
 
     #[test]
     fn test_parse_composed_node_ids() {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
         let composed_node_id = "Gene::ENTREZ:1";
         let (node_type, node_id) = Graph::parse_composed_node_ids(composed_node_id).unwrap();
         assert_eq!(node_type, "Gene");
@@ -1302,7 +1302,7 @@ mod tests {
 
     #[test]
     fn test_gen_entity_query_from_node_ids() {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
         let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
         let query_str = Graph::gen_entity_query_from_node_ids(&node_ids);
 
@@ -1315,7 +1315,7 @@ mod tests {
 
     #[test]
     fn test_gen_relation_query_from_node_ids() {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
         let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
         let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
 
@@ -1337,7 +1337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_connect_nodes() {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
         let mut graph = Graph::new();
 
         let pool = setup_test_db().await;
@@ -1357,7 +1357,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_similarity_nodes() {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
 
         let mut graph = Graph::new();
 

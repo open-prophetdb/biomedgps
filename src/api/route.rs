@@ -1,5 +1,6 @@
 //! This module defines the routes of the API.
 
+use crate::api::auth::CustomSecurityScheme;
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetRecordsResponse,
     GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery,
@@ -11,7 +12,7 @@ use crate::model::core::{
 };
 use crate::model::graph::Graph;
 use crate::model::util::match_color;
-use crate::api::auth::CustomSecurityScheme;
+use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
@@ -181,13 +182,25 @@ impl BiomedgpsApi {
             }
         };
 
+        let order_by_clause = match query.clone() {
+            Some(q) => {
+                let pairs = get_all_field_pairs(&q);
+                if pairs.len() == 0 {
+                    "id ASC".to_string()
+                } else {
+                    make_order_clause_by_pairs(pairs)
+                }
+            }
+            None => "id ASC".to_string(),
+        };
+
         match RecordResponse::<Entity>::get_records(
             &pool_arc,
             "biomedgps_entity",
             &query,
             page,
             page_size,
-            Some("id ASC"),
+            Some(order_by_clause.as_str()),
         )
         .await
         {
@@ -973,8 +986,8 @@ impl BiomedgpsApi {
 mod tests {
     use super::*;
     use crate::model::graph::Node;
-    use crate::{init_log, kv2urlstr, setup_test_db};
-    use log::{debug, error};
+    use crate::{init_logger, kv2urlstr, setup_test_db};
+    use log::{debug, error, LevelFilter};
     use poem::middleware::{AddData, AddDataEndpoint};
     use poem::test::TestClient;
     use poem::{
@@ -985,7 +998,7 @@ mod tests {
     use sqlx::{Pool, Postgres};
 
     async fn init_app() -> AddDataEndpoint<Route, Arc<Pool<Postgres>>> {
-        init_log();
+        init_logger("biomedgps-test", LevelFilter::Debug);
         let pool = setup_test_db().await;
 
         let arc_pool = Arc::new(pool);
