@@ -129,9 +129,18 @@ brew install docker docker-compose
 
 ## For Developers
 
-If you want to build the platform from source code, please follow the instructions below. You can also join us to develop the platform, see [here](#join-us).
+### Build docker image
+
+```bash
+git clone https://github.com/yjcyxky/biomedgps
+
+cd biomedgps
+bash build-docker.sh
+```
 
 ### Requirements
+
+If you want to build the platform from source code, please follow the instructions below. You can also join us to develop the platform, see [here](#join-us).
 
 #### Server
 
