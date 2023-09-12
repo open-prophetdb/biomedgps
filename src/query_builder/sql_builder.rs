@@ -289,9 +289,17 @@ pub fn make_order_clause(fields: Vec<String>) -> String {
     order_by
 }
 
-pub fn make_order_clause_by_pairs(pairs: Vec<(String, String)>) -> String {
+pub fn make_order_clause_by_pairs(pairs: Vec<(String, String)>, topk: usize) -> String {
+    let mut topk_pairs = Vec::new();
+    if topk != 0 {
+        let k = if pairs.len() < topk { pairs.len() } else { topk };
+        topk_pairs = pairs[0..k].to_vec();
+    } else {
+        topk_pairs = pairs;
+    }
+
     let mut order_by = String::new();
-    for (i, pair) in pairs.iter().enumerate() {
+    for (i, pair) in topk_pairs.iter().enumerate() {
         if i > 0 {
             order_by.push_str(", ");
         }

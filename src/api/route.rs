@@ -188,7 +188,8 @@ impl BiomedgpsApi {
                 if pairs.len() == 0 {
                     "id ASC".to_string()
                 } else {
-                    make_order_clause_by_pairs(pairs)
+                    // More fields will cause bad performance
+                    make_order_clause_by_pairs(pairs, 2)
                 }
             }
             None => "id ASC".to_string(),
