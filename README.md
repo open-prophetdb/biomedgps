@@ -20,6 +20,15 @@
 - [x] Support customized omics datasets.
 - [x] Integrated large language models (such as vicuna, rwkv, chatgpt etc. more details on [chat-publications](https://github.com/yjcyxky/chat-publications)) for answering questions.
 
+## Ecosystem
+
+| Name | Language | Description |
+| :--- | :--- | :--- |
+| [BioMedGPS Data](https://github.com/yjcyxky/biomedgps-data) | Python | For building the knowledge graph of BioMedGPS and training the graph neural network models. |
+| [Chat Publications](https://github.com/yjcyxky/chat-publications) | Python | Ask questions and get answers from publications.|
+| [BioMedical Knowledgebases](https://github.com/yjcyxky/biomedical-knowledgebases) | Markdown | A collection of biomedical knowledgebases, ontologies, datasets and publications etc. |
+| [R Omics Utility](https://github.com/yjcyxky/r-omics-utils) | R | Utilities for omics data with R. It will be part of biomedgps system and provide visulization and analysis functions of multi-omics data. |
+
 ## Demo
 
 ### Ask questions with chatbot
@@ -292,20 +301,6 @@ brew install docker docker-compose
 ## Contributing
 
 Comming soon...
-
-## Ecosystem
-
-| Name | Language | Description |
-| :--- | :--- | :--- |
-| [Chat Publications](https://github.com/yjcyxky/chat-publications) | Python | Ask questions and get answers from publications.|
-| [Ontology Matcher](https://github.com/yjcyxky/ontology-matcher) | Python | It's a simple ontology matcher for building a set of cleaned ontologies. [For BioMedGPS project]|
-| [Graph Builder](https://github.com/yjcyxky/graph-builder) | Python | A Graph Builder for BioMedGPS Project |
-| [UI Components for BiMedGPS](https://github.com/yjcyxky/biominer-components) | TypeScript | A set of React components for BioInformatics, such as Gene/Transcript Map from GTex Portal, Pathology Image Viewer, etc. |
-| [R Omics Utility](https://github.com/yjcyxky/r-omics-utils) | R | Utilities for omics data with R. It will be part of biomedgps system and provide visulization and analysis functions of multi-omics data. |
-| [BioMedical Knowledgebases](https://github.com/yjcyxky/biomedical-knowledgebases) | Markdown | A collection of biomedical knowledgebases, ontologies, datasets and publications etc. |
-| [Text2Knowledges](https://github.com/yjcyxky/text2knowledge) | Python | Extract entities and relationships from free text. |
-| [Knowledge Labeling Tool](https://github.com/yjcyxky/label-studio) | Python | It is a web application for labeling findings from publications, patents, and other free text. It's based on [Label Studio](https://github.com/HumanSignal/label-studio), but more functions for labeling findings. |
-
 
 ## License
 

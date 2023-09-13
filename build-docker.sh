@@ -17,9 +17,10 @@ else
 fi
 
 # Build standalone docker image
-docker build -t biomedgps:${VERSION}-${HASH} .
+docker build -t nordata/biomedgps:${VERSION}-${HASH} .
 
 if [ "$1" == "--push" ]; then
-  docker tag biomedgps:${VERSION}-${HASH} ghcr.io/yjcyxky/biomedgps:${VERSION}-${HASH} && \
+  docker push nordata/biomedgps:${VERSION}-${HASH}
+  docker tag nordata/biomedgps:${VERSION}-${HASH} ghcr.io/yjcyxky/biomedgps:${VERSION}-${HASH} && \
   docker push ghcr.io/yjcyxky/biomedgps:${VERSION}-${HASH}
 fi
