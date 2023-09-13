@@ -32,10 +32,7 @@ ADD . .
 # Fetch all submodule
 RUN cd studio && git submodule update --init --recursive
 
-RUN yarn global add yalc
-RUN cd ../../ && git clone https://github.com/yjcyxky/biominer-components.git && cd biominer-components && yarn && yalc publish
-
-RUN cd studio && yalc add biominer-components && yarn && yarn build:embed
+RUN cd studio && yarn && yarn build:embed
 
 RUN make build-biomedgps
 
