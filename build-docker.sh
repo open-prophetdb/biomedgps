@@ -11,9 +11,9 @@ HASH=$(git show-ref --head --hash=8 head)  # first 8 letters of hash should be e
 TRIMMED_VERSION=$(echo $VERSION | sed 's/^v//')
 # If running on macOS, use sed -i '' instead of sed -i
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  sed -i "" "s/version = \"0.1.0\"/version = \"${TRIMMED_VERSION}\"/g" Cargo.toml
+  sed -i "" "s/version = \"/.*\"/version = \"${TRIMMED_VERSION}\"/g" Cargo.toml
 else
-  sed -i "s/version = \"0.1.0\"/version = \"${TRIMMED_VERSION}\"/g" Cargo.toml
+  sed -i "s/version = \".*\"/version = \"${TRIMMED_VERSION}\"/g" Cargo.toml
 fi
 
 # Build standalone docker image
