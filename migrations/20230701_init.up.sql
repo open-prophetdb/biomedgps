@@ -56,7 +56,18 @@ CREATE TABLE
     key_sentence TEXT NOT NULL, -- The key sentence of the relation
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- The created time of the relation
     curator VARCHAR(64) NOT NULL, -- The curator of the relation
-    pmid BIGINT NOT NULL -- The PMID of the relation
+    pmid BIGINT NOT NULL, -- The PMID of the relation
+    UNIQUE (
+      relation_type,
+      source_name,
+      source_type,
+      source_id,
+      target_name,
+      target_type,
+      target_id,
+      curator,
+      pmid
+    )
   );
 
 -- biomedgps_relation table is used to store the relations between the entities, it's same with the edges in the biomedgps neo4j database
