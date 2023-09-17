@@ -17,10 +17,11 @@ create-db:
 	@bash build/create-db.sh test_biomedgps 5432
 	@echo "Migrate database: test_biomedgps"
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v initdb
-	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/entity.tsv -t entity
-	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/relation.tsv -t relation
-	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f ./examples/entity_embedding.tsv -t entity_embedding
-
+	@cp -R ./examples/ /tmp/examples/
+	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/entity.tsv -t entity
+	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/relation.tsv -t relation
+	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/entity_embedding.tsv -t entity_embedding
+	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/knowledge_curation.tsv -t knowledge_curation
 clean-test-db:
 	@printf "Stop "
 	@-docker stop biomedgps

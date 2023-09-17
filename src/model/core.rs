@@ -164,7 +164,10 @@ pub trait CheckData {
             })
             .collect();
 
-        debug!("The indices of the columns to keep are: {:?}", indices_to_keep);
+        debug!(
+            "The indices of the columns to keep are: {:?}",
+            indices_to_keep
+        );
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(delimiter)
             .from_writer(std::fs::File::create(out_filepath)?);
@@ -982,6 +985,92 @@ pub struct KnowledgeCuration {
 }
 
 impl KnowledgeCuration {
+    pub fn to_relation(&self) -> Relation {
+        Relation {
+            id: self.id,
+            relation_type: self.relation_type.clone(),
+            source_type: self.source_type.clone(),
+            source_id: self.source_id.clone(),
+            target_type: self.target_type.clone(),
+            target_id: self.target_id.clone(),
+            key_sentence: Some(self.key_sentence.clone()),
+            resource: self.curator.clone(),
+            pmids: Some(format!("{}", self.pmid)),
+            score: None,
+        }
+    }
+
+    pub async fn get_records_by_owner(
+        pool: &sqlx::PgPool,
+        curator: &str,
+        project_id: i32,
+        organization_id: i32,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<RecordResponse<KnowledgeCuration>, anyhow::Error> {
+        let project_id_qstr = if project_id >= 0 {
+            format!("payload->>'project_id' = '{}'", project_id)
+        } else {
+            format!("payload->>'project_id' IS NOT NULL")
+        };
+
+        let organization_id_qstr = if organization_id >= 0 {
+            format!("payload->>'organization_id' = '{}'", organization_id)
+        } else {
+            format!("payload->>'organization_id' IS NOT NULL")
+        };
+
+        let curator_qstr = if project_id < 0 && organization_id < 0 {
+            format!("curator = '{}'", curator)
+        } else {
+            format!("curator IS NOT NULL")
+        };
+
+        let where_str = format!("{} AND {} AND {}", curator_qstr, project_id_qstr, organization_id_qstr);
+
+        let page = match page {
+            Some(page) => page,
+            None => 1,
+        };
+
+        let page_size = match page_size {
+            Some(page_size) => page_size,
+            None => 10,
+        };
+
+        let limit = page_size;
+        let offset = (page - 1) * page_size;
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let sql_str = format!(
+            "SELECT * FROM biomedgps_knowledge_curation WHERE {} {} LIMIT {} OFFSET {}",
+            where_str, order_by_str, limit, offset
+        );
+
+        let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!("SELECT COUNT(*) FROM biomedgps_knowledge_curation WHERE {}", where_str);
+
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(RecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page,
+            page_size: page_size,
+        })
+    }
+
     fn get_value(key: &str, json: &serde_json::Value) -> Result<String, anyhow::Error> {
         match json[key].as_str() {
             Some(value) => Ok(value.to_string()),
@@ -1066,6 +1155,7 @@ impl CheckData for KnowledgeCuration {
             "source_id".to_string(),
             "target_type".to_string(),
             "target_id".to_string(),
+            "curator".to_string(),
             "pmid".to_string(),
         ]
     }

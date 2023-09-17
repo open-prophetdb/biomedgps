@@ -6,6 +6,7 @@
 //!
 
 use crate::model::core::{Entity, RecordResponse, Relation};
+use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
 use log::{debug, error};
@@ -13,9 +14,10 @@ use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::model::util::match_color;
 use std::vec;
 use std::{error::Error, fmt};
+
+use super::core::KnowledgeCuration;
 
 // The delimiter is defined here, if we want to change it, please change it here.
 pub const COMPOSED_ENTITY_DELIMITER: &str = "::";
@@ -402,6 +404,7 @@ pub struct EdgeData {
     pub score: f64,
     pub key_sentence: String,
     pub resource: String,
+    pub pmids: String,
     // In future, we can add more fields here after we add additional fields for the Relation struct
 }
 
@@ -417,6 +420,7 @@ impl EdgeData {
             score: relation.score.unwrap_or(0.0),
             key_sentence: relation.key_sentence.clone().unwrap_or("".to_string()),
             resource: relation.resource.clone(),
+            pmids: relation.pmids.clone().unwrap_or("".to_string()),
         }
     }
 }
@@ -469,6 +473,7 @@ impl Edge {
                 score: distance.unwrap_or(0.0),
                 key_sentence: "".to_string(),
                 resource: "".to_string(),
+                pmids: "".to_string(),
             },
         }
     }
@@ -487,6 +492,22 @@ impl Edge {
             reltype: relation.relation_type.clone(),
             style: EdgeStyle::new(&relation.relation_type),
             data: EdgeData::new(relation),
+        }
+    }
+
+    pub fn from_curated_knowledge(knowledge: &KnowledgeCuration) -> Self {
+        let relid = format!(
+            "{}-{}-{}",
+            knowledge.source_id, knowledge.relation_type, knowledge.target_id
+        );
+        Edge {
+            relid: relid.clone(),
+            source: Node::format_id(&knowledge.source_type, &knowledge.source_id),
+            category: "edge".to_string(),
+            target: Node::format_id(&knowledge.target_type, &knowledge.target_id),
+            reltype: knowledge.relation_type.clone(),
+            style: EdgeStyle::new(&knowledge.relation_type),
+            data: EdgeData::new(&knowledge.to_relation()),
         }
     }
 }
@@ -1224,6 +1245,70 @@ impl Graph {
         }
     }
 
+    /// Fetch the curated knowledges and convert them to nodes and edges in the graph.
+    pub async fn fetch_curated_knowledges(
+        &mut self,
+        pool: &sqlx::PgPool,
+        curator: &str,
+        project_id: i32,
+        organization_id: i32,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+        strict_mode: bool,
+    ) -> Result<&Self, ValidationError> {
+        match KnowledgeCuration::get_records_by_owner(
+            pool,
+            curator,
+            project_id,
+            organization_id,
+            page,
+            page_size,
+            order_by,
+        )
+        .await
+        {
+            Ok(records) => {
+                for record in records.records {
+                    // Skip the records with unknown source or target id or the source or target id is not composed of node type and node id
+                    if strict_mode {
+                        if record.source_id == "Unknown::Unknown" || record.target_id == "Unknown::Unknown" {
+                            continue;
+                        }
+
+                        if !record.source_id.contains(":") || !record.target_id.contains(":") {
+                            continue;
+                        }
+                    }
+
+                    let edge = Edge::from_curated_knowledge(&record);
+                    self.add_edge(edge);
+                }
+
+                // Fetch the nodes
+                let node_ids = self.get_node_ids_from_edges();
+                let node_ids_str = &node_ids.iter().map(|id| id.as_str()).collect();
+                match self.fetch_nodes_from_db(pool, node_ids_str).await {
+                    Ok(nodes) => {
+                        for node in nodes {
+                            self.add_node(node);
+                        }
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Error in fetch_nodes_from_db: {}", e);
+                        return Err(ValidationError::new(&error_msg, vec![]));
+                    }
+                };
+
+                Ok(self)
+            }
+            Err(e) => {
+                let error_msg = format!("Error in fetch_curated_knowledges: {}", e);
+                Err(ValidationError::new(&error_msg, vec![]))
+            }
+        }
+    }
+
     /// Fetch the linked nodes with some relation types or other conditions, but only one step
     pub async fn fetch_linked_nodes(
         &mut self,
@@ -1280,14 +1365,14 @@ impl Graph {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    use log::LevelFilter;
     use super::*;
     use crate::{init_logger, setup_test_db};
+    use log::LevelFilter;
     use regex::Regex;
 
     #[test]
     fn test_parse_composed_node_ids() {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let composed_node_id = "Gene::ENTREZ:1";
         let (node_type, node_id) = Graph::parse_composed_node_ids(composed_node_id).unwrap();
         assert_eq!(node_type, "Gene");
@@ -1302,7 +1387,7 @@ mod tests {
 
     #[test]
     fn test_gen_entity_query_from_node_ids() {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
         let query_str = Graph::gen_entity_query_from_node_ids(&node_ids);
 

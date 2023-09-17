@@ -11,11 +11,25 @@ use std::collections::BTreeMap;
 #[derive(Debug)]
 pub struct User {
     pub username: String,
+    pub organizations: Vec<i32>,
+    pub projects: Vec<i32>
 }
 
 impl User {
     fn new(username: String) -> Self {
-        Self { username }
+        Self { 
+            username,
+            organizations: vec![-1],
+            projects: vec![-1]
+        }
+    }
+
+    fn add_organizations(&mut self, organizations: Vec<i32>) {
+        self.organizations = organizations;
+    }
+
+    fn add_projects(&mut self, projects: Vec<i32>) {
+        self.projects = projects;
     }
 }
 
@@ -57,7 +71,33 @@ async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
         }
     };
 
-    let current_user = User::new(username.to_string());
+    let organizations = match claims.get("organizations").and_then(Value::as_array) {
+        Some(organizations) => organizations
+            .iter()
+            .filter_map(|org| org.as_i64())
+            .map(|org| org as i32)
+            .collect::<Vec<i32>>(),
+        None => {
+            // Be compatible with the old version, the token might not contain the organizations field.
+            vec![-1]
+        }
+    };
+
+    let projects = match claims.get("projects").and_then(Value::as_array) {
+        Some(projects) => projects
+            .iter()
+            .filter_map(|project| project.as_i64())
+            .map(|project| project as i32)
+            .collect::<Vec<i32>>(),
+        None => {
+            // Be compatible with the old version, the token might not contain the projects field.
+            vec![-1]
+        }
+    };
+
+    let mut current_user = User::new(username.to_string());
+    current_user.add_organizations(organizations);
+    current_user.add_projects(projects);
 
     info!("current_user: {:?}", current_user);
 

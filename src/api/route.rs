@@ -214,6 +214,226 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/curated-graph` with query params to fetch curated graph.
+    #[oai(
+        path = "/api/v1/curated-graph",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchCuratedGraph"
+    )]
+    async fn fetch_curated_graph(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        curator: Query<String>,
+        project_id: Query<Option<String>>,
+        organization_id: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        strict_mode: Query<bool>,
+        _token: CustomSecurityScheme,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let curator = curator.0;
+
+        if curator != _token.0.username {
+            let err = format!(
+                "You cannot query curated graph from other users. You are {} and you are querying {}'s curated graph.",
+                _token.0.username, curator
+            );
+            warn!("{}", err);
+            return GetGraphResponse::bad_request(err);
+        }
+
+        let project_id = match project_id.0 {
+            Some(project_id) => {
+                // Convert project_id to i32
+                match project_id.parse::<i32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse project id: {}", e);
+                        warn!("{}", err);
+                        return GetGraphResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Project id is empty.");
+                -1
+            }
+        };
+
+        let organization_id = match organization_id.0 {
+            Some(organization_id) => {
+                // Convert organization_id to i32
+                match organization_id.parse::<i32>() {
+                    Ok(organization_id) => organization_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse organization id: {}", e);
+                        warn!("{}", err);
+                        return GetGraphResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Organization id is empty.");
+                -1
+            }
+        };
+
+        // Get organizations and projects from the token
+        let user = &_token.0;
+        if organization_id != -1 && !user.organizations.contains(&organization_id) {
+            let err = format!(
+                "User {} doesn't have access to organization {}. Your system might not support querying curated graph by organization or you don't have access to this organization.",
+                user.username, organization_id
+            );
+            warn!("{}", err);
+            return GetGraphResponse::bad_request(err);
+        };
+
+        if project_id != -1 && !user.projects.contains(&project_id) {
+            let err = format!(
+                "User {} doesn't have access to project {}. Your system might not support querying curated graph by project or you don't have access to this project.",
+                user.username, project_id
+            );
+            warn!("{}", err);
+            return GetGraphResponse::bad_request(err);
+        };
+
+        let mut graph = Graph::new();
+        let page = page.0;
+        let page_size = page_size.0;
+        let strict_mode = strict_mode.0;
+
+        match graph
+            .fetch_curated_knowledges(
+                &pool_arc,
+                &curator[..],
+                project_id,
+                organization_id,
+                page,
+                page_size,
+                Some("id ASC"),
+                strict_mode,
+            )
+            .await
+        {
+            Ok(data) => GetGraphResponse::ok(data.to_owned().get_graph(None).unwrap()),
+            Err(e) => {
+                let err = format!("Failed to fetch curated graph: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/curated-knowledges-by-owner` with query params to fetch curated knowledges by owner.
+    #[oai(
+        path = "/api/v1/curated-knowledges-by-owner",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchCuratedKnowledgesByOwner"
+    )]
+    async fn fetch_curated_knowledges_by_owner(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        curator: Query<String>,
+        project_id: Query<Option<String>>,
+        organization_id: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<KnowledgeCuration> {
+        let pool_arc = pool.clone();
+        let curator = curator.0;
+
+        if curator != _token.0.username {
+            let err = format!(
+                "You cannot query curated knowledges from other users. You are {} and you are querying {}'s curated knowledges.",
+                _token.0.username, curator
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        }
+
+        let project_id = match project_id.0 {
+            Some(project_id) => {
+                // Convert project_id to i32
+                match project_id.parse::<i32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse project id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Project id is empty.");
+                -1
+            }
+        };
+
+        let organization_id = match organization_id.0 {
+            Some(organization_id) => {
+                // Convert organization_id to i32
+                match organization_id.parse::<i32>() {
+                    Ok(organization_id) => organization_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse organization id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Organization id is empty.");
+                -1
+            }
+        };
+
+        // Get organizations and projects from the token
+        let user = &_token.0;
+        if organization_id != -1 && !user.organizations.contains(&organization_id) {
+            let err = format!(
+                "User {} doesn't have access to organization {}. Your system might not support querying curated knowledges by organization or you don't have access to this organization.",
+                user.username, organization_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        if project_id != -1 && !user.projects.contains(&project_id) {
+            let err = format!(
+                "User {} doesn't have access to project {}. Your system might not support querying curated knowledges by project or you don't have access to this project.",
+                user.username, project_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        match KnowledgeCuration::get_records_by_owner(
+            &pool_arc,
+            &curator,
+            project_id,
+            organization_id,
+            page.0,
+            page_size.0,
+            // TODO: get an order_by clause from query
+            Some("id ASC"),
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch curated knowledges: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/curated-knowledges` with query params to fetch curated knowledges.
     #[oai(
         path = "/api/v1/curated-knowledges",
