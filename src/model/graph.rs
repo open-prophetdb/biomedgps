@@ -1272,7 +1272,7 @@ impl Graph {
                 for record in records.records {
                     // Skip the records with unknown source or target id or the source or target id is not composed of node type and node id
                     if strict_mode {
-                        if record.source_id == "Unknown::Unknown" || record.target_id == "Unknown::Unknown" {
+                        if record.source_id == "Unknown:Unknown" || record.target_id == "Unknown:Unknown" {
                             continue;
                         }
 
