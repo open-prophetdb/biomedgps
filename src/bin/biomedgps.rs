@@ -3,18 +3,20 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-use log::LevelFilter;
-use biomedgps::init_logger;
 use biomedgps::api::route::BiomedgpsApi;
+use biomedgps::init_logger;
 use dotenv::dotenv;
+use log::LevelFilter;
 use poem::middleware::AddData;
 use poem::EndpointExt;
 use poem::{
     async_trait,
     endpoint::EmbeddedFilesEndpoint,
+    handler,
     http::{header, Method, StatusCode},
     listener::TcpListener,
     middleware::Cors,
+    web::Redirect,
     Endpoint, Request, Response, Result, Route, Server,
 };
 use poem_openapi::OpenApiService;
@@ -93,6 +95,11 @@ impl Endpoint for HtmlEmbed {
             None => Ok(Response::builder().status(StatusCode::NOT_FOUND).finish()),
         }
     }
+}
+
+#[handler]
+async fn index() -> Redirect {
+    Redirect::moved_permanent("/index.html")
 }
 
 #[tokio::main]
@@ -191,7 +198,7 @@ async fn main() -> Result<(), std::io::Error> {
     // Remove charset=utf-8 from spec for compatibility with Apifox.
     spec = spec.replace("; charset=utf-8", "");
 
-    let route = Route::new().nest("/", api_service);
+    let route = Route::new();
 
     let route = if args.openapi {
         info!("OpenApi mode is enabled. You can access the OpenApi spec at /openapi.");
@@ -206,12 +213,15 @@ async fn main() -> Result<(), std::io::Error> {
     let route = if args.ui {
         info!("UI mode is enabled.");
         route
+            .at("/", HtmlEmbed)
             .nest("/index.html", HtmlEmbed)
             .nest("/assets", EmbeddedFilesEndpoint::<Assets>::new())
     } else {
         warn!("UI mode is disabled. If you need the UI, please use `--ui` flag.");
         route
     };
+
+    let route = route.nest_no_strip("/api/v1", api_service);
 
     let route = route.with(Cors::new()).with(shared_rb);
 

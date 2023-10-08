@@ -21,11 +21,11 @@ use validator::Validate;
 
 pub struct BiomedgpsApi;
 
-#[OpenApi]
+#[OpenApi(prefix_path = "/api/v1")]
 impl BiomedgpsApi {
     /// Call `/api/v1/statistics` with query params to fetch all entity & relation metadata.
     #[oai(
-        path = "/api/v1/statistics",
+        path = "/statistics",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchStatistics"
@@ -63,7 +63,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/entity-metadata` with query params to fetch all entity metadata.
     #[oai(
-        path = "/api/v1/entity-metadata",
+        path = "/entity-metadata",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchEntityMetadata"
@@ -87,7 +87,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/entity-colormap` with query params to fetch all entity colormap.
     #[oai(
-        path = "/api/v1/entity-colormap",
+        path = "/entity-colormap",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchEntityColorMap"
@@ -118,7 +118,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/relation-metadata` with query params to fetch all relation metadata.
     #[oai(
-        path = "/api/v1/relation-metadata",
+        path = "/relation-metadata",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchRelationMetadata"
@@ -142,7 +142,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/entities` with query params to fetch entities.
     #[oai(
-        path = "/api/v1/entities",
+        path = "/entities",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchEntities"
@@ -216,7 +216,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-graph` with query params to fetch curated graph.
     #[oai(
-        path = "/api/v1/curated-graph",
+        path = "/curated-graph",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchCuratedGraph"
@@ -329,7 +329,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-knowledges-by-owner` with query params to fetch curated knowledges by owner.
     #[oai(
-        path = "/api/v1/curated-knowledges-by-owner",
+        path = "/curated-knowledges-by-owner",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchCuratedKnowledgesByOwner"
@@ -436,7 +436,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-knowledges` with query params to fetch curated knowledges.
     #[oai(
-        path = "/api/v1/curated-knowledges",
+        path = "/curated-knowledges",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchCuratedKnowledges"
@@ -506,7 +506,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-knowledges` with payload to create a curated knowledge.
     #[oai(
-        path = "/api/v1/curated-knowledges",
+        path = "/curated-knowledges",
         method = "post",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "postCuratedKnowledge"
@@ -541,7 +541,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-knowledges/:id` with payload to create a curated knowledge.
     #[oai(
-        path = "/api/v1/curated-knowledges/:id",
+        path = "/curated-knowledges/:id",
         method = "put",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "putCuratedKnowledge"
@@ -584,7 +584,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/curated-knowledges/:id` with payload to delete a curated knowledge.
     #[oai(
-        path = "/api/v1/curated-knowledges/:id",
+        path = "/curated-knowledges/:id",
         method = "delete",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "deleteCuratedKnowledge"
@@ -616,7 +616,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/relations` with query params to fetch relations.
     #[oai(
-        path = "/api/v1/relations",
+        path = "/relations",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchRelations"
@@ -686,7 +686,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/relation-counts` with query params to fetch relation counts.
     #[oai(
-        path = "/api/v1/relation-counts",
+        path = "/relation-counts",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchRelationCounts"
@@ -734,7 +734,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/entity2d` with query params to fetch entity2d.
     #[oai(
-        path = "/api/v1/entity2d",
+        path = "/entity2d",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchEntity2d"
@@ -804,7 +804,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/subgraphs` with query params to fetch subgraphs.
     #[oai(
-        path = "/api/v1/subgraphs",
+        path = "/subgraphs",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchSubgraphs"
@@ -874,7 +874,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/subgraphs` with payload to create a subgraph.
     #[oai(
-        path = "/api/v1/subgraphs",
+        path = "/subgraphs",
         method = "post",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "postSubgraph"
@@ -909,7 +909,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/subgraphs/:id` with payload to update a subgraph.
     #[oai(
-        path = "/api/v1/subgraphs/:id",
+        path = "/subgraphs/:id",
         method = "put",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "putSubgraph"
@@ -955,7 +955,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/subgraphs/:id` with payload to create subgraph.
     #[oai(
-        path = "/api/v1/subgraphs/:id",
+        path = "/subgraphs/:id",
         method = "delete",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "deleteSubgraph"
@@ -990,7 +990,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/nodes` with query params to fetch nodes.
     #[oai(
-        path = "/api/v1/nodes",
+        path = "/nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchNodes"
@@ -1032,7 +1032,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/auto-connect-nodes` with query params to fetch edges which connect the input nodes.
     #[oai(
-        path = "/api/v1/auto-connect-nodes",
+        path = "/auto-connect-nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchEdgesAutoConnectNodes"
@@ -1074,7 +1074,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/one-step-linked-nodes` with query params to fetch linked nodes with one step.
     #[oai(
-        path = "/api/v1/one-step-linked-nodes",
+        path = "/one-step-linked-nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchOneStepLinkedNodes"
@@ -1139,7 +1139,7 @@ impl BiomedgpsApi {
 
     /// Call `/api/v1/similarity-nodes` with query params to fetch similarity nodes.
     #[oai(
-        path = "/api/v1/similarity-nodes",
+        path = "/similarity-nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchSimilarityNodes"
