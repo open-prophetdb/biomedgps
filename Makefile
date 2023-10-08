@@ -22,6 +22,7 @@ create-db:
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/relation.tsv -t relation
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/entity_embedding.tsv -t entity_embedding
 	@export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && cargo run --bin biomedgps-cli -v importdb -D -f /tmp/examples/knowledge_curation.tsv -t knowledge_curation
+
 clean-test-db:
 	@printf "Stop "
 	@-docker stop biomedgps
