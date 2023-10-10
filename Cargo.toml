@@ -20,7 +20,7 @@ path = "src/bin/biomedgps-cli.rs"
 
 [dependencies]
 anyhow = "1.0.71"
-chrono = { version = "0.4.26", features = ["serde"] }
+chrono = { version = "0.4.31", features = ["serde"] }
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
@@ -66,5 +66,4 @@ sha2 = "0.10.7"
 # Algorithms
 kiddo = "2.1.1" # for KNN
 
-# Databases
-pubchem = "0.1.1" # for PubChem
+polars = { version = "0.33.2", features = ["csv", "lazy"] }

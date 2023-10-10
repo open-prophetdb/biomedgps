@@ -12,7 +12,9 @@ use log4rs;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
+use polars::prelude::{col, lit, CsvReader, IntoLazy, SerReader};
 use std::error::Error;
+use std::vec;
 
 use crate::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationEmbedding,
@@ -70,6 +72,68 @@ pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
     info!("Migrations finished.");
 
     Ok(())
+}
+
+pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf) {
+    // Get all source_id and source_type pairs from the biomedgps_knowledge_curation table and keep them in a HashMap. The key is the source_id and source_type pair, the value is a list of numbers which are the row numbers that have the same source_id and source_type.
+    let mut curated_knowledges: HashMap<(String, String), Vec<i64>> = HashMap::new();
+    let records = KnowledgeCuration::get_records(pool).await.unwrap();
+    for record in records {
+        let key1 = (record.source_id, record.source_type);
+        let key2 = (record.target_id, record.target_type);
+        let value = record.id;
+
+        for key in vec![key1, key2] {
+            let v = curated_knowledges.get(&key).map_or_else(
+                || vec![value],
+                |v| {
+                    let cloned_v = v.clone();
+                    let mut cloned_v = cloned_v.to_vec();
+                    cloned_v.push(value);
+                    cloned_v
+                },
+            );
+            curated_knowledges.insert(key, v);
+        }
+    }
+
+    // Load the data file into a DataFrame.
+    let df = CsvReader::from_path(file).unwrap().finish().unwrap();
+
+    let mut errors = vec![];
+    // Check the id-type pairs where are from the curated_knowledges hashmap whether all are in the data file. The data file contains id and label columns.
+    for id_type_pair in curated_knowledges.keys() {
+        let id = id_type_pair.0.clone();
+        let type_ = id_type_pair.1.clone();
+        let id_type_pair_ = format!("{}-{}", id, type_);
+
+        let predicate = col("id").eq(lit(id)).and(col("label").eq(lit(type_)));
+        let filtered_df = df.clone().lazy().filter(predicate).collect().unwrap();
+
+        if filtered_df.height() == 0 {
+            errors.push((
+                id_type_pair_,
+                curated_knowledges
+                    .get(id_type_pair)
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ));
+        }
+    }
+
+    if errors.len() > 0 {
+        error!("The following id-type pairs are not in the data file:");
+        for error in errors {
+            error!(
+                "The id-type pair is {}, and the related rows are {}",
+                error.0, error.1
+            );
+        }
+        std::process::exit(1);
+    }
 }
 
 pub async fn import_data(
@@ -221,12 +285,18 @@ pub async fn import_data(
             let expected_columns = match expected_columns {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Fn: get_column_names, Invalid file: {}, reason: {}", filename, e);
+                    error!(
+                        "Fn: get_column_names, Invalid file: {}, reason: {}",
+                        filename, e
+                    );
                     continue;
                 }
             };
 
-            debug!("Expected columns which will be imported: {:?}", expected_columns);
+            debug!(
+                "Expected columns which will be imported: {:?}",
+                expected_columns
+            );
 
             // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
             let pardir = file.parent().unwrap();
@@ -251,13 +321,19 @@ pub async fn import_data(
             let file = match results {
                 Ok(_) => temp_filepath,
                 Err(e) => {
-                    error!("Fn: select_expected_columns, Invalid file: {}, reason: {}", filename, e);
+                    error!(
+                        "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                        filename, e
+                    );
                     continue;
                 }
             };
 
             match table {
                 "entity" => {
+                    // To ensure ids in the biomedgps_knowledge_curation table are in the data file, elsewise we cannot use the biomedgps_knowledge_curation table correctly.
+                    check_curated_knowledges(&pool, &file).await;
+
                     let table_name = "biomedgps_entity";
                     if drop {
                         drop_table(&pool, table_name).await;

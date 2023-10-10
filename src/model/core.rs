@@ -896,7 +896,7 @@ pub struct KnowledgeCuration {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    id: i64,
+    pub id: i64,
 
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
@@ -998,6 +998,15 @@ impl KnowledgeCuration {
             pmids: Some(format!("{}", self.pmid)),
             score: None,
         }
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KnowledgeCuration>, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_knowledge_curation";
+        let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
     }
 
     pub async fn get_records_by_owner(
