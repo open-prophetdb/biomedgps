@@ -14,6 +14,8 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use polars::prelude::{col, lit, CsvReader, IntoLazy, SerReader};
 use std::error::Error;
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
 use std::vec;
 
 use crate::model::core::{
@@ -327,6 +329,12 @@ pub async fn import_data(
             let pardir = file.parent().unwrap();
             let temp_file = tempfile::NamedTempFile::new_in(pardir).unwrap();
             let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
+            let permissions = Permissions::from_mode(0o755); // 0o755 is the octal representation of 755
+            log::info!("Setting permissions to 755 for the temp file.");
+            File::open(&temp_filepath)
+                .expect("Failed to open the file")
+                .set_permissions(permissions)
+                .expect("Failed to set file permissions");
             debug!("Data file: {:?}, Temp file: {:?}", file, temp_filepath);
             let results = if table == "entity" {
                 Entity::select_expected_columns(&file, &temp_filepath)
