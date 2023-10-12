@@ -20,7 +20,6 @@ fi
 docker build -t nordata/biomedgps:${VERSION}-${HASH} .
 
 if [ "$1" == "--push" ]; then
-  docker push nordata/biomedgps:${VERSION}-${HASH}
   docker tag nordata/biomedgps:${VERSION}-${HASH} ghcr.io/yjcyxky/biomedgps:${VERSION}-${HASH} && \
   docker push ghcr.io/yjcyxky/biomedgps:${VERSION}-${HASH}
 fi
