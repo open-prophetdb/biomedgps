@@ -5,6 +5,7 @@ services:
     image: nordata/postgre_postgresml:14-57693aa
     volumes:
       - ./data:/var/lib/postgresql/data
+      - /data:/data
     environment:
       POSTGRES_PASSWORD: password
       POSTGRES_USER: postgres

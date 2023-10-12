@@ -74,10 +74,19 @@ pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
     Ok(())
 }
 
-pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf) {
+pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delimiter: u8) {
     // Get all source_id and source_type pairs from the biomedgps_knowledge_curation table and keep them in a HashMap. The key is the source_id and source_type pair, the value is a list of numbers which are the row numbers that have the same source_id and source_type.
     let mut curated_knowledges: HashMap<(String, String), Vec<i64>> = HashMap::new();
     let records = KnowledgeCuration::get_records(pool).await.unwrap();
+    log::info!(
+        "The number of records in the biomedgps_knowledge_curation table is {}.",
+        records.len()
+    );
+
+    if records.len() == 0 {
+        return;
+    }
+
     for record in records {
         let key1 = (record.source_id, record.source_type);
         let key2 = (record.target_id, record.target_type);
@@ -98,12 +107,27 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf) {
     }
 
     // Load the data file into a DataFrame.
-    let df = CsvReader::from_path(file).unwrap().finish().unwrap();
+    log::info!(
+        "Loading the data file ({}) into a DataFrame.",
+        file.display()
+    );
+    // How to set truncate_ragged_lines=true?
+
+    let df = CsvReader::from_path(file)
+        .unwrap()
+        .with_delimiter(delimiter)
+        .has_header(true)
+        .finish()
+        .unwrap();
 
     let mut errors = vec![];
     // Check the id-type pairs where are from the curated_knowledges hashmap whether all are in the data file. The data file contains id and label columns.
     for id_type_pair in curated_knowledges.keys() {
         let id = id_type_pair.0.clone();
+        if id == "" || id == "Unknown:Unknown" {
+            continue;
+        }
+
         let type_ = id_type_pair.1.clone();
         let id_type_pair_ = format!("{}-{}", id, type_);
 
@@ -128,7 +152,7 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf) {
         error!("The following id-type pairs are not in the data file:");
         for error in errors {
             error!(
-                "The id-type pair is {}, and the related rows are {}",
+                "The id-type pair is {}, and the related ids are {}",
                 error.0, error.1
             );
         }
@@ -331,8 +355,13 @@ pub async fn import_data(
 
             match table {
                 "entity" => {
-                    // To ensure ids in the biomedgps_knowledge_curation table are in the data file, elsewise we cannot use the biomedgps_knowledge_curation table correctly.
-                    check_curated_knowledges(&pool, &file).await;
+                    if file.exists() {
+                        // To ensure ids in the biomedgps_knowledge_curation table are in the data file, elsewise we cannot use the biomedgps_knowledge_curation table correctly.
+                        check_curated_knowledges(&pool, &file, delimiter).await;
+                    } else {
+                        error!("The file {} doesn't exist.", file.display());
+                        return;
+                    }
 
                     let table_name = "biomedgps_entity";
                     if drop {

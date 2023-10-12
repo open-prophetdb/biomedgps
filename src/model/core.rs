@@ -1001,8 +1001,9 @@ impl KnowledgeCuration {
     }
 
     pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KnowledgeCuration>, anyhow::Error> {
-        let sql_str = "SELECT * FROM biomedgps_knowledge_curation";
-        let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
+        let columns = <KnowledgeCuration as CheckData>::fields().join(",");
+        let sql_str = format!("SELECT id,created_at,payload,{columns} FROM biomedgps_knowledge_curation");
+        let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str.as_str())
             .fetch_all(pool)
             .await?;
 
@@ -1036,7 +1037,10 @@ impl KnowledgeCuration {
             format!("curator IS NOT NULL")
         };
 
-        let where_str = format!("{} AND {} AND {}", curator_qstr, project_id_qstr, organization_id_qstr);
+        let where_str = format!(
+            "{} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr
+        );
 
         let page = match page {
             Some(page) => page,
@@ -1066,7 +1070,10 @@ impl KnowledgeCuration {
             .fetch_all(pool)
             .await?;
 
-        let sql_str = format!("SELECT COUNT(*) FROM biomedgps_knowledge_curation WHERE {}", where_str);
+        let sql_str = format!(
+            "SELECT COUNT(*) FROM biomedgps_knowledge_curation WHERE {}",
+            where_str
+        );
 
         let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
             .fetch_one(pool)

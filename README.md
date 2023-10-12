@@ -69,7 +69,7 @@ docker-compose up -d
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli initdb
 
 # Check and import data, -t is the table name, -f is the data file path, -D is the delete flag
-export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity -t entity -D
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity.tsv -t entity -D
 ```
 
 `Step 4`: Launch the platform, see more details on usage [here](#usage).
@@ -269,7 +269,7 @@ brew install docker docker-compose
 
 5. Run the following command to upload the data
 
-    Assume all data files are in `/data` folder.
+    Assume all data files are in `/data` folder. You need to ensure that the data directory is mounted to the docker container.
 
     ```bash
     # Upload entity data
