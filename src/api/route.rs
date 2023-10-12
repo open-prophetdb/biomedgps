@@ -235,14 +235,14 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let curator = curator.0;
 
-        if curator != _token.0.username {
-            let err = format!(
-                "You cannot query curated graph from other users. You are {} and you are querying {}'s curated graph.",
-                _token.0.username, curator
-            );
-            warn!("{}", err);
-            return GetGraphResponse::bad_request(err);
-        }
+        // if curator != _token.0.username {
+        //     let err = format!(
+        //         "You cannot query curated graph from other users. You are {} and you are querying {}'s curated graph.",
+        //         _token.0.username, curator
+        //     );
+        //     warn!("{}", err);
+        //     return GetGraphResponse::bad_request(err);
+        // }
 
         let project_id = match project_id.0 {
             Some(project_id) => {

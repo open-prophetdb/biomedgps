@@ -165,6 +165,7 @@ pub async fn import_data(
     filepath: &Option<String>,
     table: &str,
     drop: bool,
+    skip_check: bool,
     show_all_errors: bool,
 ) {
     let pool = sqlx::postgres::PgPoolOptions::new()
@@ -355,12 +356,14 @@ pub async fn import_data(
 
             match table {
                 "entity" => {
-                    if file.exists() {
-                        // To ensure ids in the biomedgps_knowledge_curation table are in the data file, elsewise we cannot use the biomedgps_knowledge_curation table correctly.
-                        check_curated_knowledges(&pool, &file, delimiter).await;
-                    } else {
-                        error!("The file {} doesn't exist.", file.display());
-                        return;
+                    if !skip_check {
+                        if file.exists() {
+                            // To ensure ids in the biomedgps_knowledge_curation table are in the data file, elsewise we cannot use the biomedgps_knowledge_curation table correctly.
+                            check_curated_knowledges(&pool, &file, delimiter).await;
+                        } else {
+                            error!("The file {} doesn't exist.", file.display());
+                            return;
+                        }
                     }
 
                     let table_name = "biomedgps_entity";

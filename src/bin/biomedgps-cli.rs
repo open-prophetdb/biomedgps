@@ -56,6 +56,10 @@ pub struct ImportDBArguments {
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
 
+    /// Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
+    #[structopt(name = "skip_check", short = "s", long = "skip-check")]
+    skip_check: bool,
+
     /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
@@ -115,6 +119,7 @@ async fn main() {
                 &arguments.filepath,
                 &arguments.table,
                 arguments.drop,
+                arguments.skip_check,
                 arguments.show_all_errors,
             )
             .await

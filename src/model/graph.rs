@@ -428,7 +428,7 @@ impl EdgeData {
 /// The edge struct which is compatible with the Graphin format
 ///
 /// * `relid` - The id of the edge. It's the combination of the source id, the relation type and the target id.
-/// * `source` - The source and target fields are the id of the node. It must be the same as the id field of the Node struct. Otherwise, the edge will not be connected to the node.
+/// * `source` - The source and target fields are the id of the node. It must be the same as the id field of the Node struct. Otherwise, the edge will not be connected to the node. such as "Compound::MESH:D0001"
 /// * `category` - The category of the edge. It must be "edge".
 /// * `target` - Same as the source field.
 /// * `reltype` - The relation type of the edge. Such as "Inhibitor::Gene:Gene".
@@ -771,6 +771,17 @@ impl Graph {
     ///
     pub fn add_edge(&mut self, edge: Edge) {
         self.edges.push(edge);
+    }
+
+    /// Remove the edges by node id
+    /// It will remove the edges which contain the node id as the source or target node id.
+    pub fn remove_edges_by_node_id(&mut self, node_id: &str) {
+        self.edges = self
+            .edges
+            .iter()
+            .filter(|edge| edge.source != node_id && edge.target != node_id)
+            .map(|edge| edge.to_owned())
+            .collect::<Vec<Edge>>();
     }
 
     /// Get the node ids from the edges, it contains the source and target node ids
@@ -1290,8 +1301,27 @@ impl Graph {
                 let node_ids_str = &node_ids.iter().map(|id| id.as_str()).collect();
                 match self.fetch_nodes_from_db(pool, node_ids_str).await {
                     Ok(nodes) => {
+                        // Keep all nodes which don't exist in our knowledge graph
+                        let missed_node_ids = node_ids
+                            .iter()
+                            .filter(|&node_id| {
+                                !nodes
+                                    .iter()
+                                    .map(|node| node.id.as_str())
+                                    .collect::<Vec<&str>>()
+                                    .contains(&&node_id[..])
+                            })
+                            .map(|node_id| node_id.to_string())
+                            .collect::<Vec<String>>();
+
+                        log::debug!("nodes: {:?}", nodes);
                         for node in nodes {
                             self.add_node(node);
+                        }
+
+                        log::info!("missed_node_ids: {:?}", missed_node_ids);
+                        for node_id in missed_node_ids {
+                            self.remove_edges_by_node_id(node_id.as_str());
                         }
                     }
                     Err(e) => {
@@ -1400,7 +1430,7 @@ mod tests {
 
     #[test]
     fn test_gen_relation_query_from_node_ids() {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
         let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
 
@@ -1422,7 +1452,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_connect_nodes() {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let mut graph = Graph::new();
 
         let pool = setup_test_db().await;
@@ -1442,7 +1472,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_similarity_nodes() {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
 
         let mut graph = Graph::new();
 
