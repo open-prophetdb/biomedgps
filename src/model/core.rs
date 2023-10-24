@@ -1510,6 +1510,11 @@ impl CheckData for Subgraph {
 }
 
 impl Subgraph {
+    pub fn update_owner(&mut self, username: String) -> &Self {
+        self.owner = username;
+        return self;
+    }
+
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Subgraph, anyhow::Error> {
         let id = uuid::Uuid::new_v4().to_string();
         let parent = if self.parent.is_none() {

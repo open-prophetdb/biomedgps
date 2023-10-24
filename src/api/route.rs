@@ -886,7 +886,13 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> PostResponse<Subgraph> {
         let pool_arc = pool.clone();
-        let payload = payload.0;
+        let mut payload = payload.0;
+        let username = _token.0.username.clone();
+
+        // When we enabled auth mode, we need to use the username from an access_token instead.
+        if username != "user-placeholder".to_string() {
+            payload.update_owner(username);
+        }
 
         match payload.validate() {
             Ok(_) => {}
@@ -923,7 +929,13 @@ impl BiomedgpsApi {
     ) -> PostResponse<Subgraph> {
         let pool_arc = pool.clone();
         let id = id.0;
-        let payload = payload.0;
+        let mut payload = payload.0;
+        let username = _token.0.username.clone();
+
+        // When we enabled auth mode, we need to use the username from an access_token instead.
+        if username != "user-placeholder".to_string() {
+            payload.update_owner(username);
+        }
 
         match SubgraphIdQuery::new(&id) {
             Ok(_) => {}

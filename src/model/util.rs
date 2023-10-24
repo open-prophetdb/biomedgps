@@ -10,11 +10,14 @@ use std::{error::Error, path::PathBuf};
 /// Don't change the order of the colors. It is important to keep the colors consistent.
 /// In future, we may specify a color for each node label when we can know all the node labels.
 const NODE_COLORS: [&str; 12] = [
-    "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
-    "#cab2d6", "#6a3d9a", "#ffff99", "#b15928",
+    "#ffff99", "#6a3d9a", "#ff7f00", "#b2df8a", "#a6cee3", "#e31a1c", "#fdbf6f", "#fb9a99",
+    "#cab2d6", "#33a02c", "#b15928", "#1f78b4",
 ];
 
 /// We have a set of colors and we want to match a color to a node label in a deterministic way.
+/// Examples: { "SideEffect": "0", "Pathway": "2", "Symptom": "2", "MolecularFunction": "3", "Metabolite": "4", "Gene": "5", "PharmacologicClass": "6", "Disease": "7", "CellularComponent": "8", "Compound": "9", "BiologicalProcess": "10", "Anatomy": "11" }
+/// { "Gene": ["#e31a1c", "Red"], "Compound": ["#33a02c", "Green"], "Disease": ["#fb9a99", "Light Pink"], "Pathway": ["#6a3d9a", "Purple"], "Anatomy": ["#1f78b4", "Dark Blue"], "BiologicalProcess": ["#b15928", "Brown"], "CellularComponent": ["#cab2d6", "Lavender"], "Metabolite": ["#a6cee3", "Light Blue"], "MolecularFunction": ["#b2df8a", "Light Green"], "PharmacologicClass": ["#fdbf6f", "Peach"], "SideEffect": ["#ffff99", "Yellow"], "Symptom": ["#ff7f00", "Orange"] }
+/// TODO: We might get the same color for different node labels. We need to handle this case. For example, we can load a user-defined color map from a settings file.
 pub fn match_color(entity_type: &str) -> String {
     let mut hasher = DefaultHasher::new();
     entity_type.hash(&mut hasher);

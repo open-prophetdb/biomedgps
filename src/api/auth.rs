@@ -39,7 +39,7 @@ pub struct CustomSecurityScheme(pub User);
 
 async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
     // Get jwt_secret_key from environment variable
-    let default_user = Some(User::new("admin".to_string()));
+    let default_user = Some(User::new("user-placeholder".to_string()));
     let jwt_secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key) => {
             if key.is_empty() {
