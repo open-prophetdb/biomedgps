@@ -8,6 +8,8 @@ use serde_json::Value;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 
+pub const USERNAME_PLACEHOLDER: &str = "ANONYMOUS-USER-PLACEHOLDER";
+
 #[derive(Debug)]
 pub struct User {
     pub username: String,
@@ -39,7 +41,7 @@ pub struct CustomSecurityScheme(pub User);
 
 async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
     // Get jwt_secret_key from environment variable
-    let default_user = Some(User::new("user-placeholder".to_string()));
+    let default_user = Some(User::new(USERNAME_PLACEHOLDER.to_string()));
     let jwt_secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key) => {
             if key.is_empty() {

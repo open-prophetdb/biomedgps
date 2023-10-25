@@ -1,6 +1,6 @@
 //! This module defines the routes of the API.
 
-use crate::api::auth::CustomSecurityScheme;
+use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetRecordsResponse,
     GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery,
@@ -890,7 +890,7 @@ impl BiomedgpsApi {
         let username = _token.0.username.clone();
 
         // When we enabled auth mode, we need to use the username from an access_token instead.
-        if username != "user-placeholder".to_string() {
+        if username != USERNAME_PLACEHOLDER.to_string() {
             payload.update_owner(username);
         }
 
