@@ -188,14 +188,33 @@ pub async fn update_entity_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(
     Ok(())
 }
 
+struct RelationMetadata {
+    relation_type: String,
+    description: String,
+}
+
 pub async fn update_relation_metadata(
     pool: &sqlx::PgPool,
+    metadata_filepath: &PathBuf,
     drop: bool,
 ) -> Result<(), Box<dyn Error>> {
     let table_name = "biomedgps_relation_metadata";
     if drop {
         drop_table(&pool, table_name).await;
     };
+
+    info!("Update relation metadata from metadata file.");
+
+    let delimiter = get_delimiter(metadata_filepath)?;
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_path(metadata_filepath)?;
+
+    let mut records = Vec::new();
+    for result in reader.deserialize() {
+        let record: RelationMetadata = result?;
+        records.push(record);
+    }
 
     info!("Update relation metadata from relation table.");
 
@@ -210,6 +229,24 @@ pub async fn update_relation_metadata(
         .execute(pool)
         .await
         .expect("Failed to update data.");
+
+    // Update the description of the relation types.
+    let mut tx = pool.begin().await?;
+    for record in records {
+        sqlx::query(
+            "
+            UPDATE biomedgps_relation_metadata
+            SET description = $1
+            WHERE relation_type = $2;
+        ",
+        )
+        .bind(record.description)
+        .bind(record.relation_type)
+        .execute(&mut tx)
+        .await?;
+    }
+    tx.commit().await?;
+
     info!("{} updated.", table_name);
 
     Ok(())
