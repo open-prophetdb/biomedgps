@@ -25,7 +25,6 @@ pom.xml.asc
 .DS_Store
 test.db
 resources/public/
-data
 assets/*
 !/assets/.gitkeep
 .VSCodeCounter
