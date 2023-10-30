@@ -175,14 +175,6 @@ pub async fn import_data(
         .await
         .unwrap();
 
-    if table == "relation_metadata" {
-        update_relation_metadata(&pool, true).await.unwrap();
-        return;
-    } else if table == "entity_metadata" {
-        update_entity_metadata(&pool, true).await.unwrap();
-        return;
-    }
-
     let filepath = match filepath {
         Some(f) => f,
         None => {
@@ -190,6 +182,17 @@ pub async fn import_data(
             return;
         }
     };
+
+    if table == "relation_metadata" {
+        update_relation_metadata(&pool, &PathBuf::from(filepath), true)
+            .await
+            .unwrap();
+        return;
+    } else if table == "entity_metadata" {
+        update_entity_metadata(&pool, true).await.unwrap();
+        return;
+    }
+
     if table == "entity_embedding" || table == "relation_embedding" {
         let file = PathBuf::from(filepath);
 

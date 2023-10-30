@@ -188,6 +188,7 @@ pub async fn update_entity_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(
     Ok(())
 }
 
+#[derive(Debug, serde::Deserialize)]
 struct RelationMetadata {
     relation_type: String,
     description: String,
@@ -211,7 +212,7 @@ pub async fn update_relation_metadata(
         .from_path(metadata_filepath)?;
 
     let mut records = Vec::new();
-    for result in reader.deserialize() {
+    for result in reader.deserialize::<RelationMetadata>() {
         let record: RelationMetadata = result?;
         records.push(record);
     }
