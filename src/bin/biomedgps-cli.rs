@@ -1,6 +1,6 @@
 extern crate log;
 
-use biomedgps::{import_data, import_graph_data, init_logger, run_migrations};
+use biomedgps::{import_data, import_graph_data, init_logger, parse_db_url, run_migrations};
 use log::*;
 use structopt::StructOpt;
 
@@ -166,20 +166,24 @@ async fn main() {
                 arguments.neo4j_url.unwrap()
             };
 
-            // Get host, username and password from neo4j_url.
-            let mut host = "";
-            let mut username = "";
-            let mut password = "";
+            // Get host, username and password from neo4j_url. the neo4j_url format is neo4j://<username>:<password>@<host>:<port>
+            let mut host = "".to_string();
+            let mut username = "".to_string();
+            let mut password = "".to_string();
             if neo4j_url.starts_with("neo4j://") {
-                let mut parts = neo4j_url.split("neo4j://");
-                host = parts.next().unwrap();
-                let mut parts = parts.next().unwrap().split(":");
-                username = parts.next().unwrap();
-                password = parts.next().unwrap();
+                let (hostname, port, user, pass) = parse_db_url(&neo4j_url);
+                host = format!("{}:{}", hostname, port);
+                username = user;
+                password = pass;
             } else {
                 error!("Invalid neo4j_url: {}", neo4j_url);
                 std::process::exit(1);
-            }
+            };
+
+            if host.is_empty() || username.is_empty() {
+                debug!("Invalid neo4j_url: {}", neo4j_url);
+                std::process::exit(1);
+            };
 
             let filetype = if arguments.filetype.is_none() {
                 error!("Please specify the file type.");
@@ -194,10 +198,12 @@ async fn main() {
                 arguments.batch_size.unwrap()
             };
 
+            debug!("Graph database host: {}", host);
+
             import_graph_data(
-                host,
-                username,
-                password,
+                &host,
+                &username,
+                &password,
                 &arguments.filepath,
                 &filetype,
                 arguments.skip_check,

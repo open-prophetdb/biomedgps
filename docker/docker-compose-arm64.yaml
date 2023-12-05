@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: nordata/postgre_postgresml:14-57693aa
+    image: nordata/postgre_postgresml:14-27b1f33
     volumes:
       - ./data:/var/lib/postgresql/data
       - /tmp:/tmp

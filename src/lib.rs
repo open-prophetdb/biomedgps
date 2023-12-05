@@ -7,7 +7,6 @@ pub mod model;
 pub mod pgvector;
 pub mod query_builder;
 
-use csv::ReaderBuilder;
 use log::{debug, error, info, warn, LevelFilter};
 use log4rs;
 use log4rs::append::console::ConsoleAppender;
@@ -165,20 +164,7 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delim
     }
 }
 
-async fn batch_insert_entities_into_neo4j(
-    records: Vec<Entity>,
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
-    batch_size: usize,
-) -> Result<(), Box<dyn Error>> {
-    let config = ConfigBuilder::new()
-        .uri(graphdb_host)
-        .user(username)
-        .password(password)
-        .build()
-        .unwrap();
-    let graph = Graph::connect(config).await?;
+async fn prepare_entity_queries(records: Vec<Entity>) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
     for record in records {
@@ -199,8 +185,9 @@ async fn batch_insert_entities_into_neo4j(
             Some(x) => x,
             None => "".to_string(),
         };
-        let query = Query::new("MERGE (n:$label {id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs} ON CREATE SET n.id = $id)".to_string())
-            .param("label", label)
+
+        let query_string = format!("MERGE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}}) ON CREATE SET n.id = $id", label);
+        let query = Query::new(query_string)
             .param("id", record.id)
             .param("name", record.name)
             .param("resource", record.resource)
@@ -211,31 +198,12 @@ async fn batch_insert_entities_into_neo4j(
         queries.push(query);
     }
 
-    for chunk in queries.chunks(batch_size) {
-        let tx = graph.start_txn().await?;
-        for query in chunk {
-            tx.run(query.to_owned()).await?;
-        }
-        tx.commit().await?;
-    }
-
-    Ok(())
+    Ok(queries)
 }
 
-pub async fn batch_insert_relations_into_neo4j(
+pub async fn prepare_relation_queries(
     records: Vec<Relation>,
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
-    batch_size: usize,
-) -> Result<(), Box<dyn Error>> {
-    let config = ConfigBuilder::new()
-        .uri(graphdb_host)
-        .user(username)
-        .password(password)
-        .build()
-        .unwrap();
-    let graph = Graph::connect(config).await?;
+) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
     for record in records {
@@ -248,99 +216,61 @@ pub async fn batch_insert_relations_into_neo4j(
             Some(t) => t,
             None => "".to_string(),
         };
-        let query = Query::new("
-            MATCH (e1:$source_type {id: $source_id})
-            MATCH (e2:$target_type {id: $target_id})
-            MERGE (e1)-[r:$label {resource: $resource, key_sentence: $key_sentence, pmids: $pmids}]->(e2)
-            ".to_string())
-            .param("source_type", record.source_type)
+        let query_string = format!(
+            "MATCH (e1:{} {{id: $source_id}})
+             MATCH (e2:{} {{id: $target_id}})
+             MERGE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+            record.source_type, record.target_type, label
+        );
+        let query = Query::new(query_string)
             .param("source_id", record.source_id)
-            .param("target_type", record.target_type)
             .param("target_id", record.target_id)
-            .param("label", label)
             .param("pmids", pmids)
             .param("resource", record.resource)
             .param("key_sentence", key_sentence);
         queries.push(query);
     }
 
-    for chunk in queries.chunks(batch_size) {
-        let tx = graph.start_txn().await?;
-        for query in chunk {
-            tx.run(query.to_owned()).await?;
-        }
-        tx.commit().await?;
-    }
-
-    Ok(())
+    Ok(queries)
 }
 
-pub async fn batch_insert_entity_attrs_into_neo4j(
+pub async fn prepare_entity_attr_queries(
     records: Vec<EntityAttribute>,
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
-    batch_size: usize,
-) -> Result<(), Box<dyn Error>> {
-    let config = ConfigBuilder::new()
-        .uri(graphdb_host)
-        .user(username)
-        .password(password)
-        .build()
-        .unwrap();
-    let graph = Graph::connect(config).await?;
+) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
     for record in records {
         let label = record.entity_type;
         let id = record.entity_id;
-        let query = Query::new(
+        let query_string = format!(
             "
-            MATCH (e:$entity_type {id: $entity_id})
+            MATCH (e:{} {{id: $entity_id}})
             SET e.external_db_name = $external_db_name
             SET e.external_id = $external_id
             SET e.external_url = $external_url
             SET e.description = $description
-            "
-            .to_string(),
-        )
-        .param("entity_type", label)
-        .param("entity_id", id)
-        .param("external_db_name", record.external_db_name)
-        .param("external_id", record.external_id)
-        .param("external_url", record.external_url)
-        .param("description", record.description);
+            ",
+            label // Directly use the label here
+        );
+        let query = Query::new(query_string)
+            .param("entity_id", id)
+            .param("external_db_name", record.external_db_name)
+            .param("external_id", record.external_id)
+            .param("external_url", record.external_url)
+            .param("description", record.description);
 
         queries.push(query);
     }
 
-    for chunk in queries.chunks(batch_size) {
-        let tx = graph.start_txn().await?;
-        for query in chunk {
-            tx.run(query.to_owned()).await?;
-        }
-        tx.commit().await?;
-    }
-
-    Ok(())
+    Ok(queries)
 }
 
-pub async fn batch_insert_relation_attrs_into_neo4j(
+pub async fn prepare_relation_attr_queries(
     records: Vec<RelationAttribute>,
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
-    batch_size: usize,
-) -> Result<(), Box<dyn Error>> {
-    let config = ConfigBuilder::new()
-        .uri(graphdb_host)
-        .user(username)
-        .password(password)
-        .build()
-        .unwrap();
-    let graph = Graph::connect(config).await?;
+) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
+    let total = records.len();
     for record in records {
         let relation_id = record.relation_id; // The relation_id is like "<RELATION_TYPE>_<SOURCE_ID>_<TARGET_ID>".
         let relation_id = relation_id.split("_").collect::<Vec<&str>>();
@@ -353,34 +283,83 @@ pub async fn batch_insert_relation_attrs_into_neo4j(
         let target_id = relation_id[2];
         let moa_ids = record.moa_ids.split("|").collect::<Vec<&str>>();
 
-        let query = Query::new(
+        let query_string = format!(
             "
-            MATCH (e1:$source_type {id: $source_id})-[r:$label]->(e2:$target_type {id: $target_id})
+            MATCH (e1:{} {{id: $source_id}})-[r:{}]->(e2:{} {{id: $target_id}})
             SET r.attention_score = $attention_score
             SET r.moa_ids = $moa_ids
-            "
-            .to_string(),
-        )
-        .param("source_type", source_type)
-        .param("source_id", source_id)
-        .param("target_type", target_type)
-        .param("target_id", target_id)
-        .param("label", label)
-        .param("attention_score", record.attention_score)
-        .param("moa_ids", moa_ids);
+            ",
+            source_type, label, target_type
+        );
+        let query = Query::new(query_string)
+            .param("source_id", source_id)
+            .param("target_id", target_id)
+            .param("label", label)
+            .param("attention_score", record.attention_score)
+            .param("moa_ids", moa_ids);
 
         queries.push(query);
     }
 
+    Ok(queries)
+}
+
+pub async fn batch_insert(
+    queries: Vec<Query>,
+    graphdb_host: &str,
+    username: &str,
+    password: &str,
+    batch_size: usize,
+) -> Result<(), Box<dyn Error>> {
+    let graph = Graph::connect(
+        ConfigBuilder::default()
+            .uri(graphdb_host)
+            .user(username)
+            .password(password)
+            .build()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let total = queries.len();
+    let mut imported = 0;
     for chunk in queries.chunks(batch_size) {
         let tx = graph.start_txn().await?;
         for query in chunk {
             tx.run(query.to_owned()).await?;
         }
         tx.commit().await?;
+        imported += chunk.len();
+        debug!("Imported {}/{} records.", imported, total);
     }
 
     Ok(())
+}
+
+pub fn create_temp_file(dir: &PathBuf, extension: Option<&str>) -> PathBuf {
+    // Create a temporary file with the extension.
+    debug!(
+        "Creating a temporary file with extension {:?} in {:?}.",
+        extension, dir
+    );
+    let extension = match extension {
+        Some(e) => e,
+        None => "",
+    };
+    let temp_file = tempfile::Builder::new()
+        .suffix(format!(".{:?}", extension).as_str()) // Replace '.ext' with the desired extension
+        .tempfile_in(dir)
+        .unwrap();
+    let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
+    let permissions = Permissions::from_mode(0o755); // 0o755 is the octal representation of 755
+    log::info!("Setting permissions to 755 for the temp file.");
+    File::open(&temp_filepath)
+        .expect("Failed to open the file")
+        .set_permissions(permissions)
+        .expect("Failed to set file permissions");
+
+    return temp_filepath;
 }
 
 pub async fn import_graph_data(
@@ -426,7 +405,8 @@ pub async fn import_graph_data(
 
     for file in files {
         let filename = file.to_str().unwrap();
-        info!("Importing {} into neo4j...", filename);
+        info!("Importing {} into neo4j...", file.display());
+        warn!("Please make sure that you have upload the data file into the importer directory of the neo4j database.");
 
         if !skip_check {
             let validation_errors = if filetype == "entity" {
@@ -453,82 +433,45 @@ pub async fn import_graph_data(
             }
         }
 
-        let delimiter = match get_delimiter(&file) {
-            Ok(d) => d,
-            Err(_) => {
-                error!("Invalid filename: {}, no extension found.", filename);
+        let file = match file.file_name() {
+            Some(f) => PathBuf::from(f.to_str().unwrap()),
+            None => {
+                error!("Invalid file: {}", filename);
                 continue;
             }
         };
 
-        let expected_columns = if filetype == "entity" {
-            Entity::get_column_names(&file)
-        } else if filetype == "relation" {
-            Relation::get_column_names(&file)
-        } else if filetype == "entity_attribute" {
-            EntityAttribute::get_column_names(&file)
-        } else if filetype == "relation_attribute" {
-            RelationAttribute::get_column_names(&file)
-        } else {
-            error!("Invalid file type: {}", filetype);
-            // Stop the program if the file type is invalid.
-            std::process::exit(1);
-        };
-
-        let expected_columns = match expected_columns {
-            Ok(v) => v,
-            Err(e) => {
-                error!(
-                    "Fn: get_column_names, Invalid file: {}, reason: {}",
-                    filename, e
-                );
-                continue;
-            }
-        };
-
-        debug!(
-            "Expected columns which will be imported: {:?}",
-            expected_columns
-        );
-
-        // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
-        let pardir = file.parent().unwrap();
-        let temp_file = tempfile::NamedTempFile::new_in(pardir).unwrap();
-        let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
-        let permissions = Permissions::from_mode(0o755); // 0o755 is the octal representation of 755
-        log::info!("Setting permissions to 755 for the temp file.");
-        File::open(&temp_filepath)
-            .expect("Failed to open the file")
-            .set_permissions(permissions)
-            .expect("Failed to set file permissions");
-        debug!("Data file: {:?}, Temp file: {:?}", file, temp_filepath);
-
-        let results = if filetype == "entity" {
+        let queries = if filetype == "entity" {
             let records = Entity::get_records(&file).unwrap();
-            batch_insert_entities_into_neo4j(records, graphdb_host, username, password, batch_size).await
+            prepare_entity_queries(records).await.unwrap()
         } else if filetype == "relation" {
             let records = Relation::get_records(&file).unwrap();
-            batch_insert_relations_into_neo4j(records, graphdb_host, username, password, batch_size).await
+            prepare_relation_queries(records).await.unwrap()
         } else if filetype == "entity_attribute" {
             let records = EntityAttribute::get_records(&file).unwrap();
-            batch_insert_entity_attrs_into_neo4j(records, graphdb_host, username, password, batch_size).await
+            prepare_entity_attr_queries(records).await.unwrap()
         } else if filetype == "relation_attribute" {
             let records = RelationAttribute::get_records(&file).unwrap();
-            batch_insert_relation_attrs_into_neo4j(records, graphdb_host, username, password, batch_size).await
+            prepare_relation_attr_queries(records).await.unwrap()
         } else {
             error!("Invalid file type: {}", filetype);
             // Stop the program if the file type is invalid.
             std::process::exit(1);
         };
 
-        match results {
-            Ok(_) => {
-                info!("Import {} into neo4j successfully.", filename);
-                return;
-            }
-            Err(e) => {
-                error!("Failed to parse CSV: ({})", e);
-                return;
+        if queries.len() == 0 {
+            error!("No queries generated.");
+            continue;
+        } else {
+            match batch_insert(queries, graphdb_host, username, password, batch_size).await {
+                Ok(_) => {
+                    info!("Import {} into neo4j successfully.", filename);
+                    return;
+                }
+                Err(e) => {
+                    error!("Failed to import {} into neo4j: ({})", filename, e);
+                    return;
+                }
             }
         }
     }
@@ -701,40 +644,79 @@ pub async fn import_data(
             );
 
             // Selecting process must be done after getting expected columns. because the temporary table is created based on the expected columns and it don't have extension. The get_column_names will fail if the file don't have extension.
-            let pardir = file.parent().unwrap();
-            let temp_file = tempfile::NamedTempFile::new_in(pardir).unwrap();
-            let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
-            let permissions = Permissions::from_mode(0o755); // 0o755 is the octal representation of 755
-            log::info!("Setting permissions to 755 for the temp file.");
-            File::open(&temp_filepath)
-                .expect("Failed to open the file")
-                .set_permissions(permissions)
-                .expect("Failed to set file permissions");
+            let pardir = file.parent().unwrap().to_path_buf();
+            let extension = file.extension().unwrap().to_str();
+            let temp_filepath = create_temp_file(&pardir, extension);
             debug!("Data file: {:?}, Temp file: {:?}", file, temp_filepath);
-            let results = if table == "entity" {
-                Entity::select_expected_columns(&file, &temp_filepath)
+
+            let file = if table == "entity" {
+                let results: Result<Vec<Entity>, Box<dyn Error>> =
+                    Entity::select_expected_columns(&file, &temp_filepath);
+                match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!(
+                            "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                            filename, e
+                        );
+                        continue;
+                    }
+                }
             } else if table == "entity2d" {
-                Entity2D::select_expected_columns(&file, &temp_filepath)
+                let results: Result<Vec<Entity2D>, Box<dyn Error>> =
+                    Entity2D::select_expected_columns(&file, &temp_filepath);
+                match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!(
+                            "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                            filename, e
+                        );
+                        continue;
+                    }
+                }
             } else if table == "relation" {
-                Relation::select_expected_columns(&file, &temp_filepath)
+                let results: Result<Vec<Relation>, Box<dyn Error>> =
+                    Relation::select_expected_columns(&file, &temp_filepath);
+                match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!(
+                            "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                            filename, e
+                        );
+                        continue;
+                    }
+                }
             } else if table == "knowledge_curation" {
-                KnowledgeCuration::select_expected_columns(&file, &temp_filepath)
+                let results: Result<Vec<KnowledgeCuration>, Box<dyn Error>> =
+                    KnowledgeCuration::select_expected_columns(&file, &temp_filepath);
+                match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!(
+                            "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                            filename, e
+                        );
+                        continue;
+                    }
+                }
             } else if table == "subgraph" {
-                Subgraph::select_expected_columns(&file, &temp_filepath)
+                let results: Result<Vec<Subgraph>, Box<dyn Error>> =
+                    Subgraph::select_expected_columns(&file, &temp_filepath);
+                match results {
+                    Ok(_) => temp_filepath,
+                    Err(e) => {
+                        error!(
+                            "Fn: select_expected_columns, Invalid file: {}, reason: {}",
+                            filename, e
+                        );
+                        continue;
+                    }
+                }
             } else {
                 error!("Invalid table name: {}", table);
                 continue;
-            };
-
-            let file = match results {
-                Ok(_) => temp_filepath,
-                Err(e) => {
-                    error!(
-                        "Fn: select_expected_columns, Invalid file: {}, reason: {}",
-                        filename, e
-                    );
-                    continue;
-                }
             };
 
             match table {
@@ -924,4 +906,14 @@ pub fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle,
             e.description()
         )
     })
+}
+
+pub fn parse_db_url(db_url: &str) -> (String, String, String, String) {
+    let url = url::Url::parse(db_url).unwrap();
+    let host = url.host_str().unwrap().to_string();
+    let port = url.port().unwrap().to_string();
+    let username = url.username().to_string();
+    let password = url.password().unwrap().to_string();
+
+    return (host, port, username, password);
 }

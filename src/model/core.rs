@@ -137,12 +137,23 @@ pub trait CheckData {
 
     fn unique_fields() -> Vec<String>;
 
+    fn get_error_msg<S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug>(
+        r: Result<Vec<S>, Box<dyn Error>>,
+    ) -> String {
+        match r {
+            Ok(_) => "".to_string(),
+            Err(e) => {
+                return e.to_string();
+            }
+        }
+    }
+
     /// Select the columns to keep
     /// Return the path of the output file which is a temporary file
-    fn select_expected_columns(
+    fn select_expected_columns<S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug>(
         in_filepath: &PathBuf,
         out_filepath: &PathBuf,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<Vec<S>, Box<dyn Error>> {
         let delimiter = get_delimiter(in_filepath)?;
         debug!("The delimiter is: {:?}", delimiter as char);
         let mut reader = csv::ReaderBuilder::new()
@@ -193,7 +204,8 @@ pub trait CheckData {
             out_filepath.display()
         );
 
-        Ok(())
+        // TODO: Poor performance, need to optimize?
+        Ok(Self::get_records(out_filepath)?) // Return the records of the output file
     }
 
     fn get_column_names(filepath: &PathBuf) -> Result<Vec<String>, Box<dyn Error>> {
@@ -218,9 +230,10 @@ pub trait CheckData {
         Ok(column_names)
     }
 
-    fn get_records<
-        S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug,
-    >(filepath: &PathBuf) -> Result<Vec<S>, Box<dyn Error>> {
+    fn get_records<S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug>(
+        filepath: &PathBuf,
+    ) -> Result<Vec<S>, Box<dyn Error>> {
+        debug!("Start to get records from the csv file: {:?}", filepath);
         let delimiter = get_delimiter(filepath)?;
         let mut reader = csv::ReaderBuilder::new()
             .delimiter(delimiter)
@@ -231,6 +244,8 @@ pub trait CheckData {
             let record: S = result?;
             records.push(record);
         }
+
+        debug!("Get {} records successfully.", records.len());
 
         Ok(records)
     }
