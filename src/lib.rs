@@ -164,7 +164,10 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delim
     }
 }
 
-async fn prepare_entity_queries(records: Vec<Entity>) -> Result<Vec<Query>, Box<dyn Error>> {
+async fn prepare_entity_queries(
+    records: Vec<Entity>,
+    check_exist: bool,
+) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
     for record in records {
@@ -186,7 +189,12 @@ async fn prepare_entity_queries(records: Vec<Entity>) -> Result<Vec<Query>, Box<
             None => "".to_string(),
         };
 
-        let query_string = format!("MERGE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}}) ON CREATE SET n.id = $id", label);
+        let query_string = if check_exist {
+            format!("MERGE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}}) ON CREATE SET n.id = $id", label)
+        } else {
+            format!("CREATE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}})", label)
+        };
+
         let query = Query::new(query_string)
             .param("id", record.id)
             .param("name", record.name)
@@ -203,6 +211,7 @@ async fn prepare_entity_queries(records: Vec<Entity>) -> Result<Vec<Query>, Box<
 
 pub async fn prepare_relation_queries(
     records: Vec<Relation>,
+    check_exist: bool,
 ) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
@@ -212,16 +221,28 @@ pub async fn prepare_relation_queries(
             Some(d) => d,
             None => "".to_string(),
         };
+
         let pmids = match record.pmids {
             Some(t) => t,
             None => "".to_string(),
         };
-        let query_string = format!(
-            "MATCH (e1:{} {{id: $source_id}})
-             MATCH (e2:{} {{id: $target_id}})
-             MERGE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
-            record.source_type, record.target_type, label
-        );
+
+        let query_string = if check_exist {
+            format!(
+                "MATCH (e1:{} {{id: $source_id}})
+                MATCH (e2:{} {{id: $target_id}})
+                MERGE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                record.source_type, record.target_type, label
+            )
+        } else {
+            format!(
+                "MATCH (e1:{} {{id: $source_id}})
+                MATCH (e2:{} {{id: $target_id}})
+                CREATE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                record.source_type, record.target_type, label
+            )
+        };
+
         let query = Query::new(query_string)
             .param("source_id", record.source_id)
             .param("target_id", record.target_id)
@@ -369,6 +390,7 @@ pub async fn import_graph_data(
     filepath: &Option<String>,
     filetype: &str,
     skip_check: bool,
+    check_exist: bool,
     show_all_errors: bool,
     batch_size: usize,
 ) {
@@ -443,10 +465,12 @@ pub async fn import_graph_data(
 
         let queries = if filetype == "entity" {
             let records = Entity::get_records(&file).unwrap();
-            prepare_entity_queries(records).await.unwrap()
+            prepare_entity_queries(records, check_exist).await.unwrap()
         } else if filetype == "relation" {
             let records = Relation::get_records(&file).unwrap();
-            prepare_relation_queries(records).await.unwrap()
+            prepare_relation_queries(records, check_exist)
+                .await
+                .unwrap()
         } else if filetype == "entity_attribute" {
             let records = EntityAttribute::get_records(&file).unwrap();
             prepare_entity_attr_queries(records).await.unwrap()

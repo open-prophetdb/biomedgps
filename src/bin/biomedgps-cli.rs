@@ -89,6 +89,10 @@ pub struct ImportGraphArguments {
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
 
+    /// Check if the data exists in the database before import data.
+    #[structopt(name = "check_exist", short = "c", long = "check-exist")]
+    check_exist: bool,
+
     /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
@@ -98,7 +102,7 @@ pub struct ImportGraphArguments {
 async fn main() {
     let opt = Opt::from_args();
 
-    let log_result = if opt.debug {
+    let _ = if opt.debug {
         init_logger("biomedgps-cli", LevelFilter::Debug)
     } else {
         init_logger("biomedgps-cli", LevelFilter::Info)
@@ -207,6 +211,7 @@ async fn main() {
                 &arguments.filepath,
                 &filetype,
                 arguments.skip_check,
+                arguments.check_exist,
                 arguments.show_all_errors,
                 batch_size,
             )
