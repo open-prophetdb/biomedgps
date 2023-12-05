@@ -58,6 +58,7 @@ custom_error = "1.9.2"
 byteorder = "1"
 bytes = "1"
 postgres = { version = "0.19.5" }
+futures = "0.3.29"
 url = "2.4.0"
 jwt = "0.16.0"
 hmac = "0.12.1"

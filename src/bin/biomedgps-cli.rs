@@ -1,6 +1,6 @@
 extern crate log;
 
-use biomedgps::{import_data, run_migrations, init_logger};
+use biomedgps::{import_data, import_graph_data, init_logger, run_migrations};
 use log::*;
 use structopt::StructOpt;
 
@@ -23,8 +23,8 @@ enum SubCommands {
     InitDB(InitDbArguments),
     #[structopt(name = "importdb")]
     ImportDB(ImportDBArguments),
-    // #[structopt(name = "importgraph")]
-    // ImportGraph(ImportGraphArguments),
+    #[structopt(name = "importgraph")]
+    ImportGraph(ImportGraphArguments),
 }
 
 /// Init database.
@@ -55,6 +55,35 @@ pub struct ImportDBArguments {
     /// Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
+
+    /// Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
+    #[structopt(name = "skip_check", short = "s", long = "skip-check")]
+    skip_check: bool,
+
+    /// Show the first 3 errors when import data.
+    #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
+    show_all_errors: bool,
+}
+
+/// Import data files into a graph database.
+#[derive(StructOpt, PartialEq, Debug)]
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importgraph", author="Jingcheng Yang <yjcyxky@163.com>")]
+pub struct ImportGraphArguments {
+    /// Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
+    #[structopt(name = "neo4j_url", short = "n", long = "neo4j_url")]
+    neo4j_url: Option<String>,
+
+    /// The file path of the data file to import. It may be a file or a directory.
+    #[structopt(name = "filepath", short = "f", long = "filepath")]
+    filepath: Option<String>,
+
+    /// The file type of the data file to import. It may be entity, relation, entity_attribute and relation_attribute.
+    #[structopt(name = "filetype", short = "t", long = "filetype")]
+    filetype: Option<String>,
+
+    /// Batch size for import data. Default is 1000.
+    #[structopt(name = "batch_size", short = "b", long = "batch-size")]
+    batch_size: Option<usize>,
 
     /// Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
@@ -121,6 +150,59 @@ async fn main() {
                 arguments.drop,
                 arguments.skip_check,
                 arguments.show_all_errors,
+            )
+            .await
+        }
+        SubCommands::ImportGraph(arguments) => {
+            let neo4j_url = if arguments.neo4j_url.is_none() {
+                match std::env::var("NEO4J_URL") {
+                    Ok(v) => v,
+                    Err(_) => {
+                        error!("{}", "NEO4J_URL is not set.");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                arguments.neo4j_url.unwrap()
+            };
+
+            // Get host, username and password from neo4j_url.
+            let mut host = "";
+            let mut username = "";
+            let mut password = "";
+            if neo4j_url.starts_with("neo4j://") {
+                let mut parts = neo4j_url.split("neo4j://");
+                host = parts.next().unwrap();
+                let mut parts = parts.next().unwrap().split(":");
+                username = parts.next().unwrap();
+                password = parts.next().unwrap();
+            } else {
+                error!("Invalid neo4j_url: {}", neo4j_url);
+                std::process::exit(1);
+            }
+
+            let filetype = if arguments.filetype.is_none() {
+                error!("Please specify the file type.");
+                std::process::exit(1);
+            } else {
+                arguments.filetype.unwrap()
+            };
+
+            let batch_size = if arguments.batch_size.is_none() {
+                1000
+            } else {
+                arguments.batch_size.unwrap()
+            };
+
+            import_graph_data(
+                host,
+                username,
+                password,
+                &arguments.filepath,
+                &filetype,
+                arguments.skip_check,
+                arguments.show_all_errors,
+                batch_size,
             )
             .await
         }

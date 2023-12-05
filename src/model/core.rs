@@ -16,6 +16,7 @@ use std::{error::Error, fmt, option::Option, path::PathBuf};
 use validator::Validate;
 
 const ENTITY_NAME_MAX_LENGTH: u64 = 255;
+const RELATION_ID_MAX_LENGTH: u64 = 255;
 const DEFAULT_MAX_LENGTH: u64 = 64;
 const DEFAULT_MIN_LENGTH: u64 = 1;
 
@@ -216,6 +217,23 @@ pub trait CheckData {
 
         Ok(column_names)
     }
+
+    fn get_records<
+        S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug,
+    >(filepath: &PathBuf) -> Result<Vec<S>, Box<dyn Error>> {
+        let delimiter = get_delimiter(filepath)?;
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(filepath)?;
+
+        let mut records = Vec::new();
+        for result in reader.deserialize::<S>() {
+            let record: S = result?;
+            records.push(record);
+        }
+
+        Ok(records)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
@@ -400,6 +418,81 @@ impl CheckData for Entity {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
+pub struct EntityAttribute {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub idx: i64,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_id should be between 1 and 64."
+    ))]
+    #[validate(regex(
+        path = "ENTITY_ID_REGEX",
+        message = "The entity id is invalid. It should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D000001'."
+    ))]
+    pub entity_id: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type should be between 1 and 64."
+    ))]
+    #[validate(regex = "ENTITY_LABEL_REGEX")]
+    pub entity_type: String,
+
+    // A human-readable summary of the entity in an external database.
+    pub description: String,
+
+    // The name of an external database. such as MESH, OMIM, etc. Also, we can develop a integrated database for collecting information for each entity. It could be a external service. We can call it as 'biomedgps-metadata-service'.
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of external_db_name should be between 1 and 64."
+    ))]
+    pub external_db_name: String,
+
+    // The link to the entity in an external database. It should be a valid URL, like https://www.ncbi.nlm.nih.gov/mesh/68000001.
+    pub external_url: String,
+
+    // The id of the entity in an external database.
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of external_id should be between 1 and 64."
+    ))]
+    pub external_id: String,
+}
+
+impl CheckData for EntityAttribute {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<EntityAttribute>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "external_db_name".to_string(),
+            "external_id".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "description".to_string(),
+            "external_db_name".to_string(),
+            "external_url".to_string(),
+            "external_id".to_string(),
+        ]
+    }
+}
+
 fn text2vector<'de, D>(deserializer: D) -> Result<Vector, D::Error>
 where
     D: Deserializer<'de>,
@@ -510,6 +603,7 @@ impl<
     }
 }
 
+/// [DEPRECATED in v0.3.0]
 /// A struct for entity embedding, it is used for import entity embeddings into database from csv file.
 /// Only for internal use, not for api.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Validate)]
@@ -637,6 +731,8 @@ impl CheckData for EntityEmbedding {
     }
 }
 
+/// [DEPRECATED in v0.3.0]
+/// A struct for relation embedding, it is used for import relation embeddings into database from csv file.
 #[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Validate)]
 pub struct RelationEmbedding {
     pub embedding_id: i64,
@@ -814,6 +910,7 @@ pub struct RelationMetadata {
     #[oai(read_only)]
     pub id: i64,
 
+    // The resource of the relation for labeling different datasets. such DRKG, HSDN, CTD, CuratedFindings, etc. Users can choose different resource combinations to build a knowledge graph and train models.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
@@ -821,6 +918,7 @@ pub struct RelationMetadata {
     ))]
     pub resource: String,
 
+    // The relation type, such as STRING::ACTIVATOR::Gene:Compound, STRING::INHIBITOR::Gene:Compound, etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
@@ -845,6 +943,10 @@ pub struct RelationMetadata {
         message = "The length of end_entity_type should be between 1 and 64."
     ))]
     pub end_entity_type: String,
+
+    // To describe the relation type with a human-readable sentence.
+    #[oai(skip_serializing_if_is_none)]
+    pub description: Option<String>,
 }
 
 impl CheckData for RelationMetadata {
@@ -868,6 +970,7 @@ impl CheckData for RelationMetadata {
             "relation_count".to_string(),
             "start_entity_type".to_string(),
             "end_entity_type".to_string(),
+            "description".to_string(),
         ]
     }
 }
@@ -1002,7 +1105,8 @@ impl KnowledgeCuration {
 
     pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KnowledgeCuration>, anyhow::Error> {
         let columns = <KnowledgeCuration as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id,created_at,payload,{columns} FROM biomedgps_knowledge_curation");
+        let sql_str =
+            format!("SELECT id,created_at,payload,{columns} FROM biomedgps_knowledge_curation");
         let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str.as_str())
             .fetch_all(pool)
             .await?;
@@ -1288,6 +1392,41 @@ impl CheckData for Relation {
             "key_sentence".to_string(),
             "resource".to_string(),
             "pmids".to_string(),
+        ]
+    }
+}
+
+/// For checking the graph data in csv file is valid or not.
+/// Temporarily, we only use it to test our models, after getting stable models, we will remove it or change its attributes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct RelationAttribute {
+    #[validate(length(
+        max = "RELATION_ID_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type must be between 1 and 64."
+    ))]
+    pub relation_id: String,
+
+    pub attention_score: f64,
+
+    // A relation might belong to multiple moa paths, so we need to use a vector to store them. But we can join them into a string with | as the delimiter.
+    pub moa_ids: String,
+}
+
+impl CheckData for RelationAttribute {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Relation>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec!["relation_id".to_string()]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "relation_id".to_string(),
+            "attention_score".to_string(),
+            "moa_ids".to_string(),
         ]
     }
 }
