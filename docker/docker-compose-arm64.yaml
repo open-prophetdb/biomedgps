@@ -16,6 +16,7 @@ services:
     volumes:
       - ./neo4j-import:/var/lib/neo4j/import
       - ./neo4j-data:/data
+      - ./plugins:/var/lib/neo4j/plugins
     ports:
       - 7474:7474
       - 7687:7687
@@ -25,3 +26,4 @@ services:
       NEO4J_server_memory_heap_max__size: 2G
       NEO4J_server_memory_pagecache_size: 2G
       NEO4J_server_default__listen__address: 
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
