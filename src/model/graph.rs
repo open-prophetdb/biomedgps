@@ -230,7 +230,8 @@ impl NodeData {
 
     /// Format the node id, we use the label and entity id to format the node id.
     pub fn format_id(label: &str, entity_id: &str) -> String {
-        format!("{}{}{}", label, COMPOSED_ENTITY_DELIMITER, entity_id)
+        // format!("{}{}{}", label, COMPOSED_ENTITY_DELIMITER, entity_id)
+        Node::format_id(label, entity_id)
     }
 }
 

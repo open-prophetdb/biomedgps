@@ -1,7 +1,7 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
 use super::util::{drop_table, get_delimiter, parse_csv_error};
-use crate::model::util::match_color;
+// use crate::model::util::match_color;
 use crate::pgvector::Vector;
 use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
@@ -21,6 +21,8 @@ const DEFAULT_MAX_LENGTH: u64 = 64;
 const DEFAULT_MIN_LENGTH: u64 = 1;
 
 lazy_static! {
+    // The relation_id is like "<RELATION_TYPE>|<SOURCE_ID>|<TARGET_ID>", e.g. "STRING::ACTIVATOR::Gene:Compound|Gene::ENTREZ:1017|Compound::DrugBank:2083"
+    pub static ref RELATION_ID_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9_\-]+::[a-zA-Z0-9 _\-]+::[a-zA-Z]+:[a-zA-Z]+|[a-zA-Z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+|[a-zA-Z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
     pub static ref ENTITY_LABEL_REGEX: Regex = Regex::new(r"^[A-Za-z]+$").unwrap();
     pub static ref ENTITY_ID_REGEX: Regex = Regex::new(r"^[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+$").unwrap();
     // 1.23|-4.56|7.89
@@ -1418,7 +1420,11 @@ pub struct RelationAttribute {
     #[validate(length(
         max = "RELATION_ID_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
-        message = "The length of relation_type must be between 1 and 64."
+        message = "The length of relation_type must be between 1 and 255."
+    ))]
+    #[validate(regex(
+        path = "RELATION_ID_REGEX",
+        message = "The relation_id must match the RELATION_ID_REGEX pattern."
     ))]
     pub relation_id: String,
 

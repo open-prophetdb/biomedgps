@@ -1,6 +1,8 @@
 extern crate log;
 
-use biomedgps::{import_data, import_graph_data, init_logger, parse_db_url, run_migrations};
+use biomedgps::{
+    build_index, import_data, import_graph_data, init_logger, parse_db_url, run_migrations,
+};
 use log::*;
 use structopt::StructOpt;
 
@@ -204,18 +206,36 @@ async fn main() {
 
             debug!("Graph database host: {}", host);
 
-            import_graph_data(
-                &host,
-                &username,
-                &password,
-                &arguments.filepath,
-                &filetype,
-                arguments.skip_check,
-                arguments.check_exist,
-                arguments.show_all_errors,
-                batch_size,
-            )
-            .await
+            if filetype == "entity"
+                || filetype == "relation"
+                || filetype == "entity_attribute"
+                || filetype == "relation_attribute"
+            {
+                import_graph_data(
+                    &host,
+                    &username,
+                    &password,
+                    &arguments.filepath,
+                    &filetype,
+                    arguments.skip_check,
+                    arguments.check_exist,
+                    arguments.show_all_errors,
+                    batch_size,
+                )
+                .await
+            }
+
+            if filetype == "entity_index" {
+                build_index(
+                    &host,
+                    &username,
+                    &password,
+                    &arguments.filepath,
+                    arguments.skip_check,
+                    arguments.show_all_errors,
+                )
+                .await
+            }
         }
     }
 }

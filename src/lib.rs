@@ -24,6 +24,7 @@ use crate::model::core::{
     CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationAttribute,
     RelationEmbedding, Subgraph,
 };
+use crate::model::graph::Node;
 use crate::model::util::{
     drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
     update_relation_metadata,
@@ -190,12 +191,14 @@ async fn prepare_entity_queries(
         };
 
         let query_string = if check_exist {
-            format!("MERGE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}}) ON CREATE SET n.id = $id", label)
+            format!("MERGE (n:{} {{idx: $idx, id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}}) ON CREATE SET n.id = $id", label)
         } else {
-            format!("CREATE (n:{} {{id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}})", label)
+            format!("CREATE (n:{} {{idx: $idx, id: $id, name: $name, resource: $resource, description: $description, taxid: $taxid, synonyms: $synonyms, xrefs: $xrefs}})", label)
         };
 
         let query = Query::new(query_string)
+            // Such as Gene::ENTREZ:01
+            .param("idx", Node::format_id(&label, &record.id))
             .param("id", record.id)
             .param("name", record.name)
             .param("resource", record.resource)
@@ -229,23 +232,29 @@ pub async fn prepare_relation_queries(
 
         let query_string = if check_exist {
             format!(
-                "MATCH (e1:{} {{id: $source_id}})
-                MATCH (e2:{} {{id: $target_id}})
-                MERGE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                "MATCH (e1:{} {{idx: $source_idx}})
+                MATCH (e2:{} {{idx: $target_idx}})
+                MERGE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         } else {
             format!(
-                "MATCH (e1:{} {{id: $source_id}})
-                MATCH (e2:{} {{id: $target_id}})
-                CREATE (e1)-[r:{} {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                "MATCH (e1:{} {{idx: $source_idx}})
+                MATCH (e2:{} {{idx: $target_idx}})
+                CREATE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         };
 
         let query = Query::new(query_string)
-            .param("source_id", record.source_id)
-            .param("target_id", record.target_id)
+            .param(
+                "source_idx",
+                Node::format_id(&record.source_type, &record.source_id),
+            )
+            .param(
+                "target_idx",
+                Node::format_id(&record.target_type, &record.target_id),
+            )
             .param("pmids", pmids)
             .param("resource", record.resource)
             .param("key_sentence", key_sentence);
@@ -265,7 +274,7 @@ pub async fn prepare_entity_attr_queries(
         let id = record.entity_id;
         let query_string = format!(
             "
-            MATCH (e:{} {{id: $entity_id}})
+            MATCH (e:{} {{idx: $entity_idx}})
             SET e.external_db_name = $external_db_name
             SET e.external_id = $external_id
             SET e.external_url = $external_url
@@ -274,7 +283,7 @@ pub async fn prepare_entity_attr_queries(
             label // Directly use the label here
         );
         let query = Query::new(query_string)
-            .param("entity_id", id)
+            .param("entity_idx", Node::format_id(&label, &id))
             .param("external_db_name", record.external_db_name)
             .param("external_id", record.external_id)
             .param("external_url", record.external_url)
@@ -291,10 +300,9 @@ pub async fn prepare_relation_attr_queries(
 ) -> Result<Vec<Query>, Box<dyn Error>> {
     let mut queries = Vec::new();
 
-    let total = records.len();
     for record in records {
-        let relation_id = record.relation_id; // The relation_id is like "<RELATION_TYPE>_<SOURCE_ID>_<TARGET_ID>".
-        let relation_id = relation_id.split("_").collect::<Vec<&str>>();
+        let relation_id = record.relation_id;
+        let relation_id = relation_id.split("|").collect::<Vec<&str>>();
         let label = relation_id[0];
         // The relation_type is like "<DB>::<RELATION>::<SOURCE_TYPE>:<TARGET_TYPE>". We need to split it to get the source_type and target_type.
         let types = label.split("::").collect::<Vec<&str>>();
@@ -306,15 +314,15 @@ pub async fn prepare_relation_attr_queries(
 
         let query_string = format!(
             "
-            MATCH (e1:{} {{id: $source_id}})-[r:{}]->(e2:{} {{id: $target_id}})
+            MATCH (e1:{} {{idx: $source_idx}})-[r:`{}`]->(e2:{} {{idx: $target_idx}})
             SET r.attention_score = $attention_score
             SET r.moa_ids = $moa_ids
             ",
             source_type, label, target_type
         );
         let query = Query::new(query_string)
-            .param("source_id", source_id)
-            .param("target_id", target_id)
+            .param("source_idx", Node::format_id(source_type, source_id))
+            .param("target_idx", Node::format_id(target_type, target_id))
             .param("label", label)
             .param("attention_score", record.attention_score)
             .param("moa_ids", moa_ids);
@@ -381,6 +389,76 @@ pub fn create_temp_file(dir: &PathBuf, extension: Option<&str>) -> PathBuf {
         .expect("Failed to set file permissions");
 
     return temp_filepath;
+}
+
+pub async fn build_index(
+    graphdb_host: &str,
+    username: &str,
+    password: &str,
+    filepath: &Option<String>,
+    skip_check: bool,
+    show_all_errors: bool,
+) {
+    let filepath = match filepath {
+        Some(f) => f,
+        None => {
+            error!("Please specify the file path.");
+            return;
+        }
+    };
+
+    if std::path::Path::new(&filepath).is_file() {
+        let file = PathBuf::from(filepath);
+
+        if !skip_check {
+            let validation_errors = Entity::check_csv_is_valid(&file);
+
+            if validation_errors.len() > 0 {
+                error!("Invalid file: {}", file.display());
+                show_errors(&validation_errors, show_all_errors);
+                warn!("Skipping {}...\n\n", file.display());
+                return;
+            } else {
+                info!("{} is valid.", file.display());
+            }
+        }
+
+        let records: Vec<Entity> = Entity::get_records(&file).unwrap();
+        let entity_types = records
+            .iter()
+            .map(|r| r.label.clone())
+            .collect::<Vec<String>>();
+        let uniq_entity_types = entity_types
+            .iter()
+            .cloned()
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+        let mut queries = vec![];
+        for entity_type in uniq_entity_types {
+            let query_string = format!(
+                "CREATE INDEX {} IF NOT EXISTS FOR (n:{}) ON (n.idx)",
+                format!("biomedgps_{}_idx", entity_type.to_lowercase()),
+                entity_type // Directly use the label here
+            );
+            let query = Query::new(query_string);
+            queries.push(query);
+        }
+
+        match batch_insert(queries, graphdb_host, username, password, 1000).await {
+            Ok(_) => {
+                info!("Build indexes successfully.");
+                return;
+            }
+            Err(e) => {
+                error!("Failed to build indexes: ({})", e);
+                return;
+            }
+        }
+    } else {
+        error!("Please specify the file path, not a directory.");
+        return;
+    }
 }
 
 pub async fn import_graph_data(
