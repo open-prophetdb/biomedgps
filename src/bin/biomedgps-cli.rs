@@ -1,7 +1,7 @@
 extern crate log;
 
 use biomedgps::{
-    build_index, import_data, import_graph_data, init_logger, parse_db_url, run_migrations,
+    build_index, import_data, import_graph_data, init_logger, connect_graph_db, run_migrations,
 };
 use log::*;
 use structopt::StructOpt;
@@ -177,24 +177,7 @@ async fn main() {
                 arguments.neo4j_url.unwrap()
             };
 
-            // Get host, username and password from neo4j_url. the neo4j_url format is neo4j://<username>:<password>@<host>:<port>
-            let mut host = "".to_string();
-            let mut username = "".to_string();
-            let mut password = "".to_string();
-            if neo4j_url.starts_with("neo4j://") {
-                let (hostname, port, user, pass) = parse_db_url(&neo4j_url);
-                host = format!("{}:{}", hostname, port);
-                username = user;
-                password = pass;
-            } else {
-                error!("Invalid neo4j_url: {}", neo4j_url);
-                std::process::exit(1);
-            };
-
-            if host.is_empty() || username.is_empty() {
-                debug!("Invalid neo4j_url: {}", neo4j_url);
-                std::process::exit(1);
-            };
+            let graph = connect_graph_db(&neo4j_url).await;
 
             let filetype = if arguments.filetype.is_none() {
                 error!("Please specify the file type.");
@@ -209,17 +192,13 @@ async fn main() {
                 arguments.batch_size.unwrap()
             };
 
-            debug!("Graph database host: {}", host);
-
             if filetype == "entity"
                 || filetype == "relation"
                 || filetype == "entity_attribute"
                 || filetype == "relation_attribute"
             {
                 import_graph_data(
-                    &host,
-                    &username,
-                    &password,
+                    &graph,
                     &arguments.filepath,
                     &filetype,
                     arguments.skip_check,
@@ -232,9 +211,7 @@ async fn main() {
 
             if filetype == "entity_index" {
                 build_index(
-                    &host,
-                    &username,
-                    &password,
+                    &graph,
                     &arguments.filepath,
                     arguments.skip_check,
                     arguments.show_all_errors,

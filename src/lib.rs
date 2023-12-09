@@ -336,23 +336,10 @@ pub async fn prepare_relation_attr_queries(
 }
 
 pub async fn batch_insert(
+    graph: &Graph,
     queries: Vec<Query>,
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
     batch_size: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let graph = Graph::connect(
-        ConfigBuilder::default()
-            .uri(graphdb_host)
-            .user(username)
-            .password(password)
-            .build()
-            .unwrap(),
-    )
-    .await
-    .unwrap();
-
     let total = queries.len();
     let mut imported = 0;
     for chunk in queries.chunks(batch_size) {
@@ -394,9 +381,7 @@ pub fn create_temp_file(dir: &PathBuf, extension: Option<&str>) -> PathBuf {
 }
 
 pub async fn build_index(
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
+    graph: &Graph,
     filepath: &Option<String>,
     skip_check: bool,
     show_all_errors: bool,
@@ -447,7 +432,7 @@ pub async fn build_index(
             queries.push(query);
         }
 
-        match batch_insert(queries, graphdb_host, username, password, 1000).await {
+        match batch_insert(graph, queries, 1000).await {
             Ok(_) => {
                 info!("Build indexes successfully.");
                 return;
@@ -464,9 +449,7 @@ pub async fn build_index(
 }
 
 pub async fn import_graph_data(
-    graphdb_host: &str,
-    username: &str,
-    password: &str,
+    graph: &Graph,
     filepath: &Option<String>,
     filetype: &str,
     skip_check: bool,
@@ -559,7 +542,7 @@ pub async fn import_graph_data(
             error!("No queries generated.");
             continue;
         } else {
-            match batch_insert(queries, graphdb_host, username, password, batch_size).await {
+            match batch_insert(graph, queries, batch_size).await {
                 Ok(_) => {
                     info!("Import {} into neo4j successfully.", filename);
 
@@ -567,9 +550,7 @@ pub async fn import_graph_data(
                         // Build indexes for the entity nodes.
                         info!("Building indexes for the entity nodes.");
                         build_index(
-                            graphdb_host,
-                            username,
-                            password,
+                            graph,
                             &Some(filename.to_string()),
                             skip_check,
                             show_all_errors,
@@ -818,11 +799,16 @@ pub async fn import_data(
                 match results {
                     Ok(_) => {
                         if let Some(d) = dataset {
-                            add_new_column(&temp_filepath.to_str().unwrap(), "dataset", d, delimiter);
+                            add_new_column(
+                                &temp_filepath.to_str().unwrap(),
+                                "dataset",
+                                d,
+                                delimiter,
+                            );
                         }
 
                         temp_filepath
-                    },
+                    }
                     Err(e) => {
                         error!(
                             "Fn: select_expected_columns, Invalid file: {}, reason: {}",
@@ -1059,4 +1045,38 @@ pub fn parse_db_url(db_url: &str) -> (String, String, String, String) {
     let password = url.password().unwrap().to_string();
 
     return (host, port, username, password);
+}
+
+pub async fn connect_graph_db(neo4j_url: &str) -> Graph {
+    // Get host, username and password from neo4j_url. the neo4j_url format is neo4j://<username>:<password>@<host>:<port>
+    let mut host = "".to_string();
+    let mut username = "".to_string();
+    let mut password = "".to_string();
+    if neo4j_url.starts_with("neo4j://") {
+        let (hostname, port, user, pass) = parse_db_url(&neo4j_url);
+        host = format!("{}:{}", hostname, port);
+        username = user;
+        password = pass;
+    } else {
+        error!("Invalid neo4j_url: {}", neo4j_url);
+        std::process::exit(1);
+    };
+
+    if host.is_empty() || username.is_empty() {
+        debug!("Invalid neo4j_url: {}", neo4j_url);
+        std::process::exit(1);
+    };
+
+    let graph = Graph::connect(
+        ConfigBuilder::default()
+            .uri(host)
+            .user(username)
+            .password(password)
+            .build()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    return graph;
 }

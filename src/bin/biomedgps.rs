@@ -4,7 +4,7 @@ extern crate log;
 extern crate lazy_static;
 
 use biomedgps::api::route::BiomedgpsApi;
-use biomedgps::init_logger;
+use biomedgps::{init_logger, connect_graph_db};
 use dotenv::dotenv;
 use log::LevelFilter;
 use poem::middleware::AddData;
@@ -57,7 +57,7 @@ struct Opt {
     #[structopt(name = "database-url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// Graph Database url, such as neo4j:://user:pass@host:port/dbname.
+    /// Graph Database url, such as neo4j:://user:pass@host:port. We will always use the default database.
     /// You can also set it with env var: NEO4J_URL.
     #[structopt(name = "neo4j-url", short = "g", long = "neo4j-url")]
     neo4j_url: Option<String>,
@@ -158,19 +158,19 @@ async fn main() -> Result<(), std::io::Error> {
         None
     };
 
-    // let neo4j_url = args.neo4j_url;
+    let neo4j_url = args.neo4j_url;
 
-    // let _neo4j_url = if neo4j_url.is_none() {
-    //     match std::env::var("NEO4J_URL") {
-    //         Ok(v) => v,
-    //         Err(_) => {
-    //             error!("{}", "NEO4J_URL is not set.");
-    //             std::process::exit(1);
-    //         }
-    //     }
-    // } else {
-    //     neo4j_url.unwrap()
-    // };
+    let _neo4j_url = if neo4j_url.is_none() {
+        match std::env::var("NEO4J_URL") {
+            Ok(v) => v,
+            Err(_) => {
+                error!("{}", "NEO4J_URL is not set.");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        neo4j_url.unwrap()
+    };
 
     let pool = match PgPoolOptions::new()
         .max_connections(5)
@@ -186,6 +186,10 @@ async fn main() -> Result<(), std::io::Error> {
 
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
+
+    let graph_pool = connect_graph_db(&_neo4j_url).await;
+    let arc_graph_pool = Arc::new(graph_pool);
+    let shared_graph_pool = AddData::new(arc_graph_pool.clone());
 
     let api_service = OpenApiService::new(BiomedgpsApi, "BioMedGPS", "v0.1.0")
         .summary("A RESTful API Service for BioMedGPS.")
@@ -223,7 +227,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let route = route.nest_no_strip("/api/v1", api_service);
 
-    let route = route.with(Cors::new()).with(shared_rb);
+    let route = route.with(Cors::new()).with(shared_rb).with(shared_graph_pool);
 
     Server::new(TcpListener::bind(format!("{}:{}", host, port)))
         .run(route)

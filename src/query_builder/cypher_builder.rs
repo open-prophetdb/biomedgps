@@ -3,18 +3,18 @@ use neo4rs::{query, Graph, Node as NeoNode, Relation};
 use std::collections::HashMap;
 
 /// Split the composed entity id into two parts: the entity type and the entity id.
-/// 
+///
 /// # Arguments
 /// * `id` - The composed entity id. Such as 'Compound::DrugBank:DB00818'
-/// 
+///
 /// # Returns
 /// * `Ok((start_node_type, start_node_id))` - The start node type and the start node id.
 /// * `Err(e)` - The error message.
-/// 
+///
 /// # Example
 /// ```
 /// use biomedgps::query_builder::cypher_builder::split_id;
-/// 
+///
 /// let id = "Compound::DrugBank:DB00818";
 /// let (start_node_type, start_node_id) = split_id(id).unwrap();
 /// assert_eq!(start_node_type, "Compound");
@@ -34,21 +34,21 @@ fn split_id(id: &str) -> Result<(String, String), anyhow::Error> {
 }
 
 /// Generate the query string to get the nodes and edges between two nodes.
-/// 
+///
 /// # Arguments
 /// * `start_node_type` - The start node type. Such as 'Compound'
 /// * `start_node_id` - The start node id. Such as 'DrugBank:DB00818'
 /// * `end_node_type` - The end node type. Such as 'Disease'
 /// * `end_node_id` - The end node id. Such as 'MONDO:0005404'
 /// * `nhops` - The number of hops between the start node and the end node.
-/// 
+///
 /// # Returns
 /// * `query_str` - The query string.
-/// 
+///
 /// # Example
 /// ```
 /// use biomedgps::query_builder::cypher_builder::gen_nhops_query_str;
-/// 
+///
 /// let start_node_type = "Compound";
 /// let start_node_id = "DrugBank:DB00818";
 /// let end_node_type = "Disease";
@@ -85,13 +85,13 @@ fn gen_nhops_query_str(
 }
 
 /// Query the graph database to get the nodes and edges between two nodes.
-/// 
+///
 /// # Arguments
 /// * `graph` - The graph database connection.
 /// * `start_node_id` - The start node id. Such as 'Compound::DrugBank:DB00818'
 /// * `end_node_id` - The end node id. Such as 'Disease::MONDO:0005404'
 /// * `nhops` - The number of hops between the start node and the end node.
-/// 
+///
 /// # Returns
 /// * `Ok((nodes, edges))` - The nodes and edges between the start node and the end node.
 /// * `Err(e)` - The error message.
@@ -150,9 +150,8 @@ pub async fn query_nhops(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse_db_url;
+    use crate::connect_graph_db;
     use log::{debug, error, info};
-    use neo4rs::{ConfigBuilder, Graph};
     use std::env;
     use tokio::test as async_test;
 
@@ -189,37 +188,16 @@ mod tests {
         // 从环境变量中获取数据库连接字符串
         let neo4j_url =
             env::var("NEO4J_URL").unwrap_or("neo4j://neo4j:password@localhost:7687".to_string());
-        // Get host, username and password from neo4j_url. the neo4j_url format is neo4j://<username>:<password>@<host>:<port>
-        let mut host = "".to_string();
-        let mut username = "".to_string();
-        let mut password = "".to_string();
-        if neo4j_url.starts_with("neo4j://") {
-            let (hostname, port, user, pass) = parse_db_url(&neo4j_url);
-            host = format!("{}:{}", hostname, port);
-            username = user;
-            password = pass;
-        } else {
-            error!("Invalid neo4j_url: {}", neo4j_url);
-            std::process::exit(1);
-        };
 
-        if host.is_empty() || username.is_empty() {
-            debug!("Invalid neo4j_url: {}", neo4j_url);
-            std::process::exit(1);
-        };
-
-        let graph = Graph::connect(
-            ConfigBuilder::default()
-                .uri(host)
-                .user(username)
-                .password(password)
-                .build()
-                .unwrap(),
+        let graph = connect_graph_db(&neo4j_url).await;
+        match query_nhops(
+            &graph,
+            "Compound::DrugBank:DB00818",
+            "Disease::MONDO:0005404",
+            2,
         )
         .await
-        .unwrap();
-
-        match query_nhops(&graph, "Compound::DrugBank:DB00818", "Disease::MONDO:0005404", 2).await {
+        {
             Ok((nodes, edges)) => {
                 // 进行测试断言
                 debug!("nodes: {:?}", nodes);
