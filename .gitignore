@@ -30,3 +30,4 @@ assets/*
 .VSCodeCounter
 neo4j-data
 neo4j-import
+data
