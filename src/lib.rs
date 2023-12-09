@@ -465,6 +465,11 @@ pub async fn import_graph_data(
     batch_size: usize,
     dataset: &Option<String>,
 ) {
+    if dataset.is_none() && filetype == "relation" {
+        error!("Please specify the dataset name.");
+        return;
+    }
+
     let filepath = match filepath {
         Some(f) => f,
         None => {
