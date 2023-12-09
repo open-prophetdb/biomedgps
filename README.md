@@ -70,6 +70,10 @@ export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps &
 
 # Check and import data, -t is the table name, -f is the data file path, -D is the delete flag
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity.tsv -t entity -D
+
+export NEO4J_URL=neo4j://neo4j:password@localhost:7687 && biomedgps-cli importgraph -f /data/relations.tsv -t relation -b 1000
+
+export NEO4J_URL=neo4j://neo4j:password@localhost:7687 && biomedgps-cli importgraph -f /data/entities.tsv -t entity -b 1000
 ```
 
 `Step 4`: Launch the platform, see more details on usage [here](#usage).

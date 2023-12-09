@@ -27,3 +27,4 @@ services:
       NEO4J_server_memory_pagecache_size: 2G
       NEO4J_server_default__listen__address: 
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_transaction_total_max: 10G

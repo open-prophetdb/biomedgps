@@ -1115,6 +1115,7 @@ impl KnowledgeCuration {
             target_id: self.target_id.clone(),
             key_sentence: Some(self.key_sentence.clone()),
             resource: self.curator.clone(),
+            dataset: "biomedgps".to_string(),
             pmids: Some(format!("{}", self.pmid)),
             score: None,
         }
@@ -1379,6 +1380,8 @@ pub struct Relation {
 
     pub resource: String,
 
+    pub dataset: String,
+
     #[oai(skip_serializing_if_is_none)]
     pub pmids: Option<String>,
 }
@@ -1390,6 +1393,8 @@ impl CheckData for Relation {
 
     fn unique_fields() -> Vec<String> {
         vec![
+            "resource".to_string(),
+            "dataset".to_string(),
             "relation_type".to_string(),
             "source_id".to_string(),
             "source_type".to_string(),
@@ -1408,6 +1413,7 @@ impl CheckData for Relation {
             "score".to_string(),
             "key_sentence".to_string(),
             "resource".to_string(),
+            "dataset".to_string(),
             "pmids".to_string(),
         ]
     }

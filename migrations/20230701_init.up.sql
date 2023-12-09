@@ -12,7 +12,7 @@ CREATE TABLE
     synonyms TEXT, -- The synonyms of the entity
     pmids TEXT, -- The PMIDs which mentions the entity
     xrefs TEXT, -- The cross references of the entity
-    UNIQUE (id, label) -- The unique constraint of the entity
+    CONSTRAINT biomedgps_entity_uniq_key UNIQUE (id, label) -- The unique constraint of the entity
   );
 
 -- biomedgps_entity_metadata table is used to store the metadata of the entities, it is used to visualize the statistics of the entities on the statistics page
@@ -22,7 +22,7 @@ CREATE TABLE
     resource VARCHAR(64) NOT NULL, -- The source of the entity metadata
     entity_type VARCHAR(64) NOT NULL, -- The entity type of the entity metadata, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     entity_count BIGINT NOT NULL, -- The entity count of the entity metadata
-    UNIQUE (resource, entity_type)
+    CONSTRAINT biomedgps_entity_metadata_uniq_key UNIQUE (resource, entity_type)
   );
 
 -- biomedgps_relation_metadata table is used to store the metadata of the relations, it is used to visualize the statistics of the relations on the statistics page
@@ -34,7 +34,7 @@ CREATE TABLE
     relation_count BIGINT NOT NULL, -- The relation count
     start_entity_type VARCHAR(64) NOT NULL, -- The start entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
     end_entity_type VARCHAR(64) NOT NULL, -- The end entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
-    UNIQUE (
+    CONSTRAINT biomedgps_relation_metadata_uniq_key UNIQUE (
       resource,
       relation_type,
       start_entity_type,
@@ -57,7 +57,7 @@ CREATE TABLE
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- The created time of the relation
     curator VARCHAR(64) NOT NULL, -- The curator of the relation
     pmid BIGINT NOT NULL, -- The PMID of the relation
-    UNIQUE (
+    CONSTRAINT biomedgps_knowledge_curation_uniq_key UNIQUE (
       relation_type,
       source_name,
       source_type,
@@ -74,7 +74,7 @@ CREATE TABLE
 CREATE TABLE
   IF NOT EXISTS biomedgps_relation (
     id BIGSERIAL PRIMARY KEY, -- The relation ID
-    relation_type VARCHAR(64) NOT NULL, -- The relation type, such as ACTIVATOR::Gene:Compound, INHIBITOR::Gene:Compound, etc.
+    relation_type VARCHAR(64) NOT NULL, -- The relation type, such as DGIDB::ACTIVATOR::Gene:Compound, DGIDB::INHIBITOR::Gene:Compound, etc.
     source_id VARCHAR(64) NOT NULL, -- The ID of the start entity
     source_type VARCHAR(64) NOT NULL, -- The entity type, such as Gene, Compound, Biological Process, etc.
     target_id VARCHAR(64) NOT NULL, -- The ID of the end entity, format: <DATABASE_NAME>:<DATABASE_ID>, such as ENTREZ:1234, MESH:D000003
@@ -83,7 +83,7 @@ CREATE TABLE
     key_sentence TEXT, -- The key sentence of the relation
     pmids TEXT, -- The PMIDs which mentions the relation
     score FLOAT, -- The score of the relation
-    UNIQUE (
+    CONSTRAINT biomedgps_relation_uniq_key UNIQUE (
       relation_type,
       source_id,
       source_type,
@@ -103,7 +103,7 @@ CREATE TABLE
     umap_y FLOAT NOT NULL, -- The UMAP Y coordinate
     tsne_x FLOAT NOT NULL, -- The t-SNE X coordinate
     tsne_y FLOAT NOT NULL, -- The t-SNE Y coordinate
-    UNIQUE (entity_id, entity_type)
+    CONSTRAINT biomedgps_entity2d_uniq_key UNIQUE (entity_id, entity_type)
   );
 
 -- biomedgps_subgraph table is used to store the subgraph which is created by the user

@@ -14,7 +14,9 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use model::core::EntityAttribute;
 use neo4rs::{ConfigBuilder, Graph, Query};
-use polars::prelude::{col, lit, CsvReader, IntoLazy, SerReader};
+use polars::prelude::{
+    col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
+};
 use std::error::Error;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -533,14 +535,6 @@ pub async fn import_graph_data(
             }
         }
 
-        let file = match file.file_name() {
-            Some(f) => PathBuf::from(f.to_str().unwrap()),
-            None => {
-                error!("Invalid file: {}", filename);
-                continue;
-            }
-        };
-
         let queries = if filetype == "entity" {
             let records = Entity::get_records(&file).unwrap();
             prepare_entity_queries(records, check_exist).await.unwrap()
@@ -568,6 +562,21 @@ pub async fn import_graph_data(
             match batch_insert(queries, graphdb_host, username, password, batch_size).await {
                 Ok(_) => {
                     info!("Import {} into neo4j successfully.", filename);
+
+                    if filetype == "entity" {
+                        // Build indexes for the entity nodes.
+                        info!("Building indexes for the entity nodes.");
+                        build_index(
+                            graphdb_host,
+                            username,
+                            password,
+                            &Some(filename.to_string()),
+                            skip_check,
+                            show_all_errors,
+                        )
+                        .await;
+                    }
+
                     return;
                 }
                 Err(e) => {
@@ -583,6 +592,7 @@ pub async fn import_data(
     database_url: &str,
     filepath: &Option<String>,
     table: &str,
+    dataset: &Option<String>,
     drop: bool,
     skip_check: bool,
     show_all_errors: bool,
@@ -781,7 +791,34 @@ pub async fn import_data(
                 let results: Result<Vec<Relation>, Box<dyn Error>> =
                     Relation::select_expected_columns(&file, &temp_filepath);
                 match results {
-                    Ok(_) => temp_filepath,
+                    Ok(_) => {
+                        // Add a new column named dataset into the temp file by using the polar crate.
+                        let mut df = CsvReader::from_path(&temp_filepath)
+                            .unwrap()
+                            .with_delimiter(delimiter)
+                            .has_header(true)
+                            .finish()
+                            .unwrap();
+                        let dataset = match dataset {
+                            Some(d) => d.to_owned(),
+                            None => {
+                                error!("Please specify the dataset name.");
+                                return;
+                            }
+                        };
+
+                        let datasets = Series::new("dataset", vec![dataset; df.height()]);
+                        df.with_column(datasets).unwrap();
+
+                        let writer = File::create(&temp_filepath).unwrap();
+                        CsvWriter::new(writer)
+                            .has_header(true)
+                            .with_delimiter(delimiter)
+                            .finish(&mut df)
+                            .unwrap();
+
+                        temp_filepath
+                    }
                     Err(e) => {
                         error!(
                             "Fn: select_expected_columns, Invalid file: {}, reason: {}",
