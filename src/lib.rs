@@ -232,18 +232,23 @@ pub async fn prepare_relation_queries(
             None => "".to_string(),
         };
 
+        let dataset = match record.dataset {
+            Some(t) => t,
+            None => "biomedgps".to_string(),
+        };
+
         let query_string = if check_exist {
             format!(
                 "MATCH (e1:{} {{idx: $source_idx}})
                 MATCH (e2:{} {{idx: $target_idx}})
-                MERGE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                MERGE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         } else {
             format!(
                 "MATCH (e1:{} {{idx: $source_idx}})
                 MATCH (e2:{} {{idx: $target_idx}})
-                CREATE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids}}]->(e2)",
+                CREATE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         };
@@ -259,7 +264,9 @@ pub async fn prepare_relation_queries(
             )
             .param("pmids", pmids)
             .param("resource", record.resource)
-            .param("key_sentence", key_sentence);
+            .param("key_sentence", key_sentence)
+            .param("dataset", dataset);
+
         queries.push(query);
     }
 
@@ -456,6 +463,7 @@ pub async fn import_graph_data(
     check_exist: bool,
     show_all_errors: bool,
     batch_size: usize,
+    dataset: &Option<String>,
 ) {
     let filepath = match filepath {
         Some(f) => f,
@@ -523,6 +531,16 @@ pub async fn import_graph_data(
             prepare_entity_queries(records, check_exist).await.unwrap()
         } else if filetype == "relation" {
             let records = Relation::get_records(&file).unwrap();
+            let records = records
+                .iter()
+                .map(|r: &Relation| {
+                    let mut r = r.clone();
+                    if let Some(d) = dataset {
+                        r.dataset = Some(d.to_string());
+                    }
+                    r
+                })
+                .collect::<Vec<Relation>>();
             prepare_relation_queries(records, check_exist)
                 .await
                 .unwrap()

@@ -102,6 +102,10 @@ pub struct ImportGraphArguments {
     /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
+
+    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
+    #[structopt(name = "dataset", short = "d", long = "dataset")]
+    dataset: Option<String>,
 }
 
 #[tokio::main]
@@ -205,6 +209,7 @@ async fn main() {
                     arguments.check_exist,
                     arguments.show_all_errors,
                     batch_size,
+                    &arguments.dataset,
                 )
                 .await
             }
