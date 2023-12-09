@@ -17,6 +17,7 @@ use neo4rs::{ConfigBuilder, Graph, Query};
 use polars::prelude::{
     col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
 };
+use sqlx::postgres::PgPoolOptions;
 use std::error::Error;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -28,8 +29,8 @@ use crate::model::core::{
 };
 use crate::model::graph::Node;
 use crate::model::util::{
-    drop_table, get_delimiter, import_file_in_loop, show_errors, update_entity_metadata,
-    update_relation_metadata,
+    drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
+    update_entity_metadata, update_relation_metadata,
 };
 
 use serde_json::Value;
@@ -68,9 +69,7 @@ pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
     }
     let migrator = Migrator::new(Path::new(dir.path())).await?;
 
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect(database_url)
-        .await?;
+    let pool = connect_db(database_url, 1).await;
 
     migrator.run(&pool).await?;
 
@@ -373,7 +372,7 @@ pub fn create_temp_file(dir: &PathBuf, extension: Option<&str>) -> PathBuf {
         None => "",
     };
     let temp_file = tempfile::Builder::new()
-        .suffix(format!(".{:?}", extension).as_str()) // Replace '.ext' with the desired extension
+        .suffix(format!(".{}", extension).as_str()) // Replace '.ext' with the desired extension
         .tempfile_in(dir)
         .unwrap();
     let temp_filepath = PathBuf::from(temp_file.path().to_str().unwrap());
@@ -601,6 +600,13 @@ fn add_new_column(filepath: &str, column_name: &str, column_value: &str, delimit
         .finish()
         .unwrap();
 
+    let columns = df.get_column_names();
+
+    if columns.contains(&column_name) {
+        warn!("The column {} already exists, skip adding it.", column_name);
+        return;
+    };
+
     let datasets = Series::new(column_name, vec![column_value; df.height()]);
     df.with_column(datasets).unwrap();
 
@@ -626,10 +632,7 @@ pub async fn import_data(
         return;
     }
 
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect(&database_url)
-        .await
-        .unwrap();
+    let pool = connect_db(database_url, 1).await;
 
     let filepath = match filepath {
         Some(f) => f,
@@ -768,7 +771,7 @@ pub async fn import_data(
                 Ok(vec![])
             };
 
-            let expected_columns = match expected_columns {
+            let mut expected_columns = match expected_columns {
                 Ok(v) => v,
                 Err(e) => {
                     error!(
@@ -821,6 +824,8 @@ pub async fn import_data(
                     Relation::select_expected_columns(&file, &temp_filepath);
                 match results {
                     Ok(_) => {
+                        // It must be done before importing the data into the database.
+                        // The dataset must not be None here, because the dataset is required for the relation table and it is checked before.
                         if let Some(d) = dataset {
                             add_new_column(
                                 &temp_filepath.to_str().unwrap(),
@@ -828,6 +833,10 @@ pub async fn import_data(
                                 d,
                                 delimiter,
                             );
+
+                            if !expected_columns.contains(&"dataset".to_string()) {
+                                expected_columns.push("dataset".to_string());
+                            }
                         }
 
                         temp_filepath
@@ -902,7 +911,13 @@ pub async fn import_data(
                 "relation" => {
                     let table_name = "biomedgps_relation";
                     if drop {
-                        drop_table(&pool, table_name).await;
+                        if dataset.is_none() {
+                            drop_table(&pool, table_name).await;
+                        } else {
+                            // Only drop the relation table with the specified dataset.
+                            let dataset = dataset.as_ref().unwrap();
+                            drop_records(&pool, table_name, "dataset", dataset).await;
+                        }
                     };
 
                     import_file_in_loop(
@@ -988,7 +1003,7 @@ pub async fn setup_test_db() -> sqlx::PgPool {
             std::process::exit(1);
         }
     };
-    let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+    let pool = connect_db(&database_url, 1).await;
 
     return pool;
 }
@@ -1102,4 +1117,22 @@ pub async fn connect_graph_db(neo4j_url: &str) -> Graph {
     .unwrap();
 
     return graph;
+}
+
+pub async fn connect_db(database_url: &str, max_connections: u32) -> sqlx::PgPool {
+    let pool = PgPoolOptions::new()
+        .max_connections(max_connections)
+        .idle_timeout(std::time::Duration::from_secs(600)) // 10 min
+        .acquire_timeout(std::time::Duration::from_secs(30)) // 30 seconds
+        .max_lifetime(std::time::Duration::from_secs(1800)) // 30 min
+        .connect(&database_url)
+        .await;
+
+    match pool {
+        Ok(p) => p,
+        Err(e) => {
+            error!("Failed to connect to the database: {}", e);
+            std::process::exit(1);
+        }
+    }
 }

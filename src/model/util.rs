@@ -63,6 +63,19 @@ pub async fn drop_table(pool: &sqlx::PgPool, table: &str) {
     .unwrap();
 }
 
+pub async fn drop_records(pool: &sqlx::PgPool, table: &str, colname: &str, colvalue: &str) {
+    debug!("Dropping records from table {}...", table);
+    sqlx::query(&format!(
+        "
+        DELETE FROM {} WHERE {} = '{}';
+        ",
+        table, colname, colvalue
+    ))
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
 pub async fn import_file_in_loop(
     pool: &sqlx::PgPool,
     filepath: &PathBuf,
@@ -82,7 +95,7 @@ pub async fn import_file_in_loop(
     let mut tx = pool.begin().await?;
     // Here we replace '{}' and {} placeholders with the appropriate values.
     sqlx::query(&format!(
-        "CREATE TEMPORARY TABLE staging (LIKE {} INCLUDING ALL)",
+        "CREATE TEMPORARY TABLE staging (LIKE {} INCLUDING DEFAULTS)",
         table_name
     ))
     .execute(&mut tx)
@@ -109,7 +122,8 @@ pub async fn import_file_in_loop(
     sqlx::query(&format!(
         "INSERT INTO {} ({})
          SELECT {} FROM staging
-         WHERE NOT EXISTS (SELECT 1 FROM {} WHERE {})",
+         WHERE NOT EXISTS (SELECT 1 FROM {} WHERE {})
+         ON CONFLICT DO NOTHING",
         table_name, columns, columns, table_name, where_clause
     ))
     .execute(&mut tx)

@@ -63,7 +63,7 @@ pub struct ImportDBArguments {
     skip_check: bool,
 
     /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
-    #[structopt(name = "dataset", short = "d", long = "dataset")]
+    #[structopt(name = "dataset", long = "dataset")]
     dataset: Option<String>,
 
     /// Show the first 3 errors when import data.

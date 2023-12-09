@@ -4,7 +4,7 @@ extern crate log;
 extern crate lazy_static;
 
 use biomedgps::api::route::BiomedgpsApi;
-use biomedgps::{init_logger, connect_graph_db};
+use biomedgps::{init_logger, connect_graph_db, connect_db};
 use dotenv::dotenv;
 use log::LevelFilter;
 use poem::middleware::AddData;
@@ -172,17 +172,7 @@ async fn main() -> Result<(), std::io::Error> {
         neo4j_url.unwrap()
     };
 
-    let pool = match PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            error!("Failed to connect to database: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let pool = connect_db(&database_url, 10).await;
 
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
