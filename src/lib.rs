@@ -588,6 +588,26 @@ pub async fn import_graph_data(
     }
 }
 
+fn add_new_column(filepath: &str, column_name: &str, column_value: &str, delimiter: u8) {
+    // Add a new column named dataset into the temp file by using the polar crate.
+    let mut df = CsvReader::from_path(&filepath)
+        .unwrap()
+        .with_delimiter(delimiter)
+        .has_header(true)
+        .finish()
+        .unwrap();
+
+    let datasets = Series::new(column_name, vec![column_value; df.height()]);
+    df.with_column(datasets).unwrap();
+
+    let writer = File::create(&filepath).unwrap();
+    CsvWriter::new(writer)
+        .has_header(true)
+        .with_delimiter(delimiter)
+        .finish(&mut df)
+        .unwrap();
+}
+
 pub async fn import_data(
     database_url: &str,
     filepath: &Option<String>,
@@ -597,6 +617,11 @@ pub async fn import_data(
     skip_check: bool,
     show_all_errors: bool,
 ) {
+    if dataset.is_none() && table == "relation" {
+        error!("Please specify the dataset name.");
+        return;
+    }
+
     let pool = sqlx::postgres::PgPoolOptions::new()
         .connect(&database_url)
         .await
@@ -792,33 +817,12 @@ pub async fn import_data(
                     Relation::select_expected_columns(&file, &temp_filepath);
                 match results {
                     Ok(_) => {
-                        // Add a new column named dataset into the temp file by using the polar crate.
-                        let mut df = CsvReader::from_path(&temp_filepath)
-                            .unwrap()
-                            .with_delimiter(delimiter)
-                            .has_header(true)
-                            .finish()
-                            .unwrap();
-                        let dataset = match dataset {
-                            Some(d) => d.to_owned(),
-                            None => {
-                                error!("Please specify the dataset name.");
-                                return;
-                            }
-                        };
-
-                        let datasets = Series::new("dataset", vec![dataset; df.height()]);
-                        df.with_column(datasets).unwrap();
-
-                        let writer = File::create(&temp_filepath).unwrap();
-                        CsvWriter::new(writer)
-                            .has_header(true)
-                            .with_delimiter(delimiter)
-                            .finish(&mut df)
-                            .unwrap();
+                        if let Some(d) = dataset {
+                            add_new_column(&temp_filepath.to_str().unwrap(), "dataset", d, delimiter);
+                        }
 
                         temp_filepath
-                    }
+                    },
                     Err(e) => {
                         error!(
                             "Fn: select_expected_columns, Invalid file: {}, reason: {}",

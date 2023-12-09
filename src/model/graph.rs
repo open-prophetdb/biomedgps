@@ -10,6 +10,7 @@ use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
 use log::{debug, error};
+use neo4rs::{Node as NeoNode, Relation as NeoRelation};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -153,11 +154,10 @@ pub struct Label {
 }
 
 impl Label {
-    /// Get the first character of the node label and convert it to a uppercase letter.
-    /// We use this letter as the icon value.
-    pub fn new(entity: &Entity) -> Self {
+    /// Use the node name as the label value.
+    pub fn new(name: &str) -> Self {
         Label {
-            value: entity.name.to_string(),
+            value: name.to_string(), // It will be shown at the bottom of the node
             fill: "#000".to_string(),
             font_size: 12,
             offset: 0,
@@ -178,9 +178,18 @@ impl NodeStyle {
     /// Create a NodeStyle according to the node label.
     pub fn new(entity: &Entity) -> Self {
         NodeStyle {
-            label: Label::new(entity),
+            label: Label::new(&entity.name.as_str()),
             keyshape: NodeKeyShape::new(entity.label.as_str()),
             icon: Icon::new(entity.label.as_str()),
+        }
+    }
+
+    /// Create a NodeStyle from a NodeData struct.
+    pub fn from_node_data(node: &NodeData) -> Self {
+        NodeStyle {
+            label: Label::new(&node.label),
+            keyshape: NodeKeyShape::new(&node.label.as_str()),
+            icon: Icon::new(&node.label.as_str()),
         }
     }
 }
@@ -219,6 +228,21 @@ impl NodeData {
             name: entity.name.clone(),
             description: entity.description.clone(),
             resource: entity.resource.clone(),
+        }
+    }
+
+    pub fn from_neo_node(node: NeoNode) -> Self {
+        let labels = node.labels();
+        let id = node.get::<String>("id").unwrap_or_default();
+        let identity = Self::format_id(&labels[0], &id);
+
+        NodeData {
+            identity: identity,
+            id: id,
+            label: labels[0].to_owned(),
+            name: node.get::<String>("name").unwrap_or_default(),
+            description: node.get::<String>("description"),
+            resource: node.get::<String>("resource").unwrap_or_default(),
         }
     }
 
@@ -291,6 +315,23 @@ impl Node {
             x: None,
             y: None,
             data: NodeData::new(entity),
+        }
+    }
+
+    pub fn from_node_data(node: &NodeData) -> Self {
+        Node {
+            combo_id: None,
+            id: node.identity.clone(),
+            label: node.id.clone(),
+            nlabel: node.label.clone(),
+            degree: None,
+            style: NodeStyle::from_node_data(&node),
+            category: "node".to_string(),
+            cluster: Some(node.label.clone()),
+            r#type: "graphin-circle".to_string(),
+            x: None,
+            y: None,
+            data: node.clone(),
         }
     }
 
@@ -406,6 +447,7 @@ pub struct EdgeData {
     pub key_sentence: String,
     pub resource: String,
     pub pmids: String,
+    pub dataset: String,
     // In future, we can add more fields here after we add additional fields for the Relation struct
 }
 
@@ -421,7 +463,27 @@ impl EdgeData {
             score: relation.score.unwrap_or(0.0),
             key_sentence: relation.key_sentence.clone().unwrap_or("".to_string()),
             resource: relation.resource.clone(),
+            dataset: relation.dataset.clone().unwrap_or("biomedgps".to_string()),
             pmids: relation.pmids.clone().unwrap_or("".to_string()),
+        }
+    }
+
+    pub fn from_neo_edge(
+        relation: &NeoRelation,
+        start_node: &NodeData,
+        end_node: &NodeData,
+    ) -> Self {
+        Self {
+            relation_type: relation.get::<String>("relation_type").unwrap_or_default(),
+            source_id: start_node.id.clone(),
+            source_type: start_node.label.clone(),
+            target_id: end_node.id.clone(),
+            target_type: end_node.label.clone(),
+            score: relation.get::<f64>("score").unwrap_or_default(),
+            key_sentence: relation.get::<String>("key_sentence").unwrap_or_default(),
+            resource: relation.get::<String>("resource").unwrap_or_default(),
+            dataset: relation.get::<String>("dataset").unwrap_or_default(),
+            pmids: relation.get::<String>("pmids").unwrap_or_default(),
         }
     }
 }
@@ -474,8 +536,25 @@ impl Edge {
                 score: distance.unwrap_or(0.0),
                 key_sentence: "".to_string(),
                 resource: "".to_string(),
+                dataset: "biomedgps".to_string(),
                 pmids: "".to_string(),
             },
+        }
+    }
+
+    /// Create a new edge from an EdgeData struct.
+    pub fn from_edge_data(edge: &EdgeData) -> Self {
+        Edge {
+            relid: format!(
+                "{}-{}-{}",
+                edge.source_id, edge.relation_type, edge.target_id
+            ),
+            source: Node::format_id(&edge.source_type, &edge.source_id),
+            category: "edge".to_string(),
+            target: Node::format_id(&edge.target_type, &edge.target_id),
+            reltype: edge.relation_type.clone(),
+            style: EdgeStyle::new(&edge.relation_type),
+            data: edge.clone(),
         }
     }
 
@@ -639,6 +718,22 @@ impl Graph {
             nodes: vec![],
             edges: vec![],
         }
+    }
+
+    ///
+    pub fn from_data(nodes: Vec<&NodeData>, edges: Vec<&EdgeData>) -> Self {
+        let mut graph = Graph::new();
+        for node in nodes {
+            let node = Node::from_node_data(&node);
+            graph.add_node(node);
+        }
+
+        for edge in edges {
+            let edge = Edge::from_edge_data(&edge);
+            graph.add_edge(edge);
+        }
+
+        graph
     }
 
     /// Get the graph from the nodes and edges.
@@ -1284,7 +1379,9 @@ impl Graph {
                 for record in records.records {
                     // Skip the records with unknown source or target id or the source or target id is not composed of node type and node id
                     if strict_mode {
-                        if record.source_id == "Unknown:Unknown" || record.target_id == "Unknown:Unknown" {
+                        if record.source_id == "Unknown:Unknown"
+                            || record.target_id == "Unknown:Unknown"
+                        {
                             continue;
                         }
 

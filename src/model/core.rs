@@ -1115,7 +1115,7 @@ impl KnowledgeCuration {
             target_id: self.target_id.clone(),
             key_sentence: Some(self.key_sentence.clone()),
             resource: self.curator.clone(),
-            dataset: "biomedgps".to_string(),
+            dataset: Some("biomedgps".to_string()),
             pmids: Some(format!("{}", self.pmid)),
             score: None,
         }
@@ -1380,7 +1380,8 @@ pub struct Relation {
 
     pub resource: String,
 
-    pub dataset: String,
+    #[oai(skip_serializing_if_is_none)]
+    pub dataset: Option<String>,
 
     #[oai(skip_serializing_if_is_none)]
     pub pmids: Option<String>,

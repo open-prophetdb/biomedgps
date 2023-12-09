@@ -12,6 +12,7 @@ use crate::model::core::{
 };
 use crate::model::graph::Graph;
 use crate::model::util::match_color;
+use crate::query_builder::cypher_builder::query_nhops;
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
 use log::{debug, info, warn};
 use poem::web::Data;
@@ -1213,12 +1214,62 @@ impl BiomedgpsApi {
             }
         }
     }
+
+    /// Call `/api/v1/paths` with query params to fetch paths.
+    #[oai(
+        path = "/paths",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPaths"
+    )]
+    async fn fetch_paths(
+        &self,
+        pool: Data<&Arc<neo4rs::Graph>>,
+        start_node_id: Query<String>,
+        end_node_id: Query<String>,
+        nhops: Query<Option<usize>>,
+        _token: CustomSecurityScheme,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let start_node_id = start_node_id.0;
+        let end_node_id = end_node_id.0;
+        let nhops = match nhops.0 {
+            Some(nhops) => nhops,
+            None => {
+                warn!("nhops is empty.");
+                2
+            }
+        };
+
+        let (nodes, edges) = match query_nhops(&pool_arc, &start_node_id, &end_node_id, nhops).await
+        {
+            Ok((nodes, edges)) => (nodes, edges),
+            Err(e) => {
+                let err = format!("Failed to fetch paths: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
+
+        if nodes.len() == 0 {
+            let err = format!(
+                "No path found between {} and {} with {} hops.",
+                start_node_id, end_node_id, nhops
+            );
+            warn!("{}", err);
+            return GetGraphResponse::bad_request(err);
+        };
+
+        let nodes = nodes.iter().collect();
+        let edges = edges.iter().collect();
+        let graph = Graph::from_data(nodes, edges);
+        GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::graph::Node;
     use crate::{init_logger, kv2urlstr, setup_test_db};
     use log::{debug, error, LevelFilter};
     use poem::middleware::{AddData, AddDataEndpoint};
@@ -1231,7 +1282,7 @@ mod tests {
     use sqlx::{Pool, Postgres};
 
     async fn init_app() -> AddDataEndpoint<Route, Arc<Pool<Postgres>>> {
-        init_logger("biomedgps-test", LevelFilter::Debug);
+        let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let pool = setup_test_db().await;
 
         let arc_pool = Arc::new(pool);
