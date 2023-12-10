@@ -321,6 +321,14 @@ brew install docker docker-compose
     systemctl restart nginx
     ```
 
+### Use docker to build cross-platform binaries for debian os on macosx with m2 chip
+
+```bash
+docker pull messense/rust-musl-cross:x86_64-musl
+alias rust-musl-builder='docker run --rm -it -v "$(pwd)":/home/rust/src messense/rust-musl-cross:x86_64-musl'
+rust-musl-builder cargo build --release
+```
+
 ## Join Us
 
 ## Contributing

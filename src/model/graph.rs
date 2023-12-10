@@ -187,7 +187,7 @@ impl NodeStyle {
     /// Create a NodeStyle from a NodeData struct.
     pub fn from_node_data(node: &NodeData) -> Self {
         NodeStyle {
-            label: Label::new(&node.label),
+            label: Label::new(&node.name),
             keyshape: NodeKeyShape::new(&node.label.as_str()),
             icon: Icon::new(&node.label.as_str()),
         }
@@ -474,7 +474,7 @@ impl EdgeData {
         end_node: &NodeData,
     ) -> Self {
         Self {
-            relation_type: relation.get::<String>("relation_type").unwrap_or_default(),
+            relation_type: relation.typ().to_string(),
             source_id: start_node.id.clone(),
             source_type: start_node.label.clone(),
             target_id: end_node.id.clone(),
