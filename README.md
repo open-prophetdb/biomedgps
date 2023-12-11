@@ -246,7 +246,7 @@ yarn start:local-dev
 
 #### Change the auth0 config
 
-Change the `auth0_config` in `studio/package.json` to your own auth0 config. Replace UMI_APP_AUTH0_DOMAIN=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo and UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com with your own auth0 client id and domain.
+Change the `auth0_config` in `studio/package.json` to your own auth0 config. Replace UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo and UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com with your own auth0 client id and domain.
 
 #### Compile the `biomedgps` and `biomedgps-cli` binaries
 
