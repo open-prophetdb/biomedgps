@@ -230,29 +230,23 @@ node -v
 ```bash
 cd studio
 git submodule update --init --recursive
-
-# Install the biominer-components package
-cd ../../
-git clone https://github.com/yjcyxky/biominer-components.git
-cd biominer-components
-## Install the dependencies
-yarn
-## Install the package locally
-npm i -g yalc
-yalc publish
-
-cd ../biomedgps/studio
-yalc add biominer-components
-yarn install
 ```
 
-#### 3. Run the frontend
+#### 3. Change the auth0 config
+
+Change the `auth0_config` in `studio/src/app.tsx` to your own auth0 config. Replace '<your-client-id>' and '<your-domain>' with your own auth0 client id and domain.
+
+#### 4. Run the frontend
 
 ```bash
 yarn start:local-dev
 ```
 
 ### Build for Production
+
+#### Change the auth0 config
+
+Change the `auth0_config` in `studio/package.json` to your own auth0 config. Replace UMI_APP_AUTH0_DOMAIN=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo and UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com with your own auth0 client id and domain.
 
 #### Compile the `biomedgps` and `biomedgps-cli` binaries
 
