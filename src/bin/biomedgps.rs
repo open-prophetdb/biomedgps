@@ -4,8 +4,10 @@ extern crate log;
 extern crate lazy_static;
 
 use biomedgps::api::route::BiomedgpsApi;
+use biomedgps::api::auth::fetch_and_store_jwks;
 use biomedgps::{init_logger, connect_graph_db, connect_db};
 use dotenv::dotenv;
+use jsonwebtoken::jwk;
 use log::LevelFilter;
 use poem::middleware::AddData;
 use poem::EndpointExt;
@@ -21,7 +23,6 @@ use poem::{
 };
 use poem_openapi::OpenApiService;
 use rust_embed::RustEmbed;
-use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 // use tokio::{self, time::Duration};
 
@@ -44,6 +45,10 @@ struct Opt {
     #[structopt(name = "openapi", short = "o", long = "openapi")]
     openapi: bool,
 
+    /// Enable simple CORS support.
+    #[structopt(name = "cors", short = "c", long = "cors")]
+    cors: bool,
+
     /// 127.0.0.1 or 0.0.0.0
     #[structopt(name = "host", short = "H", long = "host", possible_values=&["127.0.0.1", "0.0.0.0"], default_value = "127.0.0.1")]
     host: String,
@@ -64,9 +69,21 @@ struct Opt {
 
     /// JWT secret key.
     /// You can also set it with env var: JWT_SECRET_KEY.
-    /// If you don't set it, the server will disable JWT verification. You can use the API with Authorization header and set it to any value.
+    /// If you don't set it, the server will disable JWT verification with HS256 algorithm. You can use the API with Authorization header and set it to any value.
     #[structopt(name = "jwt-secret-key", short = "k", long = "jwt-secret-key")]
     jwt_secret_key: Option<String>,
+
+    /// JWT client id.
+    /// You can also set it with env var: JWT_CLIENT_ID.
+    /// If you don't set it, the server will disable JWT verification with RS256 algorithm. You can use the API with Authorization header and set it to any value.
+    #[structopt(name = "jwt-client-id", short = "i", long = "jwt-client-id")]
+    jwt_client_id: Option<String>,
+
+    /// JWT jwks url.
+    /// You can also set it with env var: JWT_JWKS_URL. such as https://biomedgps.jp.auth0.com/.well-known/jwks.json.
+    /// If you don't set it, the server will disable JWT verification with RS256 algorithm. You can use the API with Authorization header and set it to any value.
+    #[structopt(name = "jwt-jwks-url", short = "j", long = "jwt-jwks-url")]
+    jwt_jwks_url: Option<String>,
 }
 
 #[derive(RustEmbed)]
@@ -138,6 +155,7 @@ async fn main() -> Result<(), std::io::Error> {
         database_url.unwrap()
     };
 
+    // For HS256 algorithm, such as integrating with Label Studio.
     if args.jwt_secret_key.is_none() {
         match std::env::var("JWT_SECRET_KEY") {
             Ok(v) => {
@@ -157,6 +175,62 @@ async fn main() -> Result<(), std::io::Error> {
         std::env::set_var("JWT_SECRET_KEY", args.jwt_secret_key.unwrap());
         None
     };
+
+    // For RS256 algorithm, such as integrating with Auth0.
+    let jwt_client_id = if args.jwt_client_id.is_none() {
+        match std::env::var("JWT_CLIENT_ID") {
+            Ok(v) => {
+                if v.is_empty() {
+                    warn!("You don't set JWT_CLIENT_ID environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                    None
+                } else {
+                    Some(v)
+                }
+            }
+            Err(_) => {
+                warn!("You don't set JWT_CLIENT_ID environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                None
+            }
+        }
+    } else {
+        let _jwt_client_id = args.jwt_client_id.unwrap();
+        std::env::set_var("JWT_CLIENT_ID", &_jwt_client_id);
+        Some(_jwt_client_id)
+    };
+
+    // For RS256 algorithm, such as integrating with Auth0.
+    let jwks_url = if args.jwt_jwks_url.is_none() {
+        match std::env::var("JWT_JWKS_URL") {
+            Ok(v) => {
+                if v.is_empty() {
+                    warn!("You don't set JWT_JWKS_URL environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                    None
+                } else {
+                    Some(v)
+                }
+            }
+            Err(_) => {
+                warn!("You don't set JWT_JWKS_URL environment variable, so we will skip JWT verification, but users also need to set the Authorization header to access the API.");
+                None
+            }
+        }
+    } else {
+        let _jwks_url = args.jwt_jwks_url.unwrap();
+        Some(_jwks_url)
+    };
+
+    if jwt_client_id.is_some() && jwks_url.is_some() {
+        let _ = match fetch_and_store_jwks(&jwks_url.unwrap()).await {
+            Ok(_) => {
+                debug!("Fetching and storing jwks for RS256 algorithm successfully.");
+                Some(())
+            }
+            Err(err) => {
+                error!("Fetching and storing jwks for RS256 algorithm failed, {}", err);
+                None
+            }
+        };
+    }
 
     let neo4j_url = args.neo4j_url;
 
@@ -215,20 +289,18 @@ async fn main() -> Result<(), std::io::Error> {
         route
     };
 
-    let route = route.nest_no_strip("/api/v1", api_service);
+    let route = route.nest_no_strip("/api/v1", api_service).with(shared_rb).with(shared_graph_pool);
 
-    let route = route.with(Cors::new()).with(shared_rb).with(shared_graph_pool);
-
-    Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+    if args.cors {
+        info!("CORS mode is enabled.");
+        let route = route.with(Cors::new().allow_origin("*"));
+        Server::new(TcpListener::bind(format!("{}:{}", host, port)))
         .run(route)
         .await
-    // Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-    //   .run_with_graceful_shutdown(
-    //     route,
-    //     async move {
-    //       let _ = tokio::signal::ctrl_c().await;
-    //     },
-    //     Some(Duration::from_secs(5)),
-    //   )
-    //   .await
+    } else {
+        warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
+        Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+        .run(route)
+        .await
+    }
 }
