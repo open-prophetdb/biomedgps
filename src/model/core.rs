@@ -623,8 +623,11 @@ impl<
 /// [DEPRECATED in v0.3.0]
 /// A struct for entity embedding, it is used for import entity embeddings into database from csv file.
 /// Only for internal use, not for api.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
 pub struct EntityEmbedding {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub embedding_id: i64,
 
     #[validate(length(
@@ -750,8 +753,11 @@ impl CheckData for EntityEmbedding {
 
 /// [DEPRECATED in v0.3.0]
 /// A struct for relation embedding, it is used for import relation embeddings into database from csv file.
-#[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Validate)]
+#[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
 pub struct RelationEmbedding {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
     pub embedding_id: i64,
 
     #[validate(length(
