@@ -701,8 +701,9 @@ impl EntityEmbedding {
             }
         };
 
+        let mut line_number = 1;
         for result in reader.deserialize() {
-            let record: EntityEmbedding = match result {
+            let mut record: EntityEmbedding = match result {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
@@ -710,11 +711,13 @@ impl EntityEmbedding {
                 }
             };
 
-            // let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
-            let sql_str = "INSERT INTO biomedgps_entity_embedding (entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4)";
+            record.embedding_id = line_number;
+            line_number += 1;
+
+            let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
 
             let query = sqlx::query(&sql_str)
-                // .bind(record.embedding_id)
+                .bind(record.embedding_id)
                 .bind(record.entity_id)
                 .bind(record.entity_type)
                 .bind(record.entity_name)
@@ -794,8 +797,9 @@ impl RelationEmbedding {
             }
         };
 
+        let mut line_number = 1;
         for result in reader.deserialize() {
-            let record: RelationEmbedding = match result {
+            let mut record: RelationEmbedding = match result {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
@@ -803,11 +807,13 @@ impl RelationEmbedding {
                 }
             };
 
-            // let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
-            let sql_str = "INSERT INTO biomedgps_relation_embedding (relation_type, embedding) VALUES ($1, $2)";
+            record.embedding_id = line_number;
+            line_number += 1;
+
+            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
 
             let query = sqlx::query(&sql_str)
-                // .bind(record.embedding_id)
+                .bind(record.embedding_id)
                 .bind(record.relation_type)
                 .bind(record.embedding);
 

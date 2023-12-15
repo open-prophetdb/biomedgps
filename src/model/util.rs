@@ -1,9 +1,16 @@
 //! Utility functions for the model module. Contains functions to import data from CSV files into the database, and to update the metadata tables.
 
+use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
 use std::{error::Error, path::PathBuf};
+
+lazy_static! {
+    static ref EXISTING_COLORS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
 
 /// A color map for the node labels.
 /// More details on https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=12
@@ -14,6 +21,8 @@ const NODE_COLORS: [&str; 12] = [
     "#cab2d6", "#33a02c", "#b15928", "#1f78b4",
 ];
 
+const DEFAULT_COLOR: &str = "#000000";
+
 /// We have a set of colors and we want to match a color to a node label in a deterministic way.
 /// Examples: { "SideEffect": "0", "Pathway": "2", "Symptom": "2", "MolecularFunction": "3", "Metabolite": "4", "Gene": "5", "PharmacologicClass": "6", "Disease": "7", "CellularComponent": "8", "Compound": "9", "BiologicalProcess": "10", "Anatomy": "11" }
 /// { "Gene": ["#e31a1c", "Red"], "Compound": ["#33a02c", "Green"], "Disease": ["#fb9a99", "Light Pink"], "Pathway": ["#6a3d9a", "Purple"], "Anatomy": ["#1f78b4", "Dark Blue"], "BiologicalProcess": ["#b15928", "Brown"], "CellularComponent": ["#cab2d6", "Lavender"], "Metabolite": ["#a6cee3", "Light Blue"], "MolecularFunction": ["#b2df8a", "Light Green"], "PharmacologicClass": ["#fdbf6f", "Peach"], "SideEffect": ["#ffff99", "Yellow"], "Symptom": ["#ff7f00", "Orange"] }
@@ -21,9 +30,42 @@ const NODE_COLORS: [&str; 12] = [
 pub fn match_color(entity_type: &str) -> String {
     let mut hasher = DefaultHasher::new();
     entity_type.hash(&mut hasher);
-    let hash = hasher.finish();
-    let index = hash % NODE_COLORS.len() as u64;
-    NODE_COLORS[index as usize].to_string()
+    let mut hash = hasher.finish();
+
+    let mut existing_colors = EXISTING_COLORS.lock().unwrap();
+
+    if let Some(color) = existing_colors.get(entity_type) {
+        return color.to_string();
+    }
+
+    let mut attempts = 0;
+    while attempts < NODE_COLORS.len() {
+        let index = hash % NODE_COLORS.len() as u64;
+        let color = NODE_COLORS[index as usize];
+
+        if !existing_colors.values().any(|v| v == color) {
+            existing_colors.insert(entity_type.to_string(), color.to_string());
+            return color.to_string();
+        }
+
+        hash += 1;
+        attempts += 1;
+    }
+
+    DEFAULT_COLOR.to_string()
+}
+
+/// Update the existing colors with the new entity types.
+pub fn update_existing_colors(entity_types: &Vec<String>) {
+    // Order the entity types by their names.
+    let mut entity_types = entity_types.clone();
+    entity_types.sort();
+
+    // Assign colors to the entity types.
+    for (i, entity_type) in entity_types.iter().enumerate() {
+        // Find the color for the entity type and update the existing colors.
+        match_color(entity_type);
+    }
 }
 
 pub fn get_delimiter(filepath: &PathBuf) -> Result<u8, Box<dyn Error>> {

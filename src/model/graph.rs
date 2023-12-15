@@ -34,8 +34,8 @@ lazy_static! {
     // Only for predicted edge
     pub static ref PREDICTED_EDGE_COLOR_MAP: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
-        // #FF0000 is red
-        m.insert("SimilarityNode", "#FF0000");
+        // #89CFF0 is light green
+        m.insert("SimilarityNode", "#89CFF0");
         // #ccc is gray
         m.insert("Default", "#ccc");
         // ...add more pairs here

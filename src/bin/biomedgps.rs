@@ -3,11 +3,13 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-use biomedgps::api::route::BiomedgpsApi;
 use biomedgps::api::auth::fetch_and_store_jwks;
-use biomedgps::{init_logger, connect_graph_db, connect_db};
+use biomedgps::api::route::BiomedgpsApi;
+use biomedgps::model::core::EntityMetadata;
+use biomedgps::model::util::update_existing_colors;
+use biomedgps::{connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
-use jsonwebtoken::jwk;
+use itertools::Itertools;
 use log::LevelFilter;
 use poem::middleware::AddData;
 use poem::EndpointExt;
@@ -24,7 +26,6 @@ use poem::{
 use poem_openapi::OpenApiService;
 use rust_embed::RustEmbed;
 use std::sync::Arc;
-// use tokio::{self, time::Duration};
 
 use structopt::StructOpt;
 
@@ -226,7 +227,10 @@ async fn main() -> Result<(), std::io::Error> {
                 Some(())
             }
             Err(err) => {
-                error!("Fetching and storing jwks for RS256 algorithm failed, {}", err);
+                error!(
+                    "Fetching and storing jwks for RS256 algorithm failed, {}",
+                    err
+                );
                 None
             }
         };
@@ -250,6 +254,17 @@ async fn main() -> Result<(), std::io::Error> {
 
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
+
+    // Update existing colors.
+    let entity_types: Vec<String> = match EntityMetadata::get_entity_metadata(&arc_pool).await {
+        Ok(entity_types) => entity_types.into_iter().map(|x| x.entity_type).collect(),
+        Err(err) => {
+            error!("Get entity metadata failed, {}", err);
+            std::process::exit(1);
+        }
+    };
+    let unique_entity_types: Vec<String> = entity_types.into_iter().unique().collect();
+    update_existing_colors(&unique_entity_types);
 
     let graph_pool = connect_graph_db(&_neo4j_url).await;
     let arc_graph_pool = Arc::new(graph_pool);
@@ -289,18 +304,21 @@ async fn main() -> Result<(), std::io::Error> {
         route
     };
 
-    let route = route.nest_no_strip("/api/v1", api_service).with(shared_rb).with(shared_graph_pool);
+    let route = route
+        .nest_no_strip("/api/v1", api_service)
+        .with(shared_rb)
+        .with(shared_graph_pool);
 
     if args.cors {
         info!("CORS mode is enabled.");
         let route = route.with(Cors::new().allow_origin("*"));
         Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-        .run(route)
-        .await
+            .run(route)
+            .await
     } else {
         warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
         Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-        .run(route)
-        .await
+            .run(route)
+            .await
     }
 }
