@@ -710,10 +710,11 @@ impl EntityEmbedding {
                 }
             };
 
-            let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
+            // let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
+            let sql_str = "INSERT INTO biomedgps_entity_embedding (entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4)";
 
             let query = sqlx::query(&sql_str)
-                .bind(record.embedding_id)
+                // .bind(record.embedding_id)
                 .bind(record.entity_id)
                 .bind(record.entity_type)
                 .bind(record.entity_name)
@@ -742,7 +743,7 @@ impl CheckData for EntityEmbedding {
 
     fn fields() -> Vec<String> {
         vec![
-            "embedding_id".to_string(),
+            // "embedding_id".to_string(),
             "entity_id".to_string(),
             "entity_type".to_string(),
             "entity_name".to_string(),
@@ -802,10 +803,11 @@ impl RelationEmbedding {
                 }
             };
 
-            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
+            // let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
+            let sql_str = "INSERT INTO biomedgps_relation_embedding (relation_type, embedding) VALUES ($1, $2)";
 
             let query = sqlx::query(&sql_str)
-                .bind(record.embedding_id)
+                // .bind(record.embedding_id)
                 .bind(record.relation_type)
                 .bind(record.embedding);
 
@@ -838,7 +840,7 @@ impl CheckData for RelationEmbedding {
 
     fn fields() -> Vec<String> {
         vec![
-            "embedding_id".to_string(),
+            // "embedding_id".to_string(),
             "relation_type".to_string(),
             "source_id".to_string(),
             "source_type".to_string(),

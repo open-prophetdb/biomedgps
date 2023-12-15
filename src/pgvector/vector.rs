@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use bytes::{BufMut, BytesMut};
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::convert::TryInto;
@@ -7,24 +8,26 @@ use std::error::Error;
 
 /// A vector struct for storing embedding vector. It is a wrapper around `Vec<f32>`.
 /// It can be used with `pgvector` extension for Postgres.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Vector(Vec<f32>);
+#[derive(Clone, Debug, Serialize, Deserialize, Object)]
+pub struct Vector {
+    pub values: Vec<f32>,
+}
 
 impl From<Vec<f32>> for Vector {
     fn from(v: Vec<f32>) -> Self {
-        Vector(v)
+        Vector { values: v }
     }
 }
 
 impl Into<Vec<f32>> for Vector {
     fn into(self) -> Vec<f32> {
-        self.0
+        self.values
     }
 }
 
 impl Vector {
     pub fn to_vec(&self) -> Vec<f32> {
-        self.0.clone()
+        self.values.clone()
     }
 
     pub(crate) fn from_sql(mut buf: &[u8]) -> Result<Vector, Box<dyn Error + Sync + Send>> {
@@ -37,15 +40,15 @@ impl Vector {
         let mut vec = vec![0.0; dim as usize];
         buf.read_f32_into::<BigEndian>(&mut vec)?;
 
-        Ok(Vector(vec))
+        Ok(Vector { values: vec })
     }
 
     pub(crate) fn to_sql(&self, w: &mut BytesMut) -> Result<(), Box<dyn Error + Sync + Send>> {
-        let dim = self.0.len();
+        let dim = self.values.len();
         w.put_u16(dim.try_into()?);
         w.put_u16(0);
 
-        for v in self.0.iter() {
+        for v in self.values.iter() {
             w.put_f32(*v);
         }
 
@@ -55,7 +58,7 @@ impl Vector {
 
 impl PartialEq for Vector {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.values == other.values
     }
 }
 
