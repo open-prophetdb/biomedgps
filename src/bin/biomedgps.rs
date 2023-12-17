@@ -142,20 +142,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     println!("\n\t\t*** Launch biomedgps on {}:{} ***", host, port);
 
-    let database_url = args.database_url;
-
-    let database_url = if database_url.is_none() {
-        match std::env::var("DATABASE_URL") {
-            Ok(v) => v,
-            Err(_) => {
-                error!("{}", "DATABASE_URL is not set.");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        database_url.unwrap()
-    };
-
+    // Set up and check JWT environment variables.
     // For HS256 algorithm, such as integrating with Label Studio.
     if args.jwt_secret_key.is_none() {
         match std::env::var("JWT_SECRET_KEY") {
@@ -236,22 +223,21 @@ async fn main() -> Result<(), std::io::Error> {
         };
     }
 
-    let neo4j_url = args.neo4j_url;
-
-    let _neo4j_url = if neo4j_url.is_none() {
-        match std::env::var("NEO4J_URL") {
+    // Connect to database.
+    let database_url = args.database_url;
+    let database_url = if database_url.is_none() {
+        match std::env::var("DATABASE_URL") {
             Ok(v) => v,
             Err(_) => {
-                error!("{}", "NEO4J_URL is not set.");
+                error!("{}", "DATABASE_URL is not set.");
                 std::process::exit(1);
             }
         }
     } else {
-        neo4j_url.unwrap()
+        database_url.unwrap()
     };
 
     let pool = connect_db(&database_url, 10).await;
-
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
 
@@ -265,6 +251,20 @@ async fn main() -> Result<(), std::io::Error> {
     };
     let unique_entity_types: Vec<String> = entity_types.into_iter().unique().collect();
     update_existing_colors(&unique_entity_types);
+
+    // Connect to graph database.
+    let neo4j_url = args.neo4j_url;
+    let _neo4j_url = if neo4j_url.is_none() {
+        match std::env::var("NEO4J_URL") {
+            Ok(v) => v,
+            Err(_) => {
+                error!("{}", "NEO4J_URL is not set.");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        neo4j_url.unwrap()
+    };
 
     let graph_pool = connect_graph_db(&_neo4j_url).await;
     let arc_graph_pool = Arc::new(graph_pool);

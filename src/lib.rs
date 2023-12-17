@@ -17,6 +17,7 @@ use neo4rs::{ConfigBuilder, Graph, Query};
 use polars::prelude::{
     col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
 };
+use regex::Regex;
 use sqlx::postgres::PgPoolOptions;
 use std::error::Error;
 use std::fs::Permissions;
@@ -1075,26 +1076,63 @@ pub fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle,
     })
 }
 
-pub fn parse_db_url(db_url: &str) -> (String, String, String, String) {
-    let url = url::Url::parse(db_url).unwrap();
-    let host = url.host_str().unwrap().to_string();
-    let port = url.port().unwrap().to_string();
-    let username = url.username().to_string();
-    let password = url.password().unwrap().to_string();
+pub fn is_db_url_valid(db_url: &str) -> bool {
+    // check whether db url is valid. the db_url format is <postgres|neo4j>://<username>:<password>@<host>:<port>/database
+    let regex_str = r"^(postgres|neo4j)://((.+):(.+)@)?(.+):(\d+)(/.+)?$";
+    let is_valid = match Regex::new(regex_str) {
+        Ok(r) => r.is_match(db_url),
+        Err(_) => false,
+    };
 
-    return (host, port, username, password);
+    return is_valid;
+}
+
+pub fn parse_db_url(db_url: &str) -> (String, String, String, String, String) {
+    // Get host, username and password from db_url. the db_url format is postgres://<username>:<password>@<host>:<port>/database
+    let url = url::Url::parse(db_url).unwrap();
+    let host = match url.host_str() {
+        Some(h) => h.to_string(),
+        None => "".to_string(),
+    };
+    let port = match url.port() {
+        Some(p) => p.to_string(),
+        None => "".to_string(),
+    };
+    let username = url.username().to_string();
+    let password = match url.password() {
+        Some(p) => p.to_string(),
+        None => "".to_string(),
+    };
+    let database = url.path().to_string().replace("/", "");
+
+    return (host, port, username, password, database);
 }
 
 pub async fn connect_graph_db(neo4j_url: &str) -> Graph {
+    if is_db_url_valid(neo4j_url) {
+        debug!("Valid neo4j_url: {}", neo4j_url);
+    } else {
+        error!(
+            "Invalid neo4j_url: {}, the format is neo4j://<username>:<password>@<host>:<port>",
+            neo4j_url
+        );
+        std::process::exit(1);
+    };
+
     // Get host, username and password from neo4j_url. the neo4j_url format is neo4j://<username>:<password>@<host>:<port>
     let mut host = "".to_string();
     let mut username = "".to_string();
     let mut password = "".to_string();
+    let mut default_db_name = "neo4j".to_string(); // default db name is "neo4j
     if neo4j_url.starts_with("neo4j://") {
-        let (hostname, port, user, pass) = parse_db_url(&neo4j_url);
+        let (hostname, port, user, pass, db_name) = parse_db_url(&neo4j_url);
         host = format!("{}:{}", hostname, port);
         username = user;
         password = pass;
+
+        if !db_name.is_empty() {
+            default_db_name = db_name;
+        }
     } else {
         error!("Invalid neo4j_url: {}", neo4j_url);
         std::process::exit(1);
@@ -1110,6 +1148,7 @@ pub async fn connect_graph_db(neo4j_url: &str) -> Graph {
             .uri(host)
             .user(username)
             .password(password)
+            .db(default_db_name)
             .build()
             .unwrap(),
     )
@@ -1120,6 +1159,14 @@ pub async fn connect_graph_db(neo4j_url: &str) -> Graph {
 }
 
 pub async fn connect_db(database_url: &str, max_connections: u32) -> sqlx::PgPool {
+    match is_db_url_valid(database_url) {
+        true => (),
+        false => {
+            error!("Invalid database_url: {}, the format is postgres://<username>:<password>@<host>:<port>/<database>", database_url);
+            std::process::exit(1);
+        }
+    };
+
     let pool = PgPoolOptions::new()
         .max_connections(max_connections)
         .idle_timeout(std::time::Duration::from_secs(600)) // 10 min
