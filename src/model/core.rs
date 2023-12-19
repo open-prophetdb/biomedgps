@@ -464,7 +464,7 @@ pub struct EntityAttribute {
     // A human-readable summary of the entity in an external database.
     pub description: String,
 
-    // The name of an external database. such as MESH, OMIM, etc. Also, we can develop a integrated database for collecting information for each entity. It could be a external service. We can call it as 'biomedgps-metadata-service'.
+    // The name of an external database. such as MESH, OMIM, etc. Also, we can develop a integrated database for collecting information for each entity. It could be a external service. We can call it as 'biomedgps-metadata-service'. So, we can extract all related information into the external service, and then we can get the information from the external service by the entity_id and entity_type.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",

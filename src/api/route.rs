@@ -1265,6 +1265,57 @@ impl BiomedgpsApi {
         let graph = Graph::from_data(nodes, edges);
         GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
     }
+
+    // /// Call `/api/v1/llm` with query params to get answer from LLM.
+    // #[oai(
+    //     path = "/llm",
+    //     method = "post",
+    //     tag = "ApiTags::KnowledgeGraph",
+    //     operation_id = "askLLM"
+    // )]
+    // async fn ask_llm(
+    //     &self,
+    //     pool: Data<&Arc<neo4rs::Graph>>,
+    //     prompt_template_id: Query<String>,
+    //     context: Query<String>,
+    //     nhops: Query<Option<usize>>,
+    //     _token: CustomSecurityScheme,
+    // ) -> GetGraphResponse {
+    //     let pool_arc = pool.clone();
+    //     let start_node_id = start_node_id.0;
+    //     let end_node_id = end_node_id.0;
+    //     let nhops = match nhops.0 {
+    //         Some(nhops) => nhops,
+    //         None => {
+    //             warn!("nhops is empty.");
+    //             2
+    //         }
+    //     };
+
+    //     let (nodes, edges) = match query_nhops(&pool_arc, &start_node_id, &end_node_id, nhops).await
+    //     {
+    //         Ok((nodes, edges)) => (nodes, edges),
+    //         Err(e) => {
+    //             let err = format!("Failed to fetch paths: {}", e);
+    //             warn!("{}", err);
+    //             return GetGraphResponse::bad_request(err);
+    //         }
+    //     };
+
+    //     if nodes.len() == 0 {
+    //         let err = format!(
+    //             "No path found between {} and {} with {} hops.",
+    //             start_node_id, end_node_id, nhops
+    //         );
+    //         warn!("{}", err);
+    //         return GetGraphResponse::bad_request(err);
+    //     };
+
+    //     let nodes = nodes.iter().collect();
+    //     let edges = edges.iter().collect();
+    //     let graph = Graph::from_data(nodes, edges);
+    //     GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
+    // }
 }
 
 #[cfg(test)]

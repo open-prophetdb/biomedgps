@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS biomedgps_ai_message;
