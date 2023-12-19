@@ -73,7 +73,7 @@ struct Claims {
     picture: String,
     email: String,
     email_verified: bool,
-    locale: String,
+    locale: Option<String>,
     updated_at: String,
     iss: String,
     aud: String,
