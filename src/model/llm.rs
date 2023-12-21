@@ -1,3 +1,5 @@
+//! This module defines the data model for LLMs (Large Language Model), such as OpenAI GPT-3/4, etc. Also, it can use the LLM to answer the question.
+
 use super::core::{Entity, RecordResponse, Relation};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
@@ -27,6 +29,7 @@ lazy_static! {
     };
 }
 
+/// The expanded relation is used to store the relation between two entities.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct ExpandedRelation {
     pub relation: Relation,
@@ -34,6 +37,7 @@ pub struct ExpandedRelation {
     pub target: Entity,
 }
 
+/// The prompt template category is used to store the category of prompt template. Each category has a prompt template.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Enum)]
 pub enum PromptTemplateCategoryEnum {
     NodeSummary,
@@ -41,11 +45,13 @@ pub enum PromptTemplateCategoryEnum {
     CustomQuestion,
 }
 
+/// A wrapper for prompt template category.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct PromptTemplateCategory {
     value: PromptTemplateCategoryEnum,
 }
 
+/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
 impl From<String> for PromptTemplateCategory {
     fn from(v: String) -> Self {
         match v.as_str() {
@@ -63,12 +69,14 @@ impl From<String> for PromptTemplateCategory {
     }
 }
 
+/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
 impl Into<PromptTemplateCategoryEnum> for PromptTemplateCategory {
     fn into(self) -> PromptTemplateCategoryEnum {
         self.value
     }
 }
 
+/// Implement the conversion between PromptTemplateCategory and String.
 impl Into<String> for PromptTemplateCategory {
     fn into(self) -> String {
         match self.value {
@@ -79,6 +87,7 @@ impl Into<String> for PromptTemplateCategory {
     }
 }
 
+/// A trait for LLM context. Each LLM context might can render several prompt templates. So we separate the context and prompt template. But this means the users need to provide the right pair of context and prompt template.
 pub trait LlmContext {
     fn get_context(&self) -> Self;
     fn render_prompt(&self, prompt_template: &str) -> String;
@@ -162,6 +171,7 @@ where
         + poem_openapi::types::ToJSON,
 {
     pub fn new(
+        // TODO: User how to know the right prompt template category for a given context?
         prompt_template_category: &str,
         context: T,
         session_uuid: Option<String>,
