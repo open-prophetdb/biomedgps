@@ -11,8 +11,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      # If you got the following error: The cluster is owned by user id 105 which does not exist
-      # Please run: chown 101:101 data/postgresql-ml && chmod 750 data/postgresql-ml
+      # If you got the following error: The cluster is owned by user id 105 which does not exist, Please run: chown -R 101:103 ./data
+      # If you got error message: /var/lib/postgresql/15/main is not accessible or does not exist, please delete the data folder and recreate it
       - pg_ml_data:/var/lib/postgresql
       - ./conf/entrypoint.sh:/app/entrypoint.sh
       - ./conf/dashboard.sh:/app/dashboard.sh
