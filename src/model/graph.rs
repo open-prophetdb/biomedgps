@@ -6,6 +6,7 @@
 //!
 
 use crate::model::core::{Entity, RecordResponse, Relation};
+use crate::model::kge::get_embedding_metadata;
 use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
@@ -618,7 +619,22 @@ impl SimilarityNode {
         node_id: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
+        model_table_name: Option<String>,
     ) -> Result<Vec<Self>, ValidationError> {
+        let model_or_table_name = match model_table_name {
+            Some(name) => name,
+            None => "biomedgps".to_string(),
+        };
+
+        let embedding_metadata = get_embedding_metadata(&model_or_table_name);
+        if embedding_metadata.is_none() {
+            error!("Failed to get the embedding metadata from the database");
+            return Err(ValidationError::new(
+                "Failed to get the embedding metadata from the database, so we don't know how to calculate the similarity for the node. Please check the database or the model/table name you provided.",
+                vec![],
+            ));
+        };
+
         let default_query = ComposeQuery::QueryItem(QueryItem::new(
             format!(
                 "COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '')",
@@ -1262,7 +1278,8 @@ impl Graph {
     ///     let query = None;
     ///     let topk = Some(10);
     ///
-    ///     match graph.fetch_similarity_nodes(&pool, &node_id, &query, topk).await {
+    ///     // If you choose None as the model_table_name, it will use the default model/table name "biomedgps".
+    ///     match graph.fetch_similarity_nodes(&pool, &node_id, &query, topk, None).await {
     ///         Ok(graph) => {
     ///             println!("graph: {:?}", graph);
     ///         }
@@ -1277,8 +1294,11 @@ impl Graph {
         node_id: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
+        model_table_name: Option<String>,
     ) -> Result<&Self, ValidationError> {
-        match SimilarityNode::fetch_similarity_nodes(pool, node_id, query, topk).await {
+        match SimilarityNode::fetch_similarity_nodes(pool, node_id, query, topk, model_table_name)
+            .await
+        {
             Ok(similarity_nodes) => {
                 let mut node_ids = similarity_nodes
                     .iter()
@@ -1581,7 +1601,7 @@ mod tests {
         let topk = Some(10);
 
         match graph
-            .fetch_similarity_nodes(&pool, &node_id, &query, topk)
+            .fetch_similarity_nodes(&pool, &node_id, &query, topk, None)
             .await
         {
             Ok(graph) => {

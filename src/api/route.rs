@@ -1163,6 +1163,7 @@ impl BiomedgpsApi {
         node_id: Query<String>,
         query_str: Query<Option<String>>,
         topk: Query<Option<u64>>,
+        model_name: Query<Option<String>>,
         _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
@@ -1203,7 +1204,7 @@ impl BiomedgpsApi {
 
         let mut graph = Graph::new();
         match graph
-            .fetch_similarity_nodes(&pool_arc, &node_id, &query, topk)
+            .fetch_similarity_nodes(&pool_arc, &node_id, &query, topk, model_name.0)
             .await
         {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),

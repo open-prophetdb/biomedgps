@@ -276,10 +276,10 @@ pub async fn update_relation_metadata(
     info!("Update relation metadata from relation table.");
 
     let query_str = format!("
-        INSERT INTO {} (relation_type, start_entity_type, end_entity_type, relation_count, resource)
-        SELECT relation_type, source_type as start_entity_type, target_type as end_entity_type, count(*) as relation_count, resource
+        INSERT INTO {} (relation_type, formatted_relation_type, start_entity_type, end_entity_type, relation_count, resource, dataset)
+        SELECT relation_type, formatted_relation_type, source_type as start_entity_type, target_type as end_entity_type, count(*) as relation_count, resource, dataset
         FROM biomedgps_relation
-        GROUP BY relation_type, source_type, target_type, resource;
+        GROUP BY relation_type, formatted_relation_type, source_type, target_type, resource, dataset;
     ", table_name);
 
     sqlx::query(&query_str)

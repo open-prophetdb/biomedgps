@@ -1,0 +1,2 @@
+// TODO: Support for different models of KGE, we can store the metadata of the model in the database. When we initialize the database, we can create new tables for the models, load and store the models into the database. The models might be TransE, ComplEx, DistMult, etc. We can pick up different model for different tasks. Also, we need to setup a default model for all the tasks.
+// This file only contains the implementation of KGE algorithm. Other actions related to database, such as loading data, storing data, etc. are implemented in the model directory.

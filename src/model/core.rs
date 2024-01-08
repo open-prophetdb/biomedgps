@@ -1,8 +1,7 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
-use super::util::{drop_table, get_delimiter, parse_csv_error};
+use super::util::{get_delimiter, parse_csv_error};
 // use crate::model::util::match_color;
-use crate::pgvector::Vector;
 use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
@@ -15,10 +14,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{error::Error, fmt, option::Option, path::PathBuf};
 use validator::Validate;
 
-const ENTITY_NAME_MAX_LENGTH: u64 = 255;
-const RELATION_ID_MAX_LENGTH: u64 = 255;
-const DEFAULT_MAX_LENGTH: u64 = 64;
-const DEFAULT_MIN_LENGTH: u64 = 1;
+pub const ENTITY_NAME_MAX_LENGTH: u64 = 255;
+pub const RELATION_ID_MAX_LENGTH: u64 = 255;
+pub const DEFAULT_MAX_LENGTH: u64 = 64;
+pub const DEFAULT_MIN_LENGTH: u64 = 1;
 
 lazy_static! {
     // The relation_id is like "<RELATION_TYPE>|<SOURCE_ID>|<TARGET_ID>", e.g. "STRING::ACTIVATOR::Gene:Compound|Gene::ENTREZ:1017|Compound::DrugBank:2083"
@@ -510,353 +509,6 @@ impl CheckData for EntityAttribute {
     }
 }
 
-fn text2vector<'de, D>(deserializer: D) -> Result<Vector, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    match s
-        .split('|')
-        .map(|s| s.parse().map_err(serde::de::Error::custom))
-        .collect::<Result<Vec<f32>, D::Error>>()
-    {
-        // More details on https://github.com/pgvector/pgvector-rust#sqlx
-        Ok(vec) => Ok(Vector::from(vec)),
-        Err(e) => Err(e),
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq)]
-pub struct EmbeddingRecordResponse<S>
-where
-    S: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
-        + std::fmt::Debug
-        + std::marker::Unpin
-        + Send
-        + Sync,
-{
-    /// data
-    pub records: Vec<S>,
-    /// total num
-    pub total: u64,
-    /// current page index
-    pub page: u64,
-    /// default 10
-    pub page_size: u64,
-}
-
-impl<
-        S: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
-            + std::fmt::Debug
-            + std::marker::Unpin
-            + Send
-            + Sync,
-    > EmbeddingRecordResponse<S>
-{
-    pub async fn get_records(
-        pool: &sqlx::PgPool,
-        table_name: &str,
-        query: &Option<ComposeQuery>,
-        page: Option<u64>,
-        page_size: Option<u64>,
-        order_by: Option<&str>,
-    ) -> Result<EmbeddingRecordResponse<S>, anyhow::Error> {
-        let mut query_str = match query {
-            Some(ComposeQuery::QueryItem(item)) => item.format(),
-            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
-            None => "".to_string(),
-        };
-
-        if query_str.is_empty() {
-            query_str = "1=1".to_string();
-        };
-
-        let order_by_str = if order_by.is_none() {
-            "".to_string()
-        } else {
-            format!("ORDER BY {}", order_by.unwrap())
-        };
-
-        let pagination_str = if page.is_none() && page_size.is_none() {
-            "LIMIT 10 OFFSET 0".to_string()
-        } else {
-            let page = match page {
-                Some(page) => page,
-                None => 1,
-            };
-
-            let page_size = match page_size {
-                Some(page_size) => page_size,
-                None => 10,
-            };
-
-            let limit = page_size;
-            let offset = (page - 1) * page_size;
-
-            format!("LIMIT {} OFFSET {}", limit, offset)
-        };
-
-        let sql_str = format!(
-            "SELECT * FROM {} WHERE {} {} {}",
-            table_name, query_str, order_by_str, pagination_str
-        );
-
-        let records = sqlx::query_as::<_, S>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        let sql_str = format!("SELECT COUNT(*) FROM {} WHERE {}", table_name, query_str);
-
-        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
-            .fetch_one(pool)
-            .await?;
-
-        AnyOk(EmbeddingRecordResponse {
-            records: records,
-            total: total.0 as u64,
-            page: page.unwrap_or(1),
-            page_size: page_size.unwrap_or(10),
-        })
-    }
-}
-
-/// [DEPRECATED in v0.3.0]
-/// A struct for entity embedding, it is used for import entity embeddings into database from csv file.
-/// Only for internal use, not for api.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
-pub struct EntityEmbedding {
-    // Ignore this field when deserialize from json
-    #[serde(skip_deserializing)]
-    #[oai(read_only)]
-    pub embedding_id: i64,
-
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of entity_id should be between 1 and 64."
-    ))]
-    #[validate(regex(
-        path = "ENTITY_ID_REGEX",
-        message = "The entity id should match ^[A-Za-z0-9\\-]+:[a-z0-9A-Z\\.\\-_]+$. Such as 'MESH:D00001'."
-    ))]
-    pub entity_id: String,
-
-    #[validate(length(
-        max = "ENTITY_NAME_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of entity_name should be between 1 and 64."
-    ))]
-    pub entity_name: String,
-
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of entity_type should be between 1 and 64."
-    ))]
-    #[validate(regex(
-        path = "ENTITY_LABEL_REGEX",
-        message = "The entity type should match ^[A-Za-z]+$. Such as Disease."
-    ))]
-    pub entity_type: String,
-
-    #[serde(deserialize_with = "text2vector")]
-    pub embedding: Vector,
-}
-
-impl EntityEmbedding {
-    pub fn new(
-        embedding_id: i64,
-        entity_id: &str,
-        entity_name: &str,
-        entity_type: &str,
-        embedding: &Vec<f32>,
-    ) -> EntityEmbedding {
-        EntityEmbedding {
-            embedding_id: embedding_id,
-            entity_id: entity_id.to_string(),
-            entity_name: entity_name.to_string(),
-            entity_type: entity_type.to_string(),
-            embedding: Vector::from(embedding.clone()),
-        }
-    }
-
-    pub async fn import_entity_embeddings(
-        pool: &sqlx::PgPool,
-        filepath: &PathBuf,
-        delimiter: u8,
-        drop: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if drop {
-            drop_table(&pool, "biomedgps_entity_embedding").await;
-        };
-
-        // Build the CSV reader
-        let mut reader = match csv::ReaderBuilder::new()
-            .delimiter(delimiter)
-            .from_path(filepath)
-        {
-            Ok(r) => r,
-            Err(e) => {
-                return Err(Box::new(e));
-            }
-        };
-
-        let mut line_number = 1;
-        for result in reader.deserialize() {
-            let mut record: EntityEmbedding = match result {
-                Ok(r) => r,
-                Err(e) => {
-                    let error_msg = parse_csv_error(&e);
-                    return Err(Box::new(ValidationError::new(&error_msg)));
-                }
-            };
-
-            record.embedding_id = line_number;
-            line_number += 1;
-
-            let sql_str = "INSERT INTO biomedgps_entity_embedding (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)";
-
-            let query = sqlx::query(&sql_str)
-                .bind(record.embedding_id)
-                .bind(record.entity_id)
-                .bind(record.entity_type)
-                .bind(record.entity_name)
-                .bind(record.embedding);
-
-            match query.execute(pool).await {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-            };
-        }
-
-        Ok(())
-    }
-}
-
-impl CheckData for EntityEmbedding {
-    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
-        Self::check_csv_is_valid_default::<EntityEmbedding>(filepath)
-    }
-
-    fn unique_fields() -> Vec<String> {
-        vec!["entity_id".to_string(), "entity_type".to_string()]
-    }
-
-    fn fields() -> Vec<String> {
-        vec![
-            // "embedding_id".to_string(),
-            "entity_id".to_string(),
-            "entity_type".to_string(),
-            "entity_name".to_string(),
-            "embedding".to_string(),
-        ]
-    }
-}
-
-/// [DEPRECATED in v0.3.0]
-/// A struct for relation embedding, it is used for import relation embeddings into database from csv file.
-#[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
-pub struct RelationEmbedding {
-    // Ignore this field when deserialize from json
-    #[serde(skip_deserializing)]
-    #[oai(read_only)]
-    pub embedding_id: i64,
-
-    #[validate(length(
-        max = "DEFAULT_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of relation_type should be between 1 and 64."
-    ))]
-    pub relation_type: String,
-
-    #[serde(deserialize_with = "text2vector")]
-    pub embedding: Vector,
-}
-
-impl RelationEmbedding {
-    pub async fn import_relation_embeddings(
-        pool: &sqlx::PgPool,
-        filepath: &PathBuf,
-        delimiter: u8,
-        drop: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        if drop {
-            drop_table(&pool, "biomedgps_relation_embedding").await;
-        };
-
-        // Build the CSV reader
-        let mut reader = match csv::ReaderBuilder::new()
-            .delimiter(delimiter)
-            .from_path(filepath)
-        {
-            Ok(r) => r,
-            Err(e) => {
-                return Err(Box::new(e));
-            }
-        };
-
-        let mut line_number = 1;
-        for result in reader.deserialize() {
-            let mut record: RelationEmbedding = match result {
-                Ok(r) => r,
-                Err(e) => {
-                    let error_msg = parse_csv_error(&e);
-                    return Err(Box::new(ValidationError::new(&error_msg)));
-                }
-            };
-
-            record.embedding_id = line_number;
-            line_number += 1;
-
-            let sql_str = "INSERT INTO biomedgps_relation_embedding (embedding_id, relation_type, embedding) VALUES ($1, $2, $3)";
-
-            let query = sqlx::query(&sql_str)
-                .bind(record.embedding_id)
-                .bind(record.relation_type)
-                .bind(record.embedding);
-
-            match query.execute(pool).await {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-            };
-        }
-
-        Ok(())
-    }
-}
-
-impl CheckData for RelationEmbedding {
-    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
-        Self::check_csv_is_valid_default::<RelationEmbedding>(filepath)
-    }
-
-    fn unique_fields() -> Vec<String> {
-        vec![
-            "relation_type".to_string(),
-            "source_id".to_string(),
-            "source_type".to_string(),
-            "target_id".to_string(),
-            "target_type".to_string(),
-        ]
-    }
-
-    fn fields() -> Vec<String> {
-        vec![
-            // "embedding_id".to_string(),
-            "relation_type".to_string(),
-            "source_id".to_string(),
-            "source_type".to_string(),
-            "target_id".to_string(),
-            "target_type".to_string(),
-            "embedding".to_string(),
-        ]
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Statistics {
     entity_stat: Vec<EntityMetadata>,
@@ -941,13 +593,21 @@ pub struct RelationMetadata {
     #[oai(read_only)]
     pub id: i64,
 
-    // The resource of the relation for labeling different datasets. such DRKG, HSDN, CTD, CuratedFindings, etc. Users can choose different resource combinations to build a knowledge graph and train models.
+    // The resource of the relation. such as STRING, BIOMEDGPS, etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
         message = "The length of resource should be between 1 and 64."
     ))]
     pub resource: String,
+
+    // The dataset of the relation for labeling different datasets. such DRKG, HSDN, CTD, CuratedFindings, etc. Users can choose different dataset combinations to build a knowledge graph and train models.
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of dataset should be between 1 and 64."
+    ))]
+    pub dataset: String,
 
     // The relation type, such as STRING::ACTIVATOR::Gene:Compound, STRING::INHIBITOR::Gene:Compound, etc.
     #[validate(length(
@@ -956,6 +616,14 @@ pub struct RelationMetadata {
         message = "The length of relation_type should be between 1 and 64."
     ))]
     pub relation_type: String,
+
+    // The formatted relation type, such as BIOMEDGPS::ACTIVATOR::Gene::Compound, BIOMEDGPS::TREATMENT::Compound::Disease, etc.
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of formatted_relation_type should be between 1 and 64."
+    ))]
+    pub formatted_relation_type: String,
 
     pub relation_count: i64,
 
@@ -987,7 +655,9 @@ impl CheckData for RelationMetadata {
 
     fn unique_fields() -> Vec<String> {
         vec![
+            "dataset".to_string(),
             "resource".to_string(),
+            "formatted_relation_type".to_string(),
             "relation_type".to_string(),
             "start_entity_type".to_string(),
             "end_entity_type".to_string(),
@@ -996,8 +666,10 @@ impl CheckData for RelationMetadata {
 
     fn fields() -> Vec<String> {
         vec![
+            "dataset".to_string(),
             "resource".to_string(),
             "relation_type".to_string(),
+            "formatted_relation_type".to_string(),
             "relation_count".to_string(),
             "start_entity_type".to_string(),
             "end_entity_type".to_string(),
@@ -1123,6 +795,7 @@ impl KnowledgeCuration {
         Relation {
             id: self.id,
             relation_type: self.relation_type.clone(),
+            formatted_relation_type: Some(self.relation_type.clone()),
             source_type: self.source_type.clone(),
             source_id: self.source_id.clone(),
             target_type: self.target_type.clone(),
@@ -1345,6 +1018,13 @@ pub struct Relation {
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
+        message = "The length of formatted_relation_type must be between 1 and 64."
+    ))]
+    pub formatted_relation_type: Option<String>,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
         message = "The length of source_name must be between 1 and 64."
     ))]
     #[validate(regex(
@@ -1410,6 +1090,7 @@ impl CheckData for Relation {
         vec![
             "resource".to_string(),
             "dataset".to_string(),
+            "formatted_relation_type".to_string(),
             "relation_type".to_string(),
             "source_id".to_string(),
             "source_type".to_string(),
@@ -1420,6 +1101,7 @@ impl CheckData for Relation {
 
     fn fields() -> Vec<String> {
         vec![
+            "formatted_relation_type".to_string(),
             "relation_type".to_string(),
             "source_id".to_string(),
             "source_type".to_string(),

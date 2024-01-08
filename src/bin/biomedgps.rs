@@ -6,6 +6,7 @@ extern crate lazy_static;
 use biomedgps::api::auth::fetch_and_store_jwks;
 use biomedgps::api::route::BiomedgpsApi;
 use biomedgps::model::core::EntityMetadata;
+use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::util::update_existing_colors;
 use biomedgps::{connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
@@ -251,6 +252,18 @@ async fn main() -> Result<(), std::io::Error> {
     };
     let unique_entity_types: Vec<String> = entity_types.into_iter().unique().collect();
     update_existing_colors(&unique_entity_types);
+
+    // Initialize KGE models.
+    let _ = match init_kge_models(&arc_pool).await {
+        Ok(_) => {
+            debug!("Initialize KGE models successfully.");
+            Some(())
+        }
+        Err(err) => {
+            error!("Initialize KGE models failed, {}", err);
+            None
+        }
+    };
 
     // Connect to graph database.
     let neo4j_url = args.neo4j_url;

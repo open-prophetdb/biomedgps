@@ -13,6 +13,7 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use model::core::EntityAttribute;
+use model::kge::{EmbeddingMetadata, DEFAULT_MODEL_TYPES};
 use neo4rs::{ConfigBuilder, Graph, Query};
 use polars::prelude::{
     col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
@@ -25,10 +26,11 @@ use std::os::unix::fs::PermissionsExt;
 use std::vec;
 
 use crate::model::core::{
-    CheckData, Entity, Entity2D, EntityEmbedding, KnowledgeCuration, Relation, RelationAttribute,
-    RelationEmbedding, Subgraph,
+    CheckData, Entity, Entity2D, KnowledgeCuration, Relation, RelationAttribute, RelationMetadata,
+    Subgraph,
 };
 use crate::model::graph::Node;
+use crate::model::kge::{EntityEmbedding, RelationEmbedding};
 use crate::model::util::{
     drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
     update_entity_metadata, update_relation_metadata,
@@ -46,6 +48,7 @@ use url::form_urlencoded;
 
 const MIGRATIONS: include_dir::Dir = include_dir::include_dir!("migrations");
 
+/// Connect to the database and run the migrations.
 pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
     info!("Running migrations.");
     // Create a temporary directory.
@@ -81,7 +84,13 @@ pub async fn run_migrations(database_url: &str) -> sqlx::Result<()> {
     Ok(())
 }
 
-pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delimiter: u8) {
+/// Before updating the entity table, we need to check whether the curated knowledge ids are in the entity table. otherwise, we cannot use the curated knowledge table correctly.
+///
+/// # Arguments
+/// - `pool`: The database connection pool.
+/// - `entity_file`: The entity file.
+/// - `delimiter`: The delimiter of the entity file.
+pub async fn check_curated_knowledges(pool: &sqlx::PgPool, entity_file: &PathBuf, delimiter: u8) {
     // Get all source_id and source_type pairs from the biomedgps_knowledge_curation table and keep them in a HashMap. The key is the source_id and source_type pair, the value is a list of numbers which are the row numbers that have the same source_id and source_type.
     let mut curated_knowledges: HashMap<(String, String), Vec<i64>> = HashMap::new();
     let records = KnowledgeCuration::get_records(pool).await.unwrap();
@@ -113,14 +122,14 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delim
         }
     }
 
-    // Load the data file into a DataFrame.
+    // Load the entity file into a DataFrame.
     log::info!(
-        "Loading the data file ({}) into a DataFrame.",
-        file.display()
+        "Loading the entity file ({}) into a DataFrame.",
+        entity_file.display()
     );
     // How to set truncate_ragged_lines=true?
 
-    let df = CsvReader::from_path(file)
+    let df = CsvReader::from_path(entity_file)
         .unwrap()
         .with_delimiter(delimiter)
         .has_header(true)
@@ -167,6 +176,14 @@ pub async fn check_curated_knowledges(pool: &sqlx::PgPool, file: &PathBuf, delim
     }
 }
 
+/// Render all entities into a set of queries for importing into a neo4j database.
+///
+/// # Arguments
+/// - `records`: A vector of Entity.
+/// - `check_exist`: Whether to check whether the entity exists in the database before importing.
+///
+/// # Returns
+/// A vector of Query or an error.
 async fn prepare_entity_queries(
     records: Vec<Entity>,
     check_exist: bool,
@@ -214,6 +231,14 @@ async fn prepare_entity_queries(
     Ok(queries)
 }
 
+/// Render all relations into a set of queries for importing into a neo4j database.
+///
+/// # Arguments
+/// - `records`: A vector of Relation.
+/// - `check_exist`: Whether to check whether the relation exists in the database before importing.
+///
+/// # Returns
+/// A vector of Query or an error.
 pub async fn prepare_relation_queries(
     records: Vec<Relation>,
     check_exist: bool,
@@ -592,7 +617,7 @@ pub async fn import_graph_data(
     }
 }
 
-fn add_new_column(filepath: &str, column_name: &str, column_value: &str, delimiter: u8) {
+fn add_new_column(filepath: &str, column_name: &str, column_value: &Vec<&str>, delimiter: u8) {
     // Add a new column named dataset into the temp file by using the polar crate.
     let mut df = CsvReader::from_path(&filepath)
         .unwrap()
@@ -608,8 +633,20 @@ fn add_new_column(filepath: &str, column_name: &str, column_value: &str, delimit
         return;
     };
 
-    let datasets = Series::new(column_name, vec![column_value; df.height()]);
-    df.with_column(datasets).unwrap();
+    if column_value.len() == 1 {
+        let column_value = column_value[0];
+        let column_value = vec![column_value; df.height()];
+        let datasets = Series::new(column_name, column_value);
+        df.with_column(datasets).unwrap();
+    }
+
+    if column_value.len() != df.height() {
+        error!("The length of the column value must be equal to the height of the DataFrame.");
+        return;
+    } else {
+        let datasets = Series::new(column_name, column_value.to_vec());
+        df.with_column(datasets).unwrap();
+    };
 
     let writer = File::create(&filepath).unwrap();
     CsvWriter::new(writer)
@@ -624,6 +661,7 @@ pub async fn import_data(
     filepath: &Option<String>,
     table: &str,
     dataset: &Option<String>,
+    relation_type_mappings: &Option<HashMap<String, String>>,
     drop: bool,
     skip_check: bool,
     show_all_errors: bool,
@@ -651,52 +689,6 @@ pub async fn import_data(
     } else if table == "entity_metadata" {
         update_entity_metadata(&pool, true).await.unwrap();
         return;
-    }
-
-    if table == "entity_embedding" || table == "relation_embedding" {
-        let file = PathBuf::from(filepath);
-
-        if file.is_dir() {
-            error!("Please specify the file path, not a directory.");
-            return;
-        };
-
-        let delimiter = match get_delimiter(&file) {
-            Ok(d) => d,
-            Err(_) => {
-                error!("Invalid filename: {}, no extension found.", file.display());
-                return;
-            }
-        };
-
-        match if table == "entity_embedding" {
-            let errors = EntityEmbedding::check_csv_is_valid(&file);
-            if errors.len() > 0 {
-                show_errors(&errors, show_all_errors);
-                return;
-            } else {
-                info!("The data file {} is valid.", file.display());
-            }
-
-            EntityEmbedding::import_entity_embeddings(&pool, &file, delimiter, drop).await
-        } else {
-            let errors = RelationEmbedding::check_csv_is_valid(&file);
-            if errors.len() > 0 {
-                show_errors(&errors, show_all_errors);
-                return;
-            };
-
-            RelationEmbedding::import_relation_embeddings(&pool, &file, delimiter, drop).await
-        } {
-            Ok(_) => {
-                info!("Import embeddings into {} table successfully.", table);
-                return;
-            }
-            Err(e) => {
-                error!("Failed to parse CSV: ({})", e);
-                return;
-            }
-        }
     } else {
         let mut files = vec![];
         if std::path::Path::new(&filepath).is_dir() {
@@ -824,20 +816,50 @@ pub async fn import_data(
                 let results: Result<Vec<Relation>, Box<dyn Error>> =
                     Relation::select_expected_columns(&file, &temp_filepath);
                 match results {
-                    Ok(_) => {
+                    Ok(records) => {
                         // It must be done before importing the data into the database.
                         // The dataset must not be None here, because the dataset is required for the relation table and it is checked before.
                         if let Some(d) = dataset {
                             add_new_column(
                                 &temp_filepath.to_str().unwrap(),
                                 "dataset",
-                                d,
+                                &vec![d],
                                 delimiter,
                             );
 
                             if !expected_columns.contains(&"dataset".to_string()) {
                                 expected_columns.push("dataset".to_string());
                             }
+                        }
+
+                        if relation_type_mappings.is_some() {
+                            // Add the formatted_relation_type column if it doesn't exist. It must be done before importing the data into the database.
+                            let relation_types = records
+                                .iter()
+                                .map(|r| r.relation_type.clone())
+                                .collect::<Vec<String>>();
+
+                            let formatted_relation_types = relation_types
+                                .iter()
+                                .map(|r| {
+                                    let mut r = r.clone();
+                                    if let Some(mappings) = relation_type_mappings {
+                                        if mappings.contains_key(&r) {
+                                            r = mappings.get(&r).unwrap().to_string();
+                                        } else {
+                                            warn!("The relation type {} is not in the relation_type_mappings, skip formatting it and use it directly.", r);
+                                        }
+                                    }
+                                    r
+                                })
+                                .collect::<Vec<String>>();
+
+                            add_new_column(
+                                &temp_filepath.to_str().unwrap(),
+                                "formatted_relation_type",
+                                &formatted_relation_types.iter().map(|v| v.as_str()).collect::<Vec<&str>>(),
+                                delimiter,
+                            );
                         }
 
                         temp_filepath
@@ -1179,6 +1201,183 @@ pub async fn connect_db(database_url: &str, max_connections: u32) -> sqlx::PgPoo
         Ok(p) => p,
         Err(e) => {
             error!("Failed to connect to the database: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+pub async fn import_kge(
+    database_url: &str,
+    table_name: &str,
+    model_name: &str,
+    model_type: &str,
+    datasets: &Vec<&str>,
+    description: Option<&str>,
+    entity_file: &PathBuf,
+    relation_file: &PathBuf,
+    metadata_file: &PathBuf,
+    drop: bool,
+    skip_check: bool,
+    show_all_errors: bool,
+) {
+    let pool = connect_db(database_url, 1).await;
+    let default_datasets = match RelationMetadata::get_relation_metadata(&pool).await {
+        Ok(r) => {
+            let mut datasets = vec![];
+            for record in r {
+                datasets.push(record.dataset);
+            }
+            datasets
+        }
+        Err(e) => {
+            error!("Failed to get the relation metadata: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    for dataset in datasets {
+        if default_datasets.contains(&dataset.to_string()) {
+            debug!("Valid dataset: {}", dataset);
+        } else {
+            error!(
+                "Invalid dataset: {}, the valid datasets are {:?}",
+                dataset, default_datasets
+            );
+            std::process::exit(1);
+        };
+    }
+
+    if DEFAULT_MODEL_TYPES.contains(&model_type) {
+        debug!("Valid model_type: {}", model_type);
+    } else {
+        error!(
+            "Invalid model_type: {}, the valid model types are {:?}",
+            model_type, DEFAULT_MODEL_TYPES
+        );
+        std::process::exit(1);
+    };
+
+    // Read the metadata file as a json string.
+    let metadata = match std::fs::read_to_string(metadata_file) {
+        Ok(f) => f,
+        Err(e) => {
+            error!("Failed to read the metadata file: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Detect the dimension of the entity embeddings.
+    if skip_check {
+        info!("Skip checking the entity file.");
+    } else {
+        let errors = EntityEmbedding::check_csv_is_valid(entity_file);
+        show_errors(&errors, show_all_errors);
+    };
+
+    if skip_check {
+        info!("Skip checking the relation file.");
+    } else {
+        let errors = RelationEmbedding::check_csv_is_valid(relation_file);
+        show_errors(&errors, show_all_errors);
+    };
+
+    info!("Detecting the dimension of the entity embeddings.");
+    let records: Vec<EntityEmbedding> = match EntityEmbedding::get_records(entity_file) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to get records from the entity file: {}", e);
+            std::process::exit(1);
+        }
+    };
+    let dimension = records[0].embedding.to_vec().len();
+
+    // Init the embedding tables.
+    let description = match description {
+        Some(d) => d.to_string(),
+        None => format!(
+            "The model is trained with the {} dataset and the model type is {}.",
+            datasets.join(" + "),
+            model_type
+        ),
+    };
+
+    match EmbeddingMetadata::init_embedding_tables(
+        &pool,
+        table_name,
+        model_name,
+        model_type,
+        &description,
+        datasets,
+        dimension,
+        Some(metadata),
+    )
+    .await
+    {
+        Ok(_) => {
+            info!("Init the embedding tables successfully.");
+
+            let delimeter = match get_delimiter(entity_file) {
+                Ok(d) => d,
+                Err(e) => {
+                    error!(
+                        "Failed to get the delimiter of the {}: {}",
+                        entity_file.display(),
+                        e
+                    );
+                    std::process::exit(1);
+                }
+            };
+            // Import the entity embeddings.
+            match EntityEmbedding::import_entity_embeddings(
+                &pool,
+                entity_file,
+                delimeter,
+                drop,
+                Some(table_name),
+            )
+            .await
+            {
+                Ok(_) => {
+                    info!("Import the entity embeddings successfully.");
+                }
+                Err(e) => {
+                    error!("Failed to import the entity embeddings: {}", e);
+                    std::process::exit(1);
+                }
+            }
+
+            let delimeter = match get_delimiter(relation_file) {
+                Ok(d) => d,
+                Err(e) => {
+                    error!(
+                        "Failed to get the delimiter of the {}: {}",
+                        relation_file.display(),
+                        e
+                    );
+                    std::process::exit(1);
+                }
+            };
+            // Import the relation embeddings.
+            match RelationEmbedding::import_relation_embeddings(
+                &pool,
+                relation_file,
+                delimeter,
+                drop,
+                Some(table_name),
+            )
+            .await
+            {
+                Ok(_) => {
+                    info!("Import the relation embeddings successfully.");
+                }
+                Err(e) => {
+                    error!("Failed to import the relation embeddings: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(e) => {
+            error!("Failed to init the embedding tables: {}", e);
             std::process::exit(1);
         }
     }
