@@ -1,6 +1,6 @@
 use super::core::{
-    CheckData, ValidationError, DEFAULT_MAX_LENGTH, DEFAULT_MIN_LENGTH, ENTITY_ID_REGEX,
-    ENTITY_LABEL_REGEX, ENTITY_NAME_MAX_LENGTH,
+    CheckData, ValidationError, DEFAULT_DATASET_NAME, DEFAULT_MAX_LENGTH, DEFAULT_MIN_LENGTH,
+    ENTITY_ID_REGEX, ENTITY_LABEL_REGEX, ENTITY_NAME_MAX_LENGTH,
 };
 use super::util::{drop_table, get_delimiter, parse_csv_error};
 use crate::pgvector::Vector;
@@ -9,6 +9,7 @@ use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use log::{info, warn};
 use poem_openapi::Object;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -16,6 +17,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use validator::Validate;
+
+pub const DEFAULT_MODEL_NAME: &str = "biomedgps";
 
 pub const DEFAULT_MODEL_TYPES: [&str; 7] = [
     "TransE", "TransH", "TransR", "TransD", "RotatE", "DistMult", "ComplEx",
@@ -58,10 +61,95 @@ fn get_relation_emb_table_name(table_name: &str) -> String {
     format!("{}_relation_embedding", table_name)
 }
 
+pub async fn check_default_model_is_valid(pool: &sqlx::PgPool) -> Result<(), ValidationError> {
+    let table_names = vec![
+        get_entity_emb_table_name(DEFAULT_MODEL_NAME),
+        get_relation_emb_table_name(DEFAULT_MODEL_NAME),
+    ];
+
+    let table_names = table_names
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<&str>>();
+
+    match check_table_is_valid(pool, &table_names).await {
+        Ok(_) => {
+            let sql_str = "SELECT * FROM biomedgps_embedding_metadata WHERE table_name = $1 AND model_name = $2";
+
+            let count = match sqlx::query_as::<_, (i64,)>(&sql_str)
+                .bind(DEFAULT_MODEL_NAME)
+                .bind(DEFAULT_MODEL_NAME)
+                .fetch_one(pool)
+                .await
+            {
+                Ok(count) => count,
+                Err(e) => {
+                    return Err(ValidationError::new(&format!(
+                        "The default model does not exist in the database: {}",
+                        e.to_string()
+                    )));
+                }
+            };
+
+            if count.0 == 0 {
+                return Err(ValidationError::new(
+                    "The default model does not exist in the database.",
+                ));
+            } else {
+                return Ok(());
+            }
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+}
+
+pub async fn add_default_model(pool: &sqlx::PgPool) -> Result<(), anyhow::Error> {
+    match check_default_model_is_valid(pool).await {
+        Ok(_) => {
+            info!("The default model of BiomedKG already exists.");
+            return Ok(());
+        }
+        Err(_) => {
+            warn!("WARNING: The default model of BiomedKG does not exist, we will create it automatically. You may forget to create the default model.");
+            let mut kge_models = KGE_MODELS.lock().unwrap();
+            let metadata = EmbeddingMetadata {
+                id: 0,
+                table_name: DEFAULT_MODEL_NAME.to_string(),
+                model_name: DEFAULT_MODEL_NAME.to_string(),
+                model_type: "TransE".to_string(),
+                description: "The default model of BiomedKG".to_string(),
+                datasets: vec![DEFAULT_DATASET_NAME.to_string()],
+                created_at: Utc::now(),
+                dimension: 400,
+                metadata: None,
+            };
+            match &metadata.insert(pool).await {
+                Ok(_) => {
+                    info!("The default model of BiomedKG has been created successfully.");
+                }
+                Err(e) => {
+                    warn!("WARNING: The default model of BiomedKG has not been created successfully: {}", e.to_string());
+                    let msg = format!(
+                        "The default model of BiomedKG has not been created successfully: {}",
+                        e.to_string()
+                    );
+                    return Err(anyhow::Error::msg(msg));
+                }
+            };
+            kge_models.insert(DEFAULT_MODEL_NAME.to_string(), metadata);
+            return Ok(());
+        }
+    }
+}
+
 /// Initialize the kge models, it should be called when the server starts.
 pub async fn init_kge_models(
     pool: &sqlx::PgPool,
 ) -> Result<HashMap<String, EmbeddingMetadata>, anyhow::Error> {
+    add_default_model(pool).await;
+
     let mut kge_models = KGE_MODELS.lock().unwrap();
 
     if kge_models.is_empty() {
@@ -86,6 +174,10 @@ pub async fn init_kge_models(
                     // We can fetch the embedding metadata easily if we use the model name and table name as the key. We don't need to care about whether the table name is same as the model name.
                     kge_models.insert(table_name.clone(), record.clone());
                     kge_models.insert(model_name.clone(), record.clone());
+                    info!(
+                        "Load the embedding metadata of model {} successfully.",
+                        model_name
+                    );
                 }
                 Err(e) => {
                     return Err(anyhow::Error::new(e));
@@ -275,9 +367,9 @@ impl EmbeddingMetadata {
                 entity_type VARCHAR(64) NOT NULL, -- The entity type, such as Anatomy, Disease, Gene, Compound, Biological Process, etc.
                 entity_name VARCHAR(255) NOT NULL, -- The entity name
                 embedding vector({}), -- The embedding array, the length of the embedding array is {}. It is related with the knowledge graph model, such as TransE, DistMult, etc.
-                UNIQUE (entity_id, entity_type)
+                CONSTRAINT {}_uniq_key UNIQUE (entity_id, entity_type)
             );
-        ", &real_table_name, dimension, dimension);
+        ", &real_table_name, dimension, dimension, &real_table_name);
 
         match sqlx::query(&sql_str).execute(tx).await {
             Ok(_) => {
@@ -320,6 +412,25 @@ impl EmbeddingMetadata {
         };
     }
 
+    /// Insert a record into the embedding metadata table. If the table name and model name already exists, it will return an error and rollback the transaction.
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EmbeddingMetadata, Box<dyn Error>> {
+        return EmbeddingMetadata::init_embedding_table(
+            pool,
+            &self.table_name,
+            &self.model_name,
+            &self.model_type,
+            &self.description,
+            &self
+                .datasets
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>(),
+            self.dimension as usize,
+            self.metadata.clone(),
+        )
+        .await;
+    }
+
     /// Initialize the embedding tables, it will create the entity embedding table, relation embedding table and insert a record into the embedding metadata table. If the table name and model name already exists or it can not create the entity embedding table or relation embedding table, it will return an error and rollback the transaction.
     ///
     /// # Arguments
@@ -334,7 +445,7 @@ impl EmbeddingMetadata {
     ///
     /// # Returns
     /// * `Result<EmbeddingMetadata, Box<dyn Error>>` - The embedding metadata.
-    pub async fn init_embedding_tables(
+    pub async fn init_embedding_table(
         pool: &sqlx::PgPool,
         table_name: &str,
         model_name: &str,
@@ -619,7 +730,7 @@ impl EntityEmbedding {
     ) -> Result<(), Box<dyn Error>> {
         let real_table_name = match table_name {
             Some(t) => get_entity_emb_table_name(t),
-            None => get_entity_emb_table_name("biomedgps"),
+            None => get_entity_emb_table_name(DEFAULT_MODEL_NAME),
         };
 
         if drop {
@@ -727,7 +838,7 @@ impl RelationEmbedding {
     ) -> Result<RelationEmbedding, Box<dyn Error>> {
         let real_table_name = match table_name {
             Some(t) => get_relation_emb_table_name(t),
-            None => get_relation_emb_table_name("biomedgps"),
+            None => get_relation_emb_table_name(DEFAULT_MODEL_NAME),
         };
 
         let sql_str = format!(
@@ -773,7 +884,7 @@ impl RelationEmbedding {
     ) -> Result<(), Box<dyn Error>> {
         let real_table_name = match table_name {
             Some(t) => get_relation_emb_table_name(t),
-            None => get_relation_emb_table_name("biomedgps"),
+            None => get_relation_emb_table_name(DEFAULT_MODEL_NAME),
         };
 
         if drop {

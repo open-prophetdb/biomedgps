@@ -1,5 +1,6 @@
 extern crate log;
 
+use biomedgps::model::kge::DEFAULT_MODEL_NAME;
 use biomedgps::{
     build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
     run_migrations,
@@ -152,12 +153,17 @@ pub struct ImportKGEArguments {
         name = "table_name",
         short = "t",
         long = "table_name",
-        default_value = "biomedgps"
+        default_value = DEFAULT_MODEL_NAME
     )]
     table_name: String,
 
     /// The model name you want to name. e.g. mecfs_transe, mecfs_distmult, etc. You need to specify the model name when you import the embedding files. This feature is used to distinguish different models. Users can choose the model for their own purpose.
-    #[structopt(name = "model_name", short = "m", long = "model_name")]
+    #[structopt(
+        name = "model_name", 
+        short = "m", 
+        long = "model_name", 
+        default_value = DEFAULT_MODEL_NAME
+    )]
     model_name: String,
 
     /// The model type of generated embedding files. e.g. TransE, DistMult, etc.

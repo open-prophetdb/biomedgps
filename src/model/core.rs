@@ -14,6 +14,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{error::Error, fmt, option::Option, path::PathBuf};
 use validator::Validate;
 
+pub const DEFAULT_DATASET_NAME: &str = "biomedgps";
 pub const ENTITY_NAME_MAX_LENGTH: u64 = 255;
 pub const RELATION_ID_MAX_LENGTH: u64 = 255;
 pub const DEFAULT_MAX_LENGTH: u64 = 64;
@@ -802,7 +803,7 @@ impl KnowledgeCuration {
             target_id: self.target_id.clone(),
             key_sentence: Some(self.key_sentence.clone()),
             resource: self.curator.clone(),
-            dataset: Some("biomedgps".to_string()),
+            dataset: Some(DEFAULT_DATASET_NAME.to_string()),
             pmids: Some(format!("{}", self.pmid)),
             score: None,
         }

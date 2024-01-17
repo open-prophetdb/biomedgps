@@ -5,8 +5,8 @@
 //! - The module is used to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
 //!
 
-use crate::model::core::{Entity, RecordResponse, Relation};
-use crate::model::kge::get_embedding_metadata;
+use crate::model::core::{Entity, RecordResponse, Relation, DEFAULT_DATASET_NAME};
+use crate::model::kge::{get_embedding_metadata, DEFAULT_MODEL_NAME};
 use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
@@ -464,7 +464,7 @@ impl EdgeData {
             score: relation.score.unwrap_or(0.0),
             key_sentence: relation.key_sentence.clone().unwrap_or("".to_string()),
             resource: relation.resource.clone(),
-            dataset: relation.dataset.clone().unwrap_or("biomedgps".to_string()),
+            dataset: relation.dataset.clone().unwrap_or(DEFAULT_DATASET_NAME.to_string()),
             pmids: relation.pmids.clone().unwrap_or("".to_string()),
         }
     }
@@ -537,7 +537,7 @@ impl Edge {
                 score: distance.unwrap_or(0.0),
                 key_sentence: "".to_string(),
                 resource: "".to_string(),
-                dataset: "biomedgps".to_string(),
+                dataset: DEFAULT_DATASET_NAME.to_string(),
                 pmids: "".to_string(),
             },
         }
@@ -623,7 +623,7 @@ impl SimilarityNode {
     ) -> Result<Vec<Self>, ValidationError> {
         let model_or_table_name = match model_table_name {
             Some(name) => name,
-            None => "biomedgps".to_string(),
+            None => DEFAULT_MODEL_NAME.to_string(),
         };
 
         let embedding_metadata = get_embedding_metadata(&model_or_table_name);
@@ -1278,7 +1278,7 @@ impl Graph {
     ///     let query = None;
     ///     let topk = Some(10);
     ///
-    ///     // If you choose None as the model_table_name, it will use the default model/table name "biomedgps".
+    ///     // If you choose None as the model_table_name, it will use the default model/table name `DEFAULT_MODEL_NAME`.
     ///     match graph.fetch_similarity_nodes(&pool, &node_id, &query, topk, None).await {
     ///         Ok(graph) => {
     ///             println!("graph: {:?}", graph);

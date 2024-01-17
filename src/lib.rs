@@ -12,7 +12,7 @@ use log4rs;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use model::core::EntityAttribute;
+use model::core::{EntityAttribute, DEFAULT_DATASET_NAME};
 use model::kge::{EmbeddingMetadata, DEFAULT_MODEL_TYPES};
 use neo4rs::{ConfigBuilder, Graph, Query};
 use polars::prelude::{
@@ -259,7 +259,7 @@ pub async fn prepare_relation_queries(
 
         let dataset = match record.dataset {
             Some(t) => t,
-            None => "biomedgps".to_string(),
+            None => DEFAULT_DATASET_NAME.to_string(),
         };
 
         let query_string = if check_exist {
@@ -1301,7 +1301,7 @@ pub async fn import_kge(
         ),
     };
 
-    match EmbeddingMetadata::init_embedding_tables(
+    match EmbeddingMetadata::init_embedding_table(
         &pool,
         table_name,
         model_name,
