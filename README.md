@@ -1,5 +1,5 @@
 <h2 align="center">BioMedGPS Platform</h2>
-<p align="center">A knowledge graph system with graph neural network for drug discovery, disease mechanism and biomarker screening.</p>
+<p align="center">A knowledge graph system with graph neural network for drug repurposing, disease mechanism.</p>
 
 <p align="center">
 <img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/yjcyxky/biomedgps/release?label=Build Status">
