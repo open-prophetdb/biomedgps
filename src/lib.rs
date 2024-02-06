@@ -617,7 +617,12 @@ pub async fn import_graph_data(
     }
 }
 
-fn add_new_column(filepath: &str, column_name: &str, column_value: &Vec<&str>, delimiter: u8) {
+fn add_new_column(
+    filepath: &str,
+    column_name: &str,
+    column_value: &Vec<&str>,
+    delimiter: u8,
+) -> Result<(), Box<dyn Error>> {
     // Add a new column named dataset into the temp file by using the polar crate.
     let mut df = CsvReader::from_path(&filepath)
         .unwrap()
@@ -630,21 +635,22 @@ fn add_new_column(filepath: &str, column_name: &str, column_value: &Vec<&str>, d
 
     if columns.contains(&column_name) {
         warn!("The column {} already exists, skip adding it.", column_name);
-        return;
+        return Ok(());
     };
 
-    if column_value.len() == 1 {
+    let column_value = if column_value.len() == 1 {
         let column_value = column_value[0];
-        let column_value = vec![column_value; df.height()];
-        let datasets = Series::new(column_name, column_value);
-        df.with_column(datasets).unwrap();
-    }
+        vec![column_value; df.height()]
+    } else {
+        column_value.to_vec()
+    };
 
     if column_value.len() != df.height() {
-        error!("The length of the column value must be equal to the height of the DataFrame.");
-        return;
+        let err_msg =
+            "The length of the column value must be equal to the height of your data file.";
+        return Err(err_msg.into());
     } else {
-        let datasets = Series::new(column_name, column_value.to_vec());
+        let datasets = Series::new(column_name, column_value);
         df.with_column(datasets).unwrap();
     };
 
@@ -654,6 +660,8 @@ fn add_new_column(filepath: &str, column_name: &str, column_value: &Vec<&str>, d
         .with_delimiter(delimiter)
         .finish(&mut df)
         .unwrap();
+
+    return Ok(());
 }
 
 pub async fn import_data(
@@ -667,7 +675,7 @@ pub async fn import_data(
     show_all_errors: bool,
 ) {
     if dataset.is_none() && table == "relation" {
-        error!("Please specify the dataset name.");
+        error!("Please specify the dataset name. It is required for the relation table.");
         return;
     }
 
@@ -820,12 +828,21 @@ pub async fn import_data(
                         // It must be done before importing the data into the database.
                         // The dataset must not be None here, because the dataset is required for the relation table and it is checked before.
                         if let Some(d) = dataset {
-                            add_new_column(
+                            match add_new_column(
                                 &temp_filepath.to_str().unwrap(),
                                 "dataset",
                                 &vec![d],
                                 delimiter,
-                            );
+                            ) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!(
+                                        "Fn: add_new_column, NewColumn: dataset, Invalid file: {}, reason: {}",
+                                        filename, e
+                                    );
+                                    continue;
+                                }
+                            }
 
                             if !expected_columns.contains(&"dataset".to_string()) {
                                 expected_columns.push("dataset".to_string());
@@ -854,12 +871,33 @@ pub async fn import_data(
                                 })
                                 .collect::<Vec<String>>();
 
-                            add_new_column(
+                            debug!("The length of the relation types is {}.", relation_types.len());
+                            debug!("The length of the formatted relation types is {}.", formatted_relation_types.len());
+
+                            match add_new_column(
                                 &temp_filepath.to_str().unwrap(),
                                 "formatted_relation_type",
-                                &formatted_relation_types.iter().map(|v| v.as_str()).collect::<Vec<&str>>(),
+                                &formatted_relation_types
+                                    .iter()
+                                    .map(|v| v.as_str())
+                                    .collect::<Vec<&str>>(),
                                 delimiter,
-                            );
+                            ) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!(
+                                        "Fn: add_new_column, NewColumn: formatted_relation_type, Invalid file: {}, reason: {}",
+                                        filename, e
+                                    );
+                                    continue;
+                                }
+                            }
+
+                            if !expected_columns.contains(&"formatted_relation_type".to_string()) {
+                                expected_columns.push("formatted_relation_type".to_string());
+                            }
+
+                            // TODO: The order of the source_type and target_type values might not be correct. Such as the source_type is "Gene" and the target_type is "Disease", but the formatted_relation_type is "Disease:Gene". We need to fix the order of the source_type and target_type values. Or warn that the order of the source_type and target_type values in the formatted_relation_type column is not correct.
                         }
 
                         temp_filepath
@@ -1240,7 +1278,7 @@ pub async fn import_kge(
             debug!("Valid dataset: {}", dataset);
         } else {
             error!(
-                "Invalid dataset: {}, the valid datasets are {:?}",
+                "Invalid dataset: {}, the valid datasets are {:?}. You can add the dataset into the relation_metadata table by using the importdb command. It means that you need to import at least one entity and one relation into the database before importing the KGE model if the valid datasets are empty. And then update the entity_metadata and relation_metadata tables by using the importdb command.",
                 dataset, default_datasets
             );
             std::process::exit(1);

@@ -2,10 +2,10 @@
 
 -- We need to use the postgresml docker image to instead of the postgres docker image, because the postgresml docker image has installed the pgvector and pgml extensions. More details on https://github.com/postgresml/postgresml#installation
 -- Install the pgvector extension
-CREATE EXTENSION vector;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Install the postgresml extension
-CREATE EXTENSION pgml;
+CREATE EXTENSION IF NOT EXISTS pgml;
 
 -- biomedgps_entity_embedding table is used to store the embedding of the entities for computing the similarity of the entities
 CREATE TABLE

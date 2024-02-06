@@ -6,6 +6,7 @@ use biomedgps::{
     run_migrations,
 };
 use log::*;
+use polars::prelude::IntoVec;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -55,13 +56,19 @@ pub struct ImportDBArguments {
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
-    /// Annotation file path. It is used to annotate relation_type or other attributes. In current version, it is only used for relation_type.
-    /// The annotation file is a csv/tsv file. The first column is the relation_type, the second column is formatted_relation_type.
-    /// e.g. relation_type,formatted_relation_type
-    #[structopt(name = "annotation_file", short = "a", long = "annotation_file")]
+    /// Annotation file path. This option is only required for relation table. It is used to annotate relation_type or other attributes. In current version, it is only used for relation_type.
+    /// 
+    /// The annotation file is a csv/tsv file which contains two columns: relation_type and formatted_relation_type. e.g. relation_type,formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.
+    /// 
+    /// NOTE: You must ensure that the relation_type in the annotation file is consistent with the relation_type in the relation and relation_embedding files. If not, the import might fail or the relation_type will not be annotated.
+    #[structopt(name = "annotation_file", short = "a", long = "annotation-file")]
     annotation_file: Option<String>,
 
-    /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph, entity_embedding, relation_embedding
+    /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph. Please note that we don't check whether the entities in other tables, such as entity2d, relation, knowledge etc. exist in the entity table. So you need to make sure that. 
+    /// 
+    /// In addition, if you upgrade the entity and relation tables, you need to ensure that the entity2d, relation_metadata, entity_metadata, knowledge_curation, subgraph tables are also upgraded. For the entity_metadata and relation_metadata, you can use the importdb command to upgrade after the entity and relation tables are upgraded.
+    /// 
+    /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional].
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
@@ -73,7 +80,7 @@ pub struct ImportDBArguments {
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
 
-    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
+    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model. It is only required for relation table.
     #[structopt(name = "dataset", long = "dataset")]
     dataset: Option<String>,
 
@@ -87,7 +94,7 @@ pub struct ImportDBArguments {
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importgraph", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct ImportGraphArguments {
     /// Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
-    #[structopt(name = "neo4j_url", short = "n", long = "neo4j_url")]
+    #[structopt(name = "neo4j_url", short = "n", long = "neo4j-url")]
     neo4j_url: Option<String>,
 
     /// The file path of the data file to import. It may be a file or a directory.
@@ -132,7 +139,7 @@ pub struct ImportKGEArguments {
     #[structopt(
         name = "entity_embedding_file",
         short = "e",
-        long = "entity_embedding_file"
+        long = "entity-embedding-file"
     )]
     entity_embedding_file: String,
 
@@ -140,19 +147,19 @@ pub struct ImportKGEArguments {
     #[structopt(
         name = "relation_embedding_file",
         short = "r",
-        long = "relation_embedding_file"
+        long = "relation-embedding-file"
     )]
     relation_embedding_file: String,
 
     /// The file path of the metadata file to import.
-    #[structopt(name = "metadata_file", short = "m", long = "metadata_file")]
+    #[structopt(name = "metadata_file", short = "m", long = "metadata-file")]
     metadata_file: String,
 
     /// The table name you want to name. e.g. biomedgps, mecfs, etc. This feature is used to distinguish different dataset combinations matched with your model. If not set, we will use the biomedgps as default. But in this case, the dimension of the embedding should be 400.
     #[structopt(
         name = "table_name",
         short = "t",
-        long = "table_name",
+        long = "table-name",
         default_value = DEFAULT_MODEL_NAME
     )]
     table_name: String,
@@ -161,13 +168,13 @@ pub struct ImportKGEArguments {
     #[structopt(
         name = "model_name", 
         short = "m", 
-        long = "model_name", 
+        long = "model-name", 
         default_value = DEFAULT_MODEL_NAME
     )]
     model_name: String,
 
     /// The model type of generated embedding files. e.g. TransE, DistMult, etc.
-    #[structopt(name = "model_type", short = "M", long = "model_type")]
+    #[structopt(name = "model_type", short = "M", long = "model-type")]
     model_type: String,
 
     /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
@@ -243,7 +250,7 @@ async fn main() {
             // The annotation file is essential for relation table. We need the formatted_relation_type to annotate the relation_type.
             let relation_type_mappings = if arguments.table == "relation" {
                 if arguments.annotation_file.is_none() {
-                    error!("Please specify the annotation file.");
+                    error!("Please specify the annotation file for annotating the relation_type. We expect the annotation file has two columns: relation_type and formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.");
                     std::process::exit(1);
                 } else {
                     let annotation_file = PathBuf::from(arguments.annotation_file.unwrap());
@@ -262,23 +269,33 @@ async fn main() {
 
                     // Check the annotation file format.
                     let headers = reader.headers().unwrap();
-                    for header in headers {
-                        if header != "relation_type" && header != "formatted_relation_type" {
+                    for col in ["relation_type", "formatted_relation_type"].iter() {
+                        if !headers.into_vec().contains(&col.to_string()) {
                             error!(
-                                "The annotation file should have two columns: relation_type and formatted_relation_type. But the header is {}.",
-                                header
+                                "The annotation file should have two columns: relation_type and formatted_relation_type. But we found that the annotation file has no {} column.", col
                             );
                             std::process::exit(1);
                         }
                     }
 
+                    let relation_type_index =
+                        headers.iter().position(|h| h == "relation_type").unwrap();
+                    let formatted_relation_type_index = headers
+                        .iter()
+                        .position(|h| h == "formatted_relation_type")
+                        .unwrap();
+
+                    // Only get the relation_type and formatted_relation_type columns from the annotation file.
                     for result in reader.records() {
                         let record = result.unwrap();
-                        let relation_type = record.get(0).unwrap().to_string();
-                        let formatted_relation_type = record.get(1).unwrap().to_string();
+                        let relation_type = record.get(relation_type_index).unwrap().to_string();
+                        let formatted_relation_type = record
+                            .get(formatted_relation_type_index)
+                            .unwrap()
+                            .to_string();
                         relation_type_mappings.insert(
-                            relation_type.to_lowercase(),
-                            formatted_relation_type.to_lowercase(),
+                            relation_type,
+                            formatted_relation_type,
                         );
                     }
 
