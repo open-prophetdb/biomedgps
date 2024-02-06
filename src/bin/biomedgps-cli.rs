@@ -1,12 +1,12 @@
 extern crate log;
 
 use biomedgps::model::kge::DEFAULT_MODEL_NAME;
+use biomedgps::model::util::read_annotation_file;
 use biomedgps::{
     build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
     run_migrations,
 };
 use log::*;
-use polars::prelude::IntoVec;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -52,22 +52,34 @@ pub struct ImportDBArguments {
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// The file path of the data file to import. It may be a file or a directory.
+    /// The file path of the data file to import. It may be a file or a directory. If you have multiple files to import, you can use the --filepath option with a directory path. We will import all files in the directory. But you need to disable the --drop option, otherwise, only the last file will be imported successfully.
+    ///
+    /// In the case of entity, the file should be a csv/tsv file which contains the id, name, label etc. More details about the format can be found in the github.com/yjcyxky/biomedgps-data.
+    ///
+    /// In the case of relation, the file should be a csv/tsv file which contains the source_id, source_type, relation_type, target_id, target_type etc. More details about the format can be found in the github.com/yjcyxky/biomedgps-data.
+    ///
+    /// In the case of entity_metadata, the file is not required.
+    ///
+    /// In the case of relation_metadata, the file should be a csv/tsv file which contains the relation_type, description.
+    ///
+    /// In the case of knowledge_curation, the file should be a csv/tsv file which contains the source_id, source_type, relation_type, target_id, target_type, description etc.
+    ///
+    /// In the case of subgraph, the file should be a json file which contains the subgraph data.
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
     /// Annotation file path. This option is only required for relation table. It is used to annotate relation_type or other attributes. In current version, it is only used for relation_type.
-    /// 
+    ///
     /// The annotation file is a csv/tsv file which contains two columns: relation_type and formatted_relation_type. e.g. relation_type,formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.
-    /// 
+    ///
     /// NOTE: You must ensure that the relation_type in the annotation file is consistent with the relation_type in the relation and relation_embedding files. If not, the import might fail or the relation_type will not be annotated.
     #[structopt(name = "annotation_file", short = "a", long = "annotation-file")]
     annotation_file: Option<String>,
 
-    /// The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph. Please note that we don't check whether the entities in other tables, such as entity2d, relation, knowledge etc. exist in the entity table. So you need to make sure that. 
-    /// 
+    /// [Required] The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph. Please note that we don't check whether the entities in other tables, such as entity2d, relation, knowledge etc. exist in the entity table. So you need to make sure that.
+    ///
     /// In addition, if you upgrade the entity and relation tables, you need to ensure that the entity2d, relation_metadata, entity_metadata, knowledge_curation, subgraph tables are also upgraded. For the entity_metadata and relation_metadata, you can use the importdb command to upgrade after the entity and relation tables are upgraded.
-    /// 
+    ///
     /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional].
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
@@ -196,6 +208,14 @@ pub struct ImportKGEArguments {
     /// Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
+
+    /// Annotation file path. This option is only required for legacy relation_embedding file which only contains id, embedding columns.
+    ///
+    /// The annotation file is a csv/tsv file which contains two columns: relation_type and formatted_relation_type. e.g. relation_type,formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.
+    ///
+    /// NOTE: You must ensure that the relation_type in the annotation file is consistent with the relation_type in the relation_embedding files. If not, the import might fail or the relation_type will not be annotated.
+    #[structopt(name = "annotation_file", short = "a", long = "annotation-file")]
+    annotation_file: Option<String>,
 }
 
 #[tokio::main]
@@ -260,45 +280,13 @@ async fn main() {
                     };
 
                     // Read the annotation file into a hashmap.
-                    let mut relation_type_mappings = std::collections::HashMap::new();
-                    let mut reader = csv::ReaderBuilder::new()
-                        .has_headers(true)
-                        .delimiter(b'\t')
-                        .from_path(annotation_file)
-                        .unwrap();
-
-                    // Check the annotation file format.
-                    let headers = reader.headers().unwrap();
-                    for col in ["relation_type", "formatted_relation_type"].iter() {
-                        if !headers.into_vec().contains(&col.to_string()) {
-                            error!(
-                                "The annotation file should have two columns: relation_type and formatted_relation_type. But we found that the annotation file has no {} column.", col
-                            );
+                    let relation_type_mappings = match read_annotation_file(&annotation_file) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("Read annotation file failed: {}", e);
                             std::process::exit(1);
                         }
-                    }
-
-                    let relation_type_index =
-                        headers.iter().position(|h| h == "relation_type").unwrap();
-                    let formatted_relation_type_index = headers
-                        .iter()
-                        .position(|h| h == "formatted_relation_type")
-                        .unwrap();
-
-                    // Only get the relation_type and formatted_relation_type columns from the annotation file.
-                    for result in reader.records() {
-                        let record = result.unwrap();
-                        let relation_type = record.get(relation_type_index).unwrap().to_string();
-                        let formatted_relation_type = record
-                            .get(formatted_relation_type_index)
-                            .unwrap()
-                            .to_string();
-                        relation_type_mappings.insert(
-                            relation_type,
-                            formatted_relation_type,
-                        );
-                    }
-
+                    };
                     Some(relation_type_mappings)
                 }
             } else {
@@ -389,6 +377,7 @@ async fn main() {
             let entity_embedding_file = PathBuf::from(arguments.entity_embedding_file);
             let relation_embedding_file = PathBuf::from(arguments.relation_embedding_file);
             let metadata_file = PathBuf::from(arguments.metadata_file);
+            let annotation_file = arguments.annotation_file.as_deref().map(PathBuf::from);
 
             for file in vec![
                 &entity_embedding_file,
@@ -423,6 +412,7 @@ async fn main() {
                 drop,
                 skip_check,
                 show_all_errors,
+                &annotation_file,
             )
             .await
         }

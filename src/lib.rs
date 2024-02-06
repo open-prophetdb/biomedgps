@@ -30,7 +30,7 @@ use crate::model::core::{
     Subgraph,
 };
 use crate::model::graph::Node;
-use crate::model::kge::{EntityEmbedding, RelationEmbedding};
+use crate::model::kge::{EntityEmbedding, LegacyRelationEmbedding, RelationEmbedding};
 use crate::model::util::{
     drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
     update_entity_metadata, update_relation_metadata,
@@ -674,12 +674,18 @@ pub async fn import_data(
     skip_check: bool,
     show_all_errors: bool,
 ) {
+    let pool = connect_db(database_url, 10).await;
+
+    // Don't need a file path for updating the entity_metadata table.
+    if table == "entity_metadata" {
+        update_entity_metadata(&pool, true).await.unwrap();
+        return;
+    }
+
     if dataset.is_none() && table == "relation" {
         error!("Please specify the dataset name. It is required for the relation table.");
         return;
     }
-
-    let pool = connect_db(database_url, 1).await;
 
     let filepath = match filepath {
         Some(f) => f,
@@ -690,12 +696,14 @@ pub async fn import_data(
     };
 
     if table == "relation_metadata" {
-        update_relation_metadata(&pool, &PathBuf::from(filepath), true)
-            .await
-            .unwrap();
-        return;
-    } else if table == "entity_metadata" {
-        update_entity_metadata(&pool, true).await.unwrap();
+        match update_relation_metadata(&pool, &PathBuf::from(filepath), true).await {
+            Ok(_) => {
+                info!("Relation metadata updated successfully.");
+            }
+            Err(e) => {
+                error!("Failed to update relation metadata: ({})", e);
+            }
+        }
         return;
     } else {
         let mut files = vec![];
@@ -871,8 +879,14 @@ pub async fn import_data(
                                 })
                                 .collect::<Vec<String>>();
 
-                            debug!("The length of the relation types is {}.", relation_types.len());
-                            debug!("The length of the formatted relation types is {}.", formatted_relation_types.len());
+                            debug!(
+                                "The length of the relation types is {}.",
+                                relation_types.len()
+                            );
+                            debug!(
+                                "The length of the formatted relation types is {}.",
+                                formatted_relation_types.len()
+                            );
 
                             match add_new_column(
                                 &temp_filepath.to_str().unwrap(),
@@ -1257,8 +1271,9 @@ pub async fn import_kge(
     drop: bool,
     skip_check: bool,
     show_all_errors: bool,
+    annotation_file: &Option<PathBuf>,
 ) {
-    let pool = connect_db(database_url, 1).await;
+    let pool = connect_db(database_url, 10).await;
     let default_datasets = match RelationMetadata::get_relation_metadata(&pool).await {
         Ok(r) => {
             let mut datasets = vec![];
@@ -1309,14 +1324,42 @@ pub async fn import_kge(
         info!("Skip checking the entity file.");
     } else {
         let errors = EntityEmbedding::check_csv_is_valid(entity_file);
-        show_errors(&errors, show_all_errors);
+        if errors.len() > 0 {
+            show_errors(&errors, show_all_errors);
+            std::process::exit(1);
+        } else {
+            info!("{} is valid.", entity_file.display());
+        }
     };
 
+    let mut fileformat = "relation_embedding";
     if skip_check {
         info!("Skip checking the relation file.");
     } else {
         let errors = RelationEmbedding::check_csv_is_valid(relation_file);
-        show_errors(&errors, show_all_errors);
+
+        if errors.len() == 0 {
+            // We prefer to use the new format of relation embedding. If the new format is valid, we will ignore the old format.
+        } else {
+            let warning_msg = "Your relation embedding file is not valid, the file should contain the following fields: relation_type, formatted_relation_type, embedding. We will try to use the old format of relation embedding. If the old format is valid, we will return the old format. Otherwise, the relation embedding file is invalid.";
+            warn!("{}", warning_msg);
+        }
+
+        let final_errors = LegacyRelationEmbedding::check_csv_is_valid(relation_file);
+
+        if final_errors.len() == 0 {
+            // If the old format is valid, we will return the old format.
+            fileformat = "legacy_relation_embedding";
+            info!("{} is valid.", relation_file.display());
+
+            if annotation_file.is_none() {
+                error!("Please specify an annotation file for the legacy relation embedding.");
+                std::process::exit(1);
+            }
+        } else {
+            show_errors(&errors, show_all_errors);
+            std::process::exit(1);
+        };
     };
 
     info!("Detecting the dimension of the entity embeddings.");
@@ -1353,69 +1396,101 @@ pub async fn import_kge(
     {
         Ok(_) => {
             info!("Init the embedding tables successfully.");
-
-            let delimeter = match get_delimiter(entity_file) {
-                Ok(d) => d,
-                Err(e) => {
-                    error!(
-                        "Failed to get the delimiter of the {}: {}",
-                        entity_file.display(),
-                        e
-                    );
-                    std::process::exit(1);
-                }
-            };
-            // Import the entity embeddings.
-            match EntityEmbedding::import_entity_embeddings(
-                &pool,
-                entity_file,
-                delimeter,
-                drop,
-                Some(table_name),
-            )
-            .await
-            {
-                Ok(_) => {
-                    info!("Import the entity embeddings successfully.");
-                }
-                Err(e) => {
-                    error!("Failed to import the entity embeddings: {}", e);
-                    std::process::exit(1);
-                }
-            }
-
-            let delimeter = match get_delimiter(relation_file) {
-                Ok(d) => d,
-                Err(e) => {
-                    error!(
-                        "Failed to get the delimiter of the {}: {}",
-                        relation_file.display(),
-                        e
-                    );
-                    std::process::exit(1);
-                }
-            };
-            // Import the relation embeddings.
-            match RelationEmbedding::import_relation_embeddings(
-                &pool,
-                relation_file,
-                delimeter,
-                drop,
-                Some(table_name),
-            )
-            .await
-            {
-                Ok(_) => {
-                    info!("Import the relation embeddings successfully.");
-                }
-                Err(e) => {
-                    error!("Failed to import the relation embeddings: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            true
         }
         Err(e) => {
-            error!("Failed to init the embedding tables: {}", e);
+            if drop {
+                info!("The embedding tables already exist, drop their records and reimport the embeddings.");
+                true
+            } else {
+                error!("Failed to init the embedding tables: {}", e);
+                std::process::exit(1);
+            }
+        }
+    };
+
+    let delimiter = match get_delimiter(relation_file) {
+        Ok(d) => d,
+        Err(e) => {
+            error!(
+                "Failed to get the delimiter of the {}: {}",
+                relation_file.display(),
+                e
+            );
+            std::process::exit(1);
+        }
+    };
+
+    if fileformat == "relation_embedding" {
+        // Import the relation embeddings.
+        match RelationEmbedding::import_relation_embeddings(
+            &pool,
+            relation_file,
+            delimiter,
+            drop,
+            Some(table_name),
+        )
+        .await
+        {
+            Ok(_) => {
+                info!("Import the relation embeddings successfully.");
+            }
+            Err(e) => {
+                error!("Failed to import the relation embeddings: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        let annotation_file = annotation_file.as_ref().unwrap();
+        match LegacyRelationEmbedding::import_relation_embeddings(
+            &pool,
+            relation_file,
+            annotation_file,
+            drop,
+            Some(table_name),
+            delimiter,
+        )
+        .await
+        {
+            Ok(_) => {
+                info!(
+                    "Import the relation embeddings successfully with the annotation file: {}",
+                    annotation_file.display()
+                );
+            }
+            Err(e) => {
+                error!("Failed to import the relation embeddings: {}", e);
+                std::process::exit(1);
+            }
+        };
+    }
+
+    let delimiter = match get_delimiter(entity_file) {
+        Ok(d) => d,
+        Err(e) => {
+            error!(
+                "Failed to get the delimiter of the {}: {}",
+                entity_file.display(),
+                e
+            );
+            std::process::exit(1);
+        }
+    };
+    // Import the entity embeddings.
+    match EntityEmbedding::import_entity_embeddings(
+        &pool,
+        entity_file,
+        delimiter,
+        drop,
+        Some(table_name),
+    )
+    .await
+    {
+        Ok(_) => {
+            info!("Import the entity embeddings successfully.");
+        }
+        Err(e) => {
+            error!("Failed to import the entity embeddings: {}", e);
             std::process::exit(1);
         }
     }

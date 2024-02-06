@@ -1,7 +1,9 @@
 //! Utility functions for the model module. Contains functions to import data from CSV files into the database, and to update the metadata tables.
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
+use polars::prelude::IntoVec;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -53,6 +55,45 @@ pub fn match_color(entity_type: &str) -> String {
     }
 
     DEFAULT_COLOR.to_string()
+}
+
+pub fn read_annotation_file(filepath: &PathBuf) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let delimiter = get_delimiter(filepath).unwrap();
+
+    // Read the annotation file into a hashmap.
+    let mut relation_type_mappings = std::collections::HashMap::new();
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .delimiter(delimiter)
+        .from_path(filepath)
+        .unwrap();
+
+    // Check the annotation file format.
+    let headers = reader.headers().unwrap();
+    for col in ["relation_type", "formatted_relation_type"].iter() {
+        if !headers.into_vec().contains(&col.to_string()) {
+            return Err(format!("The annotation file should have two columns: relation_type and formatted_relation_type. But we found that the annotation file has no {} column.", col).into());
+        }
+    }
+
+    let relation_type_index = headers.iter().position(|h| h == "relation_type").unwrap();
+    let formatted_relation_type_index = headers
+        .iter()
+        .position(|h| h == "formatted_relation_type")
+        .unwrap();
+
+    // Only get the relation_type and formatted_relation_type columns from the annotation file.
+    for result in reader.records() {
+        let record = result.unwrap();
+        let relation_type = record.get(relation_type_index).unwrap().to_string();
+        let formatted_relation_type = record
+            .get(formatted_relation_type_index)
+            .unwrap()
+            .to_string();
+        relation_type_mappings.insert(relation_type, formatted_relation_type);
+    }
+
+    Ok(relation_type_mappings)
 }
 
 /// Update the existing colors with the new entity types.
@@ -260,12 +301,24 @@ pub async fn update_relation_metadata(
         drop_table(&pool, table_name).await;
     };
 
-    info!("Update relation metadata from metadata file.");
+    info!("Load relation metadata from an annotation file.");
 
     let delimiter = get_delimiter(metadata_filepath)?;
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_path(metadata_filepath)?;
+
+    let headers = reader.headers().unwrap();
+    for col in ["relation_type", "description"].iter() {
+        if !headers.into_iter().contains(col) {
+            return Err(format!(
+                "Column {} not found in the {} file. You should specify a file with the columns 'relation_type' and 'description' for annotating the relation types in the relation table.",
+                col,
+                metadata_filepath.display()
+            )
+            .into());
+        }
+    }
 
     let mut records = Vec::new();
     for result in reader.deserialize::<RelationMetadata>() {

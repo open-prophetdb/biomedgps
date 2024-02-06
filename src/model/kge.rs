@@ -2,14 +2,14 @@ use super::core::{
     CheckData, ValidationError, DEFAULT_DATASET_NAME, DEFAULT_MAX_LENGTH, DEFAULT_MIN_LENGTH,
     ENTITY_ID_REGEX, ENTITY_LABEL_REGEX, ENTITY_NAME_MAX_LENGTH,
 };
-use super::util::{drop_table, get_delimiter, parse_csv_error};
+use super::util::{drop_table, get_delimiter, parse_csv_error, read_annotation_file};
 use crate::pgvector::Vector;
 use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::{debug, info, warn};
 use poem_openapi::Object;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -20,8 +20,15 @@ use validator::Validate;
 
 pub const DEFAULT_MODEL_NAME: &str = "biomedgps";
 
-pub const DEFAULT_MODEL_TYPES: [&str; 7] = [
-    "TransE", "TransH", "TransR", "TransD", "RotatE", "DistMult", "ComplEx",
+pub const DEFAULT_MODEL_TYPES: [&str; 8] = [
+    "TransE_l2",
+    "TransE_l1",
+    "TransH",
+    "TransR",
+    "TransD",
+    "RotatE",
+    "DistMult",
+    "ComplEx",
 ];
 
 lazy_static! {
@@ -467,9 +474,10 @@ impl EmbeddingMetadata {
             .await?;
 
         if count.0 > 0 {
-            return Err(Box::new(ValidationError::new(
-                "The table name and model name already exists.",
-            )));
+            return Err(Box::new(ValidationError::new(&format!(
+                "The table {} and model {} already exists.",
+                table_name, model_name
+            ))));
         }
 
         let m = match metadata {
@@ -493,6 +501,10 @@ impl EmbeddingMetadata {
         // Check if the table exists
         let entity_emb_table_name = get_entity_emb_table_name(table_name);
         let relation_emb_table_name = get_relation_emb_table_name(table_name);
+        info!(
+            "Check if the entity embedding table ({}) and relation embedding table ({}) exist.",
+            &entity_emb_table_name, &relation_emb_table_name
+        );
         let err_msg = match check_table_is_valid(&pool, &vec![&entity_emb_table_name]).await {
             Ok(_) => "".to_string(),
             Err(e) => {
@@ -510,6 +522,8 @@ impl EmbeddingMetadata {
                 "Create the entity embedding table failed: {}",
                 err_msg
             ))));
+        } else {
+            info!("The entity embedding table has been created successfully.");
         }
 
         let err_msg = match check_table_is_valid(&pool, &vec![&relation_emb_table_name]).await {
@@ -529,6 +543,8 @@ impl EmbeddingMetadata {
                 "Create the relation embedding table failed: {}",
                 err_msg
             ))));
+        } else {
+            info!("The relation embedding table has been created successfully.");
         }
 
         tx.commit().await?;
@@ -728,6 +744,7 @@ impl EntityEmbedding {
         drop: bool,
         table_name: Option<&str>,
     ) -> Result<(), Box<dyn Error>> {
+        let mut tx = pool.begin().await.unwrap();
         let real_table_name = match table_name {
             Some(t) => get_entity_emb_table_name(t),
             None => get_entity_emb_table_name(DEFAULT_MODEL_NAME),
@@ -763,20 +780,25 @@ impl EntityEmbedding {
 
             let sql_str = format!("INSERT INTO {} (embedding_id, entity_id, entity_type, entity_name, embedding) VALUES ($1, $2, $3, $4, $5)", real_table_name);
 
+            // Execute the no more than 1000 queries in one transaction
             let query = sqlx::query(&sql_str)
                 .bind(record.embedding_id)
                 .bind(record.entity_id)
                 .bind(record.entity_type)
                 .bind(record.entity_name)
-                .bind(record.embedding);
+                .bind(record.embedding)
+                .execute(&mut tx)
+                .await;
 
-            match query.execute(pool).await {
+            match query {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(Box::new(e));
                 }
             };
         }
+
+        tx.commit().await.unwrap();
 
         Ok(())
     }
@@ -799,6 +821,96 @@ impl CheckData for EntityEmbedding {
             "entity_name".to_string(),
             "embedding".to_string(),
         ]
+    }
+}
+
+/// A legacy struct for relation embedding, it is only for checking the relation embedding csv file.
+#[derive(Debug, Clone, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
+pub struct LegacyRelationEmbedding {
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of relation_type should be between 1 and 64."
+    ))]
+    pub id: String,
+
+    #[serde(deserialize_with = "text2vector")]
+    pub embedding: Vector,
+}
+
+impl LegacyRelationEmbedding {
+    pub async fn import_relation_embeddings(
+        pool: &sqlx::PgPool,
+        filepath: &PathBuf,
+        annotated_relation_file: &PathBuf,
+        drop: bool,
+        table_name: Option<&str>,
+        delimiter: u8,
+    ) -> Result<(), Box<dyn Error>> {
+        let real_table_name = match table_name {
+            Some(t) => get_relation_emb_table_name(t),
+            None => get_relation_emb_table_name(DEFAULT_MODEL_NAME),
+        };
+
+        if drop {
+            drop_table(&pool, &real_table_name).await;
+        };
+
+        let relation_type_mappings = read_annotation_file(annotated_relation_file).unwrap();
+
+        let mut reader = match csv::ReaderBuilder::new()
+            .delimiter(delimiter)
+            .from_path(filepath)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        };
+
+        debug!(
+            "The columns of the relation embedding csv file: {:?}",
+            reader.headers().unwrap()
+        );
+
+        let mut line_num = 1;
+        for record in reader.deserialize() {
+            let record: LegacyRelationEmbedding = record.unwrap();
+            let relation_type = record.id;
+            let formatted_relation_type = relation_type_mappings.get(&relation_type).unwrap();
+            let sql_str = format!("INSERT INTO {} (embedding_id, relation_type, formatted_relation_type, embedding) VALUES ($1, $2, $3)", real_table_name);
+
+            let query = sqlx::query(&sql_str)
+                .bind(line_num)
+                .bind(relation_type)
+                .bind(formatted_relation_type)
+                .bind(record.embedding);
+
+            match query.execute(pool).await {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+
+            line_num += 1;
+        }
+
+        Ok(())
+    }
+}
+
+impl CheckData for LegacyRelationEmbedding {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<LegacyRelationEmbedding>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec!["id".to_string()]
+    }
+
+    fn fields() -> Vec<String> {
+        vec!["id".to_string(), "embedding".to_string()]
     }
 }
 
@@ -915,7 +1027,7 @@ impl RelationEmbedding {
             record.embedding_id = line_number;
             line_number += 1;
 
-            let sql_str = format!("INSERT INTO {} (embedding_id, relation_type, formatted_relation_type, embedding) VALUES ($1, $2, $3)", real_table_name);
+            let sql_str = format!("INSERT INTO {} (embedding_id, relation_type, formatted_relation_type, embedding) VALUES ($1, $2, $3, $4)", real_table_name);
 
             let query = sqlx::query(&sql_str)
                 .bind(record.embedding_id)
