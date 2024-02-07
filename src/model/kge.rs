@@ -877,8 +877,11 @@ impl LegacyRelationEmbedding {
         for record in reader.deserialize() {
             let record: LegacyRelationEmbedding = record.unwrap();
             let relation_type = record.id;
-            let formatted_relation_type = relation_type_mappings.get(&relation_type).unwrap();
-            let sql_str = format!("INSERT INTO {} (embedding_id, relation_type, formatted_relation_type, embedding) VALUES ($1, $2, $3)", real_table_name);
+            let formatted_relation_type = match relation_type_mappings.get(&relation_type) {
+                Some(t) => t.to_string(),
+                None => relation_type.clone(),
+            };
+            let sql_str = format!("INSERT INTO {} (embedding_id, relation_type, formatted_relation_type, embedding) VALUES ($1, $2, $3, $4)", real_table_name);
 
             let query = sqlx::query(&sql_str)
                 .bind(line_num)
