@@ -1351,11 +1351,6 @@ pub async fn import_kge(
             // If the old format is valid, we will return the old format.
             fileformat = "legacy_relation_embedding";
             info!("{} is valid.", relation_file.display());
-
-            if annotation_file.is_none() {
-                error!("Please specify an annotation file for the legacy relation embedding.");
-                std::process::exit(1);
-            }
         } else {
             show_errors(&errors, show_all_errors);
             std::process::exit(1);
@@ -1441,7 +1436,6 @@ pub async fn import_kge(
             }
         }
     } else {
-        let annotation_file = annotation_file.as_ref().unwrap();
         match LegacyRelationEmbedding::import_relation_embeddings(
             &pool,
             relation_file,
@@ -1454,8 +1448,7 @@ pub async fn import_kge(
         {
             Ok(_) => {
                 info!(
-                    "Import the relation embeddings successfully with the annotation file: {}",
-                    annotation_file.display()
+                    "Import the relation embeddings successfully. The relation embeddings are in the old format.",
                 );
             }
             Err(e) => {

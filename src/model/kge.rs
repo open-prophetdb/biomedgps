@@ -842,7 +842,7 @@ impl LegacyRelationEmbedding {
     pub async fn import_relation_embeddings(
         pool: &sqlx::PgPool,
         filepath: &PathBuf,
-        annotated_relation_file: &PathBuf,
+        annotated_relation_file: &Option<PathBuf>,
         drop: bool,
         table_name: Option<&str>,
         delimiter: u8,
@@ -856,7 +856,17 @@ impl LegacyRelationEmbedding {
             drop_table(&pool, &real_table_name).await;
         };
 
-        let relation_type_mappings = read_annotation_file(annotated_relation_file).unwrap();
+        let relation_type_mappings = match annotated_relation_file {
+            None => HashMap::new(),
+            Some(annotated_relation_file) => {
+                match read_annotation_file(annotated_relation_file) {
+                    Ok(mappings) => mappings,
+                    Err(e) => {
+                        return Err(e)
+                    }
+                }
+            }
+        };
 
         let mut reader = match csv::ReaderBuilder::new()
             .delimiter(delimiter)

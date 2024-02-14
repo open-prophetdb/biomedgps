@@ -10,7 +10,7 @@ use log::*;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-/// A cli for rnmpdb.
+/// A cli for biomedgps service.
 #[derive(StructOpt, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name = "A cli for biomedgps service.", author="Jingcheng Yang <yjcyxky@163.com>;")]
 struct Opt {
@@ -48,11 +48,11 @@ pub struct InitDbArguments {
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importdb", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct ImportDBArguments {
-    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
+    /// [Required] Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// The file path of the data file to import. It may be a file or a directory. If you have multiple files to import, you can use the --filepath option with a directory path. We will import all files in the directory. But you need to disable the --drop option, otherwise, only the last file will be imported successfully.
+    /// [Required] The file path of the data file to import. It may be a file or a directory. If you have multiple files to import, you can use the --filepath option with a directory path. We will import all files in the directory. But you need to disable the --drop option, otherwise, only the last file will be imported successfully.
     ///
     /// In the case of entity, the file should be a csv/tsv file which contains the id, name, label etc. More details about the format can be found in the github.com/yjcyxky/biomedgps-data.
     ///
@@ -68,7 +68,7 @@ pub struct ImportDBArguments {
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
-    /// Annotation file path. This option is only required for relation table. It is used to annotate relation_type or other attributes. In current version, it is only used for relation_type.
+    /// [Optional] Annotation file path. This option is only required for relation table. It is used to annotate relation_type or other attributes. In current version, it is only used for relation_type.
     ///
     /// The annotation file is a csv/tsv file which contains two columns: relation_type and formatted_relation_type. e.g. relation_type,formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.
     ///
@@ -84,19 +84,19 @@ pub struct ImportDBArguments {
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
-    /// Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
+    /// [Optional] Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
 
-    /// Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
+    /// [Optional] Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
 
-    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model. It is only required for relation table.
+    /// [Optional] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model. It is only required for relation table.
     #[structopt(name = "dataset", long = "dataset")]
     dataset: Option<String>,
 
-    /// Show the first 3 errors when import data.
+    /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
 }
@@ -105,35 +105,35 @@ pub struct ImportDBArguments {
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importgraph", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct ImportGraphArguments {
-    /// Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
+    /// [Required] Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
     #[structopt(name = "neo4j_url", short = "n", long = "neo4j-url")]
     neo4j_url: Option<String>,
 
-    /// The file path of the data file to import. It may be a file or a directory.
+    /// [Required] The file path of the data file to import. It may be a file or a directory.
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
-    /// The file type of the data file to import. It may be entity, relation, entity_attribute and relation_attribute.
+    /// [Required] The file type of the data file to import. It may be entity, relation, entity_attribute and relation_attribute.
     #[structopt(name = "filetype", short = "t", long = "filetype")]
     filetype: Option<String>,
 
-    /// Batch size for import data. Default is 1000.
+    /// [Optional] Batch size for import data. Default is 1000.
     #[structopt(name = "batch_size", short = "b", long = "batch-size")]
     batch_size: Option<usize>,
 
-    /// Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
+    /// [Optional] Don't check other related tables in the database. Such as knowledge_curation which might be related to entity.
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
 
-    /// Check if the data exists in the database before import data.
+    /// [Optional] Check if the data exists in the database before import data.
     #[structopt(name = "check_exist", short = "c", long = "check-exist")]
     check_exist: bool,
 
-    /// Show the first 3 errors when import data.
+    /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
 
-    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
+    /// [Optional] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
     #[structopt(name = "dataset", short = "d", long = "dataset")]
     dataset: Option<String>,
 }
@@ -143,11 +143,11 @@ pub struct ImportGraphArguments {
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - importkge", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct ImportKGEArguments {
-    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
+    /// [Optional] Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// The file path of the data file to import.
+    /// [Required] The file path of the data file to import. It must be a csv/tsv file which contains the embedding_id, entity_id, entity_type, entity_name, embedding columns. And the embedding column is a string which contains the embedding values separated by pipe and the dimension of the embedding should be 400 or other values. e.g. Gene::ENTREZ:6747,ENTREZ:6747,Gene,SSR3,0.1|0.2|0.3|0.4|0.5
     #[structopt(
         name = "entity_embedding_file",
         short = "e",
@@ -155,7 +155,7 @@ pub struct ImportKGEArguments {
     )]
     entity_embedding_file: String,
 
-    /// The file path of the data file to import.
+    /// [Required] The file path of the data file to import. It must be a csv/tsv file which contains the embedding_id, relation_type, formatted_relation_type, embedding columns. And the embedding column is a string which contains the embedding values separated by pipe and the dimension of the embedding should be 400 or other values. e.g. 1,STRING::BINDING::Gene:Gene,STRING::BINDING::Gene:Gene,0.1|0.2|0.3|0.4|0.5
     #[structopt(
         name = "relation_embedding_file",
         short = "r",
@@ -163,11 +163,11 @@ pub struct ImportKGEArguments {
     )]
     relation_embedding_file: String,
 
-    /// The file path of the metadata file to import.
+    /// [Required] The file path of the metadata file to import. It must be a json file which contains the metadata of the model. Such as the model name, model type, description, learning rate, batch size, epochs, etc. If you don't have the metadata file, you can use a empty json file. e.g. {}
     #[structopt(name = "metadata_file", short = "m", long = "metadata-file")]
     metadata_file: String,
 
-    /// The table name you want to name. e.g. biomedgps, mecfs, etc. This feature is used to distinguish different dataset combinations matched with your model. If not set, we will use the biomedgps as default. But in this case, the dimension of the embedding should be 400.
+    /// [Optional] The table name you want to name. e.g. biomedgps, mecfs, etc. This feature is used to distinguish different dataset combinations matched with your model. If not set, we will use the biomedgps as default. But in this case, the dimension of the embedding should be 400.
     #[structopt(
         name = "table_name",
         short = "t",
@@ -176,7 +176,7 @@ pub struct ImportKGEArguments {
     )]
     table_name: String,
 
-    /// The model name you want to name. e.g. mecfs_transe, mecfs_distmult, etc. You need to specify the model name when you import the embedding files. This feature is used to distinguish different models. Users can choose the model for their own purpose.
+    /// [Optional] The model name you want to name. e.g. mecfs_transe, mecfs_distmult, etc. You need to specify the model name when you import the embedding files. This feature is used to distinguish different models. Users can choose the model for their own purpose.
     #[structopt(
         name = "model_name", 
         short = "m", 
@@ -185,31 +185,35 @@ pub struct ImportKGEArguments {
     )]
     model_name: String,
 
-    /// The model type of generated embedding files. e.g. TransE, DistMult, etc.
+    /// [Required] The model type of generated embedding files. e.g. TransE_l1, TransE_l2, DistMult, ComplEx, etc. This feature is used to distinguish different models. Users can choose the model for their own purpose.
     #[structopt(name = "model_type", short = "M", long = "model-type")]
     model_type: String,
 
-    /// Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
+    /// [Required] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model. 
+    /// 
+    /// If you have multiple datasets, you can use the --dataset option with multiple values. e.g. --dataset biomedgps --dataset mecfs
+    /// 
+    /// Each dataset must be registered in the relation table by the importdb command. If not, the import might fail.
     #[structopt(name = "dataset", long = "dataset", multiple = true)]
     dataset: Vec<String>,
 
-    /// Description of the model.
+    /// [Optional] Description of the model.
     #[structopt(name = "description", short = "D", long = "description")]
     description: Option<String>,
 
-    /// Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
+    /// [Optional] Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
     #[structopt(name = "drop", short = "D", long = "drop")]
     drop: bool,
 
-    /// Don't check the validity of the data files.
+    /// [Optional] Don't check the validity of the data files.
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
 
-    /// Show the first 3 errors when import data.
+    /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
 
-    /// Annotation file path. This option is only required for legacy relation_embedding file which only contains id, embedding columns.
+    /// [Optional] Annotation file path. This option is only required for legacy relation_embedding file which only contains id, embedding columns.
     ///
     /// The annotation file is a csv/tsv file which contains two columns: relation_type and formatted_relation_type. e.g. relation_type,formatted_relation_type. If you don't want to format the relation_type, you can use the same value for the two columns.
     ///
