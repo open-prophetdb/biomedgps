@@ -1161,6 +1161,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         node_id: Query<String>,
+        relation_type: Query<String>,
         query_str: Query<Option<String>>,
         topk: Query<Option<u64>>,
         model_name: Query<Option<String>>,
@@ -1168,7 +1169,7 @@ impl BiomedgpsApi {
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
 
-        match SimilarityNodeQuery::new(&node_id.0, &query_str.0, topk.0) {
+        match SimilarityNodeQuery::new(&node_id.0, &relation_type.0, &query_str.0, topk.0) {
             Ok(query) => query,
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -1204,12 +1205,12 @@ impl BiomedgpsApi {
 
         let mut graph = Graph::new();
         match graph
-            .fetch_similarity_nodes(&pool_arc, &node_id, &query, topk, model_name.0)
+            .fetch_similarity_nodes(&pool_arc, &node_id, &relation_type, &query, topk, model_name.0)
             .await
         {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
-                let err = format!("Failed to fetch similarity nodes: {}", e);
+                let err = format!("{}", e);
                 warn!("{}", err);
                 return GetGraphResponse::bad_request(err);
             }

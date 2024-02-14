@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::model::core::{RecordResponse, Statistics, RelationCount};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::graph::Graph;
-use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX};
+use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
 use log::{debug, info, warn};
 use poem_openapi::Object;
 use poem_openapi::{payload::Json, ApiResponse, Tags};
@@ -378,6 +378,12 @@ pub struct SimilarityNodeQuery {
     pub node_id: String,
 
     #[validate(regex(
+        path = "RELATION_TYPE_REGEX",
+        message = "Invalid relation type, it must be a valid relation type. e.g. biomedgps::treats::Compound:Disease"
+    ))]
+    pub relation_type: String,
+
+    #[validate(regex(
         path = "JSON_REGEX",
         message = "Invalid query string, it must be a json string"
     ))]
@@ -394,11 +400,13 @@ pub struct SimilarityNodeQuery {
 impl SimilarityNodeQuery {
     pub fn new(
         node_id: &str,
+        relation_type: &str,
         query_str: &Option<String>,
         topk: Option<u64>,
     ) -> Result<Self, ValidationErrors> {
         let query = Self {
             node_id: node_id.to_string(),
+            relation_type: relation_type.to_string(),
             query_str: query_str.clone(),
             topk,
         };

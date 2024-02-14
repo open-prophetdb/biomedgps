@@ -60,11 +60,11 @@ async fn check_table_is_valid(
     Ok(())
 }
 
-fn get_entity_emb_table_name(table_name: &str) -> String {
+pub fn get_entity_emb_table_name(table_name: &str) -> String {
     format!("{}_entity_embedding", table_name)
 }
 
-fn get_relation_emb_table_name(table_name: &str) -> String {
+pub fn get_relation_emb_table_name(table_name: &str) -> String {
     format!("{}_relation_embedding", table_name)
 }
 
@@ -858,14 +858,10 @@ impl LegacyRelationEmbedding {
 
         let relation_type_mappings = match annotated_relation_file {
             None => HashMap::new(),
-            Some(annotated_relation_file) => {
-                match read_annotation_file(annotated_relation_file) {
-                    Ok(mappings) => mappings,
-                    Err(e) => {
-                        return Err(e)
-                    }
-                }
-            }
+            Some(annotated_relation_file) => match read_annotation_file(annotated_relation_file) {
+                Ok(mappings) => mappings,
+                Err(e) => return Err(e),
+            },
         };
 
         let mut reader = match csv::ReaderBuilder::new()

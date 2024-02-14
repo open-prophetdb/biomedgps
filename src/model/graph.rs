@@ -5,8 +5,12 @@
 //! - The module is used to fetch the graph data from the postgresql database or neo4j graph database and convert it to the graph data structure which can be used by the frontend.
 //!
 
+use super::core::KnowledgeCuration;
 use crate::model::core::{Entity, RecordResponse, Relation, DEFAULT_DATASET_NAME};
-use crate::model::kge::{get_embedding_metadata, DEFAULT_MODEL_NAME};
+use crate::model::kge::{
+    get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
+    EmbeddingMetadata, DEFAULT_MODEL_NAME,
+};
 use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
@@ -19,8 +23,6 @@ use std::collections::HashMap;
 use std::vec;
 use std::{error::Error, fmt};
 
-use super::core::KnowledgeCuration;
-
 // The delimiter is defined here, if we want to change it, please change it here.
 pub const COMPOSED_ENTITY_DELIMITER: &str = "::";
 
@@ -31,6 +33,9 @@ lazy_static! {
     // There is a comma between the composed entitys, each composed entity must be composed of entity type, ::, and entity id. e.g. Disease::MESH:D001755,Drug::CHEMBL:CHEMBL88
     pub static ref COMPOSED_ENTITIES_REGEX: Regex =
         Regex::new(r"^[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+(,[A-Za-z]+::[A-Za-z0-9\-]+:[a-z0-9A-Z\.\-_]+)*$").unwrap();
+
+    // The composed relation type is like "biomedgps::relation_type_abbr::Compound:Disease"
+    pub static ref RELATION_TYPE_REGEX: Regex = Regex::new(r"^([A-Za-z0-9\-_]+)::([A-Za-z0-9\-_ \+]+)::([A-Z][a-z]+):([A-Z][a-z]+)$").unwrap();
 
     // Only for predicted edge
     pub static ref PREDICTED_EDGE_COLOR_MAP: HashMap<&'static str, &'static str> = {
@@ -464,7 +469,10 @@ impl EdgeData {
             score: relation.score.unwrap_or(0.0),
             key_sentence: relation.key_sentence.clone().unwrap_or("".to_string()),
             resource: relation.resource.clone(),
-            dataset: relation.dataset.clone().unwrap_or(DEFAULT_DATASET_NAME.to_string()),
+            dataset: relation
+                .dataset
+                .clone()
+                .unwrap_or(DEFAULT_DATASET_NAME.to_string()),
             pmids: relation.pmids.clone().unwrap_or("".to_string()),
         }
     }
@@ -594,29 +602,31 @@ impl Edge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow)]
-struct SimilarityNode {
+struct TargetNode {
     node_id: String,
-    distance: Option<f64>,
+    score: Option<f64>, // The score is the distance between the nodes and the relation type
 }
 
-impl SimilarityNode {
-    /// Fetch the similar nodes from the database by node id. It is based on the node embeddings.
-    /// We will use the pgvector extension to calculate the similarity between the node embeddings.
+impl TargetNode {
+    /// Fetch the target nodes from the database by node id. It is based on the node embeddings and relation_type embedding.
+    /// We will use custom functions in the pgml extension to calculate the score between the nodes and the relation_type.
     ///
     /// # Arguments
     ///
     /// * `pool` - The database connection pool.
     /// * `node_id` - The id of the node. It is the combination of the node type and the node id. Such as "Gene::ENTREZ:123".
+    /// * `relation_type` - The relation type of the nodes. It is the combination of the source type and the target type. Such as "STRING::BINDING::Gene:Gene".
     /// * `query` - The query to filter the nodes. It is a compose query. More details on the compose query can be found in the [`ComposeQuery`](struct.ComposeQuery.html) struct.
-    /// * `topk` - The number of the similar nodes to be fetched. default is 10.
+    /// * `topk` - The number of the target nodes to be fetched. default is 10.
     ///
     /// # Returns
     ///
-    /// * `Result<Vec<Self>, ValidationError>` - The similar nodes.
+    /// * `Result<Vec<Self>, ValidationError>` - The target nodes.
     ///
-    pub async fn fetch_similarity_nodes(
+    pub async fn fetch_target_nodes(
         pool: &sqlx::PgPool,
         node_id: &str,
+        relation_type: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
         model_table_name: Option<String>,
@@ -626,61 +636,46 @@ impl SimilarityNode {
             None => DEFAULT_MODEL_NAME.to_string(),
         };
 
-        let embedding_metadata = get_embedding_metadata(&model_or_table_name);
-        if embedding_metadata.is_none() {
-            error!("Failed to get the embedding metadata from the database");
-            return Err(ValidationError::new(
-                "Failed to get the embedding metadata from the database, so we don't know how to calculate the similarity for the node. Please check the database or the model/table name you provided.",
-                vec![],
-            ));
-        };
-
-        let default_query = ComposeQuery::QueryItem(QueryItem::new(
-            format!(
-                "COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '')",
-                COMPOSED_ENTITY_DELIMITER
-            ),
-            Value::String(node_id.to_string()),
-            "<>".to_string(),
-        ));
-
-        let query_str = match query {
-            Some(query) => ComposeQueryItem::new("and")
-                .add_item(query.clone())
-                .add_item(default_query)
-                .format(),
-            None => ComposeQueryItem::default().add_item(default_query).format(),
-        };
-
         // The first one is the node itself, so we need to add 1 to the topk
         let topk = match topk {
             Some(topk) => topk,
             None => 10,
         };
 
-        // Example:
-        // SELECT COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') AS node_id,
-        //         embedding <-> (SELECT embedding FROM biomedgps_entity_embedding
-        // 					      WHERE COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') = 'Chemical::MESH:C000601183') AS distance
-        // FROM biomedgps_entity_embedding
-        // WHERE entity_type = 'Chemical' AND COALESCE(entity_type, '') || '::' || COALESCE(entity_id, '') <> 'Chemical::MESH:C000601183'
-        // ORDER BY distance ASC
-        // LIMIT 5;
+        let (entity_type, entity_id) = Node::parse_id(node_id);
 
-        let sql_str = format!(
-            "SELECT COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '') AS node_id, 
-                    embedding <-> (SELECT embedding FROM biomedgps_entity_embedding 
-                                   WHERE COALESCE(entity_type, '') || '{}' || COALESCE(entity_id, '') = $1) AS distance 
-             FROM biomedgps_entity_embedding 
-             WHERE {}
-             ORDER BY distance ASC
-             LIMIT {};",
-            COMPOSED_ENTITY_DELIMITER, COMPOSED_ENTITY_DELIMITER, query_str, topk
-        );
+        let embedding_metadata = match get_embedding_metadata(&model_or_table_name) {
+            Some(metadata) => metadata,
+            None => {
+                error!("Failed to get the embedding metadata from the database");
+                return Err(ValidationError::new(
+                    "Failed to get the embedding metadata from the database, so we don't know how to calculate the similarity for the node. Please check the database or the model/table name you provided.",
+                    vec![],
+                ));
+            }
+        };
+
+        // TODO: We need to allow the user to set the score function, gamma and exp_enabled
+        let gamma = 12.0;
+        let sql_str = match Graph::format_score_sql(
+            &entity_id,
+            &entity_type,
+            relation_type,
+            &embedding_metadata,
+            topk,
+            gamma,
+        ) {
+            Ok(sql_str) => sql_str,
+            Err(err) => {
+                let err_msg = format!("Failed to format the score sql: {}", err);
+                error!("{}", &err_msg);
+                return Err(ValidationError::new(&err_msg, vec![]));
+            }
+        };
 
         debug!(
-            "sql_str: {} with arguments $1: `{}`, $2: `{}`",
-            sql_str, node_id, query_str
+            "sql_str: {} with arguments node_id: `{}`, relation_type: `{}`, topk: `{:?}`",
+            sql_str, node_id, relation_type, topk
         );
 
         match sqlx::query_as::<_, Self>(sql_str.as_str())
@@ -691,25 +686,24 @@ impl SimilarityNode {
             Ok(similarity_nodes) => {
                 let filtered_similarity_nodes = similarity_nodes
                     .into_iter()
-                    .filter(|node| node.distance.is_some())
+                    .filter(|node| node.score.is_some())
                     .collect::<Vec<Self>>();
 
                 if filtered_similarity_nodes.is_empty() {
-                    error!("No similar nodes found, you may need to check the node id {} or check if the embedding database matches the entity database", node_id);
-                    return Err(ValidationError::new(
-                        "No similar nodes found, please check your input.",
-                        vec![],
-                    ));
+                    let err_msg = format!(
+                        "No similar nodes found for the node id `{}` and the relation type `{}`, you may need to check the node id or ask the admin to check if the embedding database matches the entity database",
+                        node_id, relation_type
+                    );
+                    error!("{}", &err_msg);
+                    return Err(ValidationError::new(&err_msg, vec![]));
                 } else {
                     return Ok(filtered_similarity_nodes);
                 }
             }
             Err(err) => {
-                error!("Failed to fetch similarity nodes from database: {}", err);
-                Err(ValidationError::new(
-                    "Failed to fetch similarity nodes from database, please check your input.",
-                    vec![],
-                ))
+                let err_msg = format!("Failed to fetch similarity nodes from database: {}", err);
+                error!("{}", &err_msg);
+                Err(ValidationError::new(&err_msg, vec![]))
             }
         }
     }
@@ -998,6 +992,249 @@ impl Graph {
         }
     }
 
+    /// Parse the relation type to get the source type and target type
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let relation_type = "biomedgps::Inhibitor::Gene:Gene";
+    /// let (source_type, target_type) = Graph::parse_relation_type(relation_type).unwrap();
+    /// assert_eq!(source_type, "Gene");
+    /// assert_eq!(target_type, "Gene");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If the relation type is not valid, it will return an error.
+    ///
+    /// ```
+    /// use biomedgps::model::graph::Graph;
+    ///
+    /// let relation_type = "biomedgps::Inhibitor::Gene:Gene::";
+    /// let result = Graph::parse_relation_type(relation_type);
+    /// assert!(result.is_err());
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `relation_type` - The relation type, like "biomedgps::Inhibitor::Gene:Gene"
+    ///
+    /// # Returns
+    ///
+    /// * `Ok((source_type, target_type))` - The source type and target type
+    /// * `Err(ValidationError)` - The error message and the invalid relation type
+    ///
+    pub fn parse_relation_type(relation_type: &str) -> Result<(String, String), ValidationError> {
+        RELATION_TYPE_REGEX
+            .captures(relation_type)
+            .map(|captures| {
+                (
+                    captures.get(3).unwrap().as_str().to_string(),
+                    captures.get(4).unwrap().as_str().to_string(),
+                )
+            })
+            .ok_or_else(|| {
+                ValidationError::new(
+                    &format!("The relation type is not valid: {}", relation_type),
+                    vec![relation_type.to_string()],
+                )
+            })
+    }
+
+    /// Generate the SQL to fetch the target nodes from the database
+    ///
+    /// # Arguments
+    ///
+    /// * `source_id` - The id of the source node
+    /// * `source_type` - The type of the source node
+    /// * `target_type` - The type of the target node
+    /// * `relation_type` - The relation type of the nodes
+    /// * `embedding_metadata` - The metadata of the embedding
+    /// * `topk` - The number of the target nodes to be fetched
+    /// * `gamma` - The gamma value for the score function
+    ///
+    /// # Returns
+    ///
+    /// * `Result<String, ValidationError>` - The SQL to fetch the target nodes
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use regex::Regex;
+    /// use chrono::{Utc, NaiveDateTime, DateTime};
+    /// use biomedgps::model::graph::Graph;
+    /// use biomedgps::model::kge::EmbeddingMetadata;
+    ///
+    /// let source_id = "ENTREZ:6747";
+    /// let source_type = "Gene";
+    /// let relation_type = "STRING::BINDING::Gene:Gene";
+    /// let embedding_metadata = EmbeddingMetadata {
+    ///    id: 1,
+    ///    metadata: None,
+    ///    model_name: "biomedgps_transe_l2".to_string(),
+    ///    model_type: "TransE_l2".to_string(),
+    ///    dimension: 400,
+    ///    table_name: "biomedgps".to_string(),
+    ///    created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+    ///    datasets: vec!("STRING".to_string()),
+    ///    description: "The entity embedding trained by the TransE_l2 model".to_string(),
+    /// };
+    /// let topk = 10;
+    /// let gamma = 12.0;
+    /// let sql_str = Graph::format_score_sql(source_id, source_type, relation_type, &embedding_metadata, topk, gamma).unwrap();
+    /// let expected_sql_str = "
+    /// SELECT
+    ///     COALESCE(ee2.entity_type, '') || '::' || COALESCE(ee2.entity_id, '') AS node_id,
+    ///     pgml.transe_l2_ndarray(
+    ///         vector_to_float4(ee1.embedding, 400, false),
+    ///         vector_to_float4(rte.embedding, 400, false),
+    ///         vector_to_float4(ee2.embedding, 400, false),
+    ///         12,
+    ///         true,
+    ///         true
+    ///     ) AS score
+    /// FROM
+    ///     biomedgps_entity_embedding ee1,
+    ///     biomedgps_relation_embedding rte,
+    ///     biomedgps_entity_embedding ee2
+    /// WHERE
+    ///     ee1.entity_id = 'ENTREZ:6747'
+    ///     AND ee1.entity_type = 'Gene'
+    ///     AND ee2.entity_type = 'Gene'
+    ///     AND rte.relation_type = 'STRING::BINDING::Gene:Gene'
+    /// GROUP BY
+    ///     ee1.embedding_id,
+    ///     rte.embedding_id,
+    ///     ee2.embedding_id
+    /// ORDER BY score DESC
+    /// LIMIT 10";
+    ///
+    /// // Clear the white spaces
+    /// let re = Regex::new(r"\s+").unwrap();
+    /// let trimmed_sql_str = re.replace_all(&sql_str, " ").trim().to_string();
+    /// let trimmed_expected_sql_str = re.replace_all(&expected_sql_str, " ").trim().to_string();
+    /// assert_eq!(trimmed_sql_str, trimmed_expected_sql_str);
+    /// ```
+    pub fn format_score_sql(
+        source_id: &str,
+        source_type: &str,
+        relation_type: &str,
+        embedding_metadata: &EmbeddingMetadata,
+        topk: u64,
+        gamma: f64,
+    ) -> Result<String, ValidationError> {
+        let (r_source_type, r_target_type) = match Graph::parse_relation_type(relation_type) {
+            Ok((source_type, target_type)) => (source_type, target_type),
+            Err(err) => {
+                error!("Failed to parse the relation type: {}", err);
+                return Err(ValidationError::new(
+                    "Failed to parse the relation type, please check your input.",
+                    vec![],
+                ));
+            }
+        };
+
+        if r_source_type != source_type && r_target_type != source_type {
+            return Err(ValidationError::new(
+                &format!(
+                    "The source type {} is not in the relation type {}",
+                    source_type, relation_type
+                ),
+                vec![source_type.to_string()],
+            ));
+        }
+
+        let reverse = if source_type == r_target_type {
+            true
+        } else {
+            false
+        };
+
+        // TODO: We need to add more score functions here
+        let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
+            "pgml.transe_l2_ndarray"
+        } else if embedding_metadata.model_type == "TransE_l1" {
+            "pgml.transe_l1_ndarray"
+        } else if embedding_metadata.model_type == "DistMult" {
+            "pgml.distmult_ndarray"
+        } else if embedding_metadata.model_type == "ComplEx" {
+            "pgml.complex_ndarray"
+        } else {
+            "pgml.transe_l2_ndarray"
+        };
+
+        // Example SQL:
+        // SELECT
+        //     ee1.entity_id AS head,
+        //     rte.relation_type AS relation_type,
+        //     ee2.entity_id AS tail,
+        //     pgml.transe_l2_ndarray(
+        //             vector_to_float4(ee1.embedding, 400, false),
+        //             vector_to_float4(rte.embedding, 400, false),
+        //             vector_to_float4(ee2.embedding, 400, false),
+        //             12.0,
+        //             true
+        //     ) AS score
+        // FROM
+        //     biomedgps_entity_embedding ee1,
+        //     biomedgps_relation_embedding rte,
+        //     biomedgps_entity_embedding ee2
+        // WHERE
+        //     ee1.entity_id = 'ENTREZ:6747'
+        //     AND ee1.entity_type = 'Gene'
+        //     AND ee2.entity_type = 'Gene'
+        //     AND rte.relation_type = 'STRING::BINDING::Gene:Gene'
+        // GROUP BY
+        //     ee1.embedding_id,
+        //     rte.embedding_id,
+        //     ee2.embedding_id
+        // ORDER BY score DESC
+        // LIMIT 10
+        let sql_str = format!(
+            "SELECT
+                COALESCE(ee2.entity_type, '') || '::' || COALESCE(ee2.entity_id, '') AS node_id,
+                {score_function_name}(
+                        vector_to_float4(ee1.embedding, {dimension}, false),
+                        vector_to_float4(rte.embedding, {dimension}, false),
+                        vector_to_float4(ee2.embedding, {dimension}, false),
+                        {gamma},
+                        true,
+                        {reverse}
+                ) AS score	
+            FROM
+                {entity_embedding_table} ee1,
+                {relation_type_embedding_table} rte,
+                {entity_embedding_table} ee2
+            WHERE
+                ee1.entity_id = '{source_id}' 
+                AND ee1.entity_type = '{source_type}'
+                AND ee2.entity_type = '{target_type}'
+                AND rte.relation_type = '{relation_type}'
+            GROUP BY
+                ee1.embedding_id,
+                rte.embedding_id,
+                ee2.embedding_id
+            ORDER BY score DESC
+            LIMIT {topk}",
+            source_id = source_id,
+            source_type = source_type,
+            target_type = r_target_type,
+            relation_type = relation_type,
+            dimension = embedding_metadata.dimension,
+            topk = topk,
+            reverse = reverse,
+            entity_embedding_table = get_entity_emb_table_name(&embedding_metadata.table_name),
+            relation_type_embedding_table =
+                get_relation_emb_table_name(&embedding_metadata.table_name),
+            score_function_name = score_function_name,
+            gamma = gamma
+        );
+
+        Ok(sql_str)
+    }
+
     /// Parse the composed node id to get the node type and node id
     ///
     /// # Example
@@ -1274,7 +1511,7 @@ impl Graph {
     ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
     ///     let pool = PgPool::connect(database_url).await.unwrap();
     ///     let mut graph = Graph::new();
-    ///     let node_id = "Chemical::MESH:C000601183";
+    ///     let node_id = "Compound::MESH:C000601183";
     ///     let query = None;
     ///     let topk = Some(10);
     ///
@@ -1292,12 +1529,20 @@ impl Graph {
         &mut self,
         pool: &sqlx::PgPool,
         node_id: &str,
+        relation_type: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
         model_table_name: Option<String>,
     ) -> Result<&Self, ValidationError> {
-        match SimilarityNode::fetch_similarity_nodes(pool, node_id, query, topk, model_table_name)
-            .await
+        match TargetNode::fetch_target_nodes(
+            pool,
+            node_id,
+            relation_type,
+            query,
+            topk,
+            model_table_name,
+        )
+        .await
         {
             Ok(similarity_nodes) => {
                 let mut node_ids = similarity_nodes
@@ -1313,7 +1558,7 @@ impl Graph {
                     .map(|similarity_node| {
                         (
                             similarity_node.node_id.as_str(),
-                            similarity_node.distance.unwrap(),
+                            similarity_node.score.unwrap(),
                         )
                     })
                     .collect::<HashMap<&str, f64>>();
@@ -1597,11 +1842,12 @@ mod tests {
         let pool = setup_test_db().await;
 
         let node_id = "Chemical::MESH:C000601183";
+        let relation_type = "biomedgps::treats::Compound:Disease";
         let query = None;
         let topk = Some(10);
 
         match graph
-            .fetch_similarity_nodes(&pool, &node_id, &query, topk, None)
+            .fetch_similarity_nodes(&pool, &node_id, &relation_type, &query, topk, None)
             .await
         {
             Ok(graph) => {
