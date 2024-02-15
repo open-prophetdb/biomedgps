@@ -41,7 +41,7 @@ lazy_static! {
     pub static ref PREDICTED_EDGE_COLOR_MAP: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         // #89CFF0 is light green
-        m.insert("SimilarityNode", "#89CFF0");
+        m.insert("PredictedNode", "#89CFF0");
         // #ccc is gray
         m.insert("Default", "#ccc");
         // ...add more pairs here
@@ -50,7 +50,7 @@ lazy_static! {
 
     pub static ref PREDICTED_EDGE_TYPES: Vec<&'static str> = {
         let mut v = Vec::new();
-        v.push("SimilarityNode");
+        v.push("PredictedNode");
         v.push("Default");
         v
     };
@@ -398,8 +398,8 @@ pub struct EdgeKeyShape {
 impl EdgeKeyShape {
     /// Create a new key shape for the edge.
     pub fn new(relation_type: &str) -> Self {
-        let color = if relation_type == "SimilarityNode" {
-            PREDICTED_EDGE_COLOR_MAP.get("SimilarityNode").unwrap()
+        let color = if relation_type == "PredictedNode" {
+            PREDICTED_EDGE_COLOR_MAP.get("PredictedNode").unwrap()
         } else {
             PREDICTED_EDGE_COLOR_MAP.get("Default").unwrap()
         };
@@ -604,7 +604,7 @@ impl Edge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow)]
 struct TargetNode {
     node_id: String,
-    score: Option<f64>, // The score is the distance between the nodes and the relation type
+    score: Option<f32>, // The score is the distance between the nodes and the relation type
 }
 
 impl TargetNode {
@@ -1558,7 +1558,7 @@ impl Graph {
                     .map(|similarity_node| {
                         (
                             similarity_node.node_id.as_str(),
-                            similarity_node.score.unwrap(),
+                            similarity_node.score.unwrap() as f64,
                         )
                     })
                     .collect::<HashMap<&str, f64>>();
@@ -1578,7 +1578,7 @@ impl Graph {
                                     }
 
                                     let edge = Edge::new(
-                                        "SimilarityNode",
+                                        "PredictedNode",
                                         source_node.data.id.as_str(),
                                         source_node.data.label.as_str(),
                                         node.data.id.as_str(),

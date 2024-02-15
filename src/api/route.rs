@@ -4,7 +4,7 @@ use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetRecordsResponse,
     GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery,
-    Pagination, PaginationQuery, PostResponse, SimilarityNodeQuery, SubgraphIdQuery,
+    Pagination, PaginationQuery, PostResponse, PredictedNodeQuery, SubgraphIdQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
@@ -1155,7 +1155,7 @@ impl BiomedgpsApi {
         path = "/similarity-nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
-        operation_id = "fetchSimilarityNodes"
+        operation_id = "fetchPredictedNodes"
     )]
     async fn fetch_similarity_nodes(
         &self,
@@ -1169,7 +1169,7 @@ impl BiomedgpsApi {
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
 
-        match SimilarityNodeQuery::new(&node_id.0, &relation_type.0, &query_str.0, topk.0) {
+        match PredictedNodeQuery::new(&node_id.0, &relation_type.0, &query_str.0, topk.0) {
             Ok(query) => query,
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);

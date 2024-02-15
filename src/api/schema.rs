@@ -369,7 +369,7 @@ impl NodeIdsQuery {
 }
 
 #[derive(Debug, Deserialize, Validate)]
-pub struct SimilarityNodeQuery {
+pub struct PredictedNodeQuery {
     /// The ID of the object.
     #[validate(regex(
         path = "COMPOSED_ENTITY_REGEX",
@@ -397,7 +397,7 @@ pub struct SimilarityNodeQuery {
     pub topk: Option<u64>,
 }
 
-impl SimilarityNodeQuery {
+impl PredictedNodeQuery {
     pub fn new(
         node_id: &str,
         relation_type: &str,
