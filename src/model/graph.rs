@@ -25,6 +25,7 @@ use std::{error::Error, fmt};
 
 // The delimiter is defined here, if we want to change it, please change it here.
 pub const COMPOSED_ENTITY_DELIMITER: &str = "::";
+pub const PREDICTED_EDGE_TYPE: &str = "PredictedRelation";
 
 lazy_static! {
     pub static ref COMPOSED_ENTITY_REGEX: Regex =
@@ -41,7 +42,7 @@ lazy_static! {
     pub static ref PREDICTED_EDGE_COLOR_MAP: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         // #89CFF0 is light green
-        m.insert("PredictedNode", "#89CFF0");
+        m.insert(PREDICTED_EDGE_TYPE, "#89CFF0");
         // #ccc is gray
         m.insert("Default", "#ccc");
         // ...add more pairs here
@@ -50,7 +51,7 @@ lazy_static! {
 
     pub static ref PREDICTED_EDGE_TYPES: Vec<&'static str> = {
         let mut v = Vec::new();
-        v.push("PredictedNode");
+        v.push(PREDICTED_EDGE_TYPE);
         v.push("Default");
         v
     };
@@ -398,8 +399,8 @@ pub struct EdgeKeyShape {
 impl EdgeKeyShape {
     /// Create a new key shape for the edge.
     pub fn new(relation_type: &str) -> Self {
-        let color = if relation_type == "PredictedNode" {
-            PREDICTED_EDGE_COLOR_MAP.get("PredictedNode").unwrap()
+        let color = if relation_type == PREDICTED_EDGE_TYPE {
+            PREDICTED_EDGE_COLOR_MAP.get(PREDICTED_EDGE_TYPE).unwrap()
         } else {
             PREDICTED_EDGE_COLOR_MAP.get("Default").unwrap()
         };
@@ -1522,7 +1523,7 @@ impl Graph {
     ///     let topk = Some(10);
     ///
     ///     // If you choose None as the model_table_name, it will use the default model/table name `DEFAULT_MODEL_NAME`.
-    ///     match graph.fetch_similarity_nodes(&pool, &node_id, &query, topk, None).await {
+    ///     match graph.fetch_predicted_nodes(&pool, &node_id, &query, topk, None).await {
     ///         Ok(graph) => {
     ///             println!("graph: {:?}", graph);
     ///         }
@@ -1531,7 +1532,7 @@ impl Graph {
     ///         }
     ///     }
     /// }
-    pub async fn fetch_similarity_nodes(
+    pub async fn fetch_predicted_nodes(
         &mut self,
         pool: &sqlx::PgPool,
         node_id: &str,
@@ -1550,24 +1551,43 @@ impl Graph {
         )
         .await
         {
-            Ok(similarity_nodes) => {
-                let mut node_ids = similarity_nodes
+            Ok(predicted_nodes) => {
+                let mut node_ids = predicted_nodes
                     .iter()
-                    .map(|similarity_node| similarity_node.node_id.as_str())
+                    .map(|predicted_node| predicted_node.node_id.as_str())
                     .collect::<Vec<&str>>();
 
                 node_ids.push(node_id);
 
-                // Convert similarity nodes to a hashmap which key is node id and value is distance.
-                let similarity_node_map = similarity_nodes
+                // Convert predicted nodes to a hashmap which key is node id and value is distance.
+                let predicted_node_map = predicted_nodes
                     .iter()
-                    .map(|similarity_node| {
+                    .map(|predicted_node| {
                         (
-                            similarity_node.node_id.as_str(),
-                            similarity_node.score.unwrap() as f64,
+                            predicted_node.node_id.as_str(),
+                            predicted_node.score.unwrap() as f64,
                         )
                     })
                     .collect::<HashMap<&str, f64>>();
+
+                // Allow to label the existing records with any relation type
+                let existing_records = match Relation::exist_records(
+                    pool,
+                    node_id,
+                    &node_ids,
+                    None,  // Some(relation_type),
+                    true,
+                )
+                .await
+                {
+                    Ok(records) => records,
+                    Err(e) => {
+                        return Err(ValidationError::new(
+                            &format!("Error in exist_records: {}", e),
+                            vec![],
+                        ))
+                    }
+                };
 
                 let edges = match self.fetch_nodes_by_ids(pool, &node_ids).await {
                     Ok(graph) => {
@@ -1576,21 +1596,43 @@ impl Graph {
 
                         let mut edges = vec![];
                         for node in nodes {
-                            let distance = similarity_node_map.get(node.id.as_str());
+                            let distance = predicted_node_map.get(node.id.as_str());
                             match distance {
                                 Some(&d) => {
                                     if node.id == source_node.id {
                                         continue;
                                     }
 
-                                    let edge = Edge::new(
-                                        "PredictedNode",
-                                        source_node.data.id.as_str(),
-                                        source_node.data.label.as_str(),
-                                        node.data.id.as_str(),
-                                        node.data.label.as_str(),
-                                        Some(d),
+                                    let first_node_id = format!(
+                                        "{}{}{}",
+                                        source_node.data.label,
+                                        COMPOSED_ENTITY_DELIMITER,
+                                        source_node.data.id
                                     );
+                                    let second_node_id = format!(
+                                        "{}{}{}",
+                                        node.data.label, COMPOSED_ENTITY_DELIMITER, node.data.id
+                                    );
+                                    let ordered_key_str =
+                                        Relation::gen_composed_key(&first_node_id, &second_node_id);
+                                    let edge = match existing_records.get(&ordered_key_str) {
+                                        Some(record) => Edge::new(
+                                            &record.relation_type,
+                                            source_node.data.id.as_str(),
+                                            source_node.data.label.as_str(),
+                                            node.data.id.as_str(),
+                                            node.data.label.as_str(),
+                                            Some(d),
+                                        ),
+                                        None => Edge::new(
+                                            PREDICTED_EDGE_TYPE,
+                                            source_node.data.id.as_str(),
+                                            source_node.data.label.as_str(),
+                                            node.data.id.as_str(),
+                                            node.data.label.as_str(),
+                                            Some(d),
+                                        ),
+                                    };
 
                                     edges.push(edge);
                                 }
@@ -1617,7 +1659,7 @@ impl Graph {
                 Ok(self)
             }
             Err(e) => Err(ValidationError::new(
-                &format!("Error in fetch_similarity_nodes: {}", e),
+                &format!("Error in fetch_predicted_nodes: {}", e),
                 vec![],
             )),
         }
@@ -1840,7 +1882,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_similarity_nodes() {
+    async fn test_fetch_predicted_nodes() {
         let _ = init_logger("biomedgps-test", LevelFilter::Debug);
 
         let mut graph = Graph::new();
@@ -1853,7 +1895,7 @@ mod tests {
         let topk = Some(10);
 
         match graph
-            .fetch_similarity_nodes(&pool, &node_id, &relation_type, &query, topk, None)
+            .fetch_predicted_nodes(&pool, &node_id, &relation_type, &query, topk, None)
             .await
         {
             Ok(graph) => {

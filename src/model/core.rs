@@ -1,11 +1,14 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
+use super::graph::COMPOSED_ENTITY_DELIMITER;
 use super::util::{get_delimiter, parse_csv_error};
+use std::collections::HashMap;
 // use crate::model::util::match_color;
 use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use poem_openapi::Object;
@@ -1080,6 +1083,98 @@ pub struct Relation {
 
     #[oai(skip_serializing_if_is_none)]
     pub pmids: Option<String>,
+}
+
+impl Relation {
+    pub fn gen_composed_key(first_node_id: &str, second_node_id: &str) -> String {
+        if first_node_id < second_node_id {
+            format!(
+                "{}{}{}",
+                first_node_id, COMPOSED_ENTITY_DELIMITER, second_node_id
+            )
+        } else {
+            format!(
+                "{}{}{}",
+                second_node_id, COMPOSED_ENTITY_DELIMITER, first_node_id
+            )
+        }
+    }
+
+    pub async fn exist_records(
+        pool: &sqlx::PgPool,
+        node_id: &str,              // for example, "Gene::ENTREZ:123"
+        other_node_ids: &Vec<&str>, // for example, ["Gene::ENTREZ:123", "Compound::DrugBank:DB00001"]
+        relation_type: Option<&str>,
+        ignore_direction: bool,
+    ) -> Result<HashMap<String, Relation>, anyhow::Error> {
+        let other_node_ids_str = other_node_ids
+            .iter()
+            .map(|x| format!("'{}'", x))
+            .collect::<Vec<String>>()
+            .join(",");
+        let where_clauses = if ignore_direction {
+            format!(
+                "
+                SELECT *
+                FROM biomedgps_relation
+                WHERE (
+                    (
+                        CONCAT(source_type, '{delimiter}', source_id) in ('{node_id}') AND 
+                        CONCAT(target_type, '{delimiter}', target_id) in ({other_node_ids_str})
+                    ) OR 
+                    (
+                        CONCAT(source_type, '{delimiter}', source_id) in ({other_node_ids_str}) AND 
+                        CONCAT(target_type, '{delimiter}', target_id) in ('{node_id}')
+                    )
+                )
+            ",
+                delimiter = COMPOSED_ENTITY_DELIMITER,
+                node_id = node_id,
+                other_node_ids_str = other_node_ids_str
+            )
+        } else {
+            format!(
+                "
+                SELECT *
+                FROM biomedgps_relation
+                WHERE (
+                    CONCAT(source_type, '{delimiter}', source_id) in ({node_id}) AND 
+                    CONCAT(target_type, '{delimiter}', target_id) in ({other_node_ids_str})
+                )
+            ",
+                delimiter = COMPOSED_ENTITY_DELIMITER,
+                node_id = node_id,
+                other_node_ids_str = other_node_ids_str
+            )
+        };
+
+        let sql_str = match relation_type {
+            Some(relation_type) => {
+                format!("{} AND relation_type = '{}'", where_clauses, relation_type)
+            }
+            None => where_clauses,
+        };
+
+        let records = sqlx::query_as::<_, Relation>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let mut relation_map = HashMap::new();
+        for record in records {
+            let source_node_id = format!(
+                "{}{}{}",
+                record.source_type, COMPOSED_ENTITY_DELIMITER, record.source_id
+            );
+            let target_node_id = format!(
+                "{}{}{}",
+                record.target_type, COMPOSED_ENTITY_DELIMITER, record.target_id
+            );
+            let ordered_key_str = Self::gen_composed_key(&source_node_id, &target_node_id);
+            relation_map.insert(ordered_key_str, record);
+        }
+
+        AnyOk(relation_map)
+    }
 }
 
 impl CheckData for Relation {

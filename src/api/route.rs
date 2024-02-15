@@ -1150,14 +1150,14 @@ impl BiomedgpsApi {
         }
     }
 
-    /// Call `/api/v1/similarity-nodes` with query params to fetch similarity nodes.
+    /// Call `/api/v1/predicted-nodes` with query params to fetch predicted nodes.
     #[oai(
-        path = "/similarity-nodes",
+        path = "/predicted-nodes",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchPredictedNodes"
     )]
-    async fn fetch_similarity_nodes(
+    async fn fetch_predicted_nodes(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         node_id: Query<String>,
@@ -1205,7 +1205,7 @@ impl BiomedgpsApi {
 
         let mut graph = Graph::new();
         match graph
-            .fetch_similarity_nodes(&pool_arc, &node_id, &relation_type, &query, topk, model_name.0)
+            .fetch_predicted_nodes(&pool_arc, &node_id, &relation_type, &query, topk, model_name.0)
             .await
         {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
@@ -1426,7 +1426,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_similarity_nodes() {
+    async fn test_fetch_predicted_nodes() {
         let app = init_app().await;
         let cli = TestClient::new(app);
 
