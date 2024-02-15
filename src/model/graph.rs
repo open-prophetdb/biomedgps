@@ -1152,6 +1152,12 @@ impl Graph {
             false
         };
 
+        let target_type = if source_type == r_target_type {
+            r_source_type
+        } else {
+            r_target_type
+        };
+
         // TODO: We need to add more score functions here
         let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
             "pgml.transe_l2_ndarray"
@@ -1220,7 +1226,7 @@ impl Graph {
             LIMIT {topk}",
             source_id = source_id,
             source_type = source_type,
-            target_type = r_target_type,
+            target_type = target_type,
             relation_type = relation_type,
             dimension = embedding_metadata.dimension,
             topk = topk,
