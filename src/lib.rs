@@ -1,6 +1,9 @@
 #![doc = include_str!("../README.md")]
-
 //! BioMedGPS library for knowledge graph construction and analysis.
+
+// You must change the DB_VERSION to match the version of the database the library is compatible with.
+const DB_VERSION: &str = "2.8.3";
+
 pub mod algorithm;
 pub mod api;
 pub mod model;
@@ -20,6 +23,7 @@ use polars::prelude::{
 };
 use regex::Regex;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Row;
 use std::error::Error;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -1486,5 +1490,42 @@ pub async fn import_kge(
             error!("Failed to import the entity embeddings: {}", e);
             std::process::exit(1);
         }
+    }
+}
+
+pub async fn check_db_version(pool: &sqlx::PgPool) -> Result<(), Box<dyn Error>> {
+    // Check whether the pgml.version function exists.
+    let sql_str = "
+        SELECT
+        CASE
+            WHEN EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pgml') THEN
+                -- If the pgml extension is enabled, return the version of the pgml.
+                pgml.version()
+            ELSE
+                -- If the pgml extension is not enabled, return the error message.
+                'Unknown'
+        END AS version;
+    ";
+
+    let version = match sqlx::query(sql_str).fetch_one(pool).await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(format!("Failed to get the database version: {}", e).into());
+        }
+    };
+
+    let version: String = version.get("version");
+    let version_num_str = version.split(" ").collect::<Vec<&str>>()[0].to_string();
+    info!("The database version is: {}", version_num_str);
+
+    if DB_VERSION >= &version_num_str[..] && version_num_str != "Unknown" {
+        info!("The database version is compatible with the current version of the pgml.");
+        return Ok(());
+    } else {
+        error!(
+            "The database version is not compatible with the current version of the pgml. The database version is {}, but the current version of the pgml requires the database version to be {} or higher. If the database version is Unknown, it means that the pgml extension is not enabled or not installed.",
+            version_num_str, DB_VERSION
+        );
+        std::process::exit(1);
     }
 }

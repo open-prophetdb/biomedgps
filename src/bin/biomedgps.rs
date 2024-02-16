@@ -8,7 +8,7 @@ use biomedgps::api::route::BiomedgpsApi;
 use biomedgps::model::core::EntityMetadata;
 use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::util::update_existing_colors;
-use biomedgps::{connect_db, connect_graph_db, init_logger};
+use biomedgps::{check_db_version, connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
 use itertools::Itertools;
 use log::LevelFilter;
@@ -241,6 +241,15 @@ async fn main() -> Result<(), std::io::Error> {
     let pool = connect_db(&database_url, 10).await;
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
+
+    // Check the environment, such as database version.
+    match check_db_version(&arc_pool.clone()).await {
+        Ok(_) => (),
+        Err(err) => {
+            error!("Check database version failed, {}", err);
+            std::process::exit(1);
+        }
+    };
 
     // Update existing colors.
     let entity_types: Vec<String> = match EntityMetadata::get_entity_metadata(&arc_pool).await {
