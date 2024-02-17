@@ -391,8 +391,8 @@ pub struct PredictedNodeQuery {
 
     #[validate(range(
         min = 0,
-        max = 100,
-        message = "Invalid threshold, it must be between 0 and 100"
+        max = 500,
+        message = "Invalid threshold, it must be between 0 and 500"
     ))]
     pub topk: Option<u64>,
 }
