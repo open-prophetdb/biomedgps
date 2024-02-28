@@ -253,3 +253,150 @@ pub async fn create_score_table(
         }
     }
 }
+
+pub fn get_kg_score_table_name(table_prefix: &str) -> String {
+    format!("{}_relation_with_score", table_prefix)
+}
+
+pub fn init_kg_score_sql(
+    table_prefix: Option<&str>,
+    gamma: f64,
+    embedding_metadata: &EmbeddingMetadata,
+) -> String {
+    let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
+    let score_table_name = get_kg_score_table_name(table_prefix);
+
+    // TODO: We need to add more score functions here
+    let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
+        "pgml.transe_l2_ndarray"
+    } else if embedding_metadata.model_type == "TransE_l1" {
+        "pgml.transe_l1_ndarray"
+    } else if embedding_metadata.model_type == "DistMult" {
+        "pgml.distmult_ndarray"
+    } else if embedding_metadata.model_type == "ComplEx" {
+        "pgml.complex_ndarray"
+    } else {
+        "pgml.transe_l2_ndarray"
+    };
+
+    format!(
+        r#"
+            WITH kg_embeddings AS (
+                SELECT
+                    c.*,
+                    cd_emb.embedding AS relation_type_embedding
+                FROM biomedgps_relation c
+                LEFT JOIN {realtion_emb_table} cd_emb ON c.relation_type = cd_emb.relation_type
+            ),
+            final_embeddings AS (
+                SELECT
+                    e.*,
+                    ce.embedding AS source_embedding,
+                    de.embedding AS target_embedding
+                FROM kg_embeddings e
+                LEFT JOIN {entity_emb_table} ce ON e.source_id = ce.entity_id AND e.source_type = ce.entity_type
+                LEFT JOIN {entity_emb_table} de ON e.target_id = de.entity_id AND e.target_type = de.entity_type
+            )
+            SELECT
+                id AS id,
+                source_id AS source_id,
+                source_type AS source_type,
+                target_id AS target_id,
+                target_type AS target_type,
+                relation_type AS relation_type,
+                formatted_relation_type AS formatted_relation_type,
+                key_sentence AS key_sentence,
+                resource AS resource,
+                dataset AS dataset,
+                pmids AS pmids,
+                {score_function_name}(
+                    vector_to_float4(tt.source_embedding, {dimension}, false),
+                    vector_to_float4(tt.relation_type_embedding, {dimension}, false),
+                    vector_to_float4(tt.target_embedding, {dimension}, false),
+                    {gamma},
+                    true,
+                    false
+                )::FLOAT8 AS score
+            INTO TABLE {score_table}
+            FROM final_embeddings tt;
+        "#,
+        score_table = score_table_name,
+        realtion_emb_table = get_relation_emb_table_name(table_prefix),
+        entity_emb_table = get_entity_emb_table_name(table_prefix),
+        score_function_name = score_function_name,
+        dimension = embedding_metadata.dimension,
+        gamma = gamma
+    )
+}
+
+pub async fn create_kg_score_table(
+    pool: &PgPool,
+    table_prefix: Option<&str>,
+) -> Result<(), ValidationError> {
+    // TODO: We need to allow the user to set the score function, gamma and exp_enabled or get them from the model.
+    let embedding_metadata = match get_embedding_metadata(
+        &table_prefix.unwrap_or(DEFAULT_MODEL_NAME),
+    ) {
+        Some(metadata) => metadata,
+        None => {
+            error!("Failed to get the embedding metadata from the database");
+            return Err(ValidationError::new(
+                "Failed to get the embedding metadata from the database, so we don't know how to calculate the similarity for the node. Please check the database or the model/table name you provided.",
+                vec![],
+            ));
+        }
+    };
+
+    let gamma = 12.0;
+    let init_sql = init_kg_score_sql(
+        table_prefix,
+        gamma,
+        &embedding_metadata,
+    );
+
+    debug!("init_sql: {}", init_sql);
+    let mut tx = pool.begin().await.unwrap();
+    let delete_sql_str = format!(
+        "DROP TABLE IF EXISTS {score_table};",
+        score_table = get_kg_score_table_name(
+            table_prefix.unwrap_or(DEFAULT_MODEL_NAME),
+        )
+    );
+    match sqlx::query(&delete_sql_str).execute(&mut tx).await {
+        Ok(_) => {
+            debug!("The kg score table is deleted successfully");
+        }
+        Err(e) => {
+            error!("Failed to delete the score table: {}", e);
+            return Err(ValidationError::new(
+                &format!("Failed to delete the score table: {}", e),
+                vec![],
+            ));
+        }
+    }
+
+    match sqlx::query(&init_sql).execute(&mut tx).await {
+        Ok(_) => {
+            debug!("The kg score table is created successfully");
+        }
+        Err(e) => {
+            error!("Failed to create the score table: {}", e);
+            return Err(ValidationError::new(
+                &format!("Failed to create the score table: {}", e),
+                vec![],
+            ));
+        }
+    };
+
+    // Commit the transaction
+    match tx.commit().await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Failed to commit the transaction: {}", e);
+            return Err(ValidationError::new(
+                &format!("Failed to commit the transaction: {}", e),
+                vec![],
+            ));
+        }
+    }
+}

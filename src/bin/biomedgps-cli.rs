@@ -1,5 +1,6 @@
 extern crate log;
 
+use biomedgps::model::init_sql::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
 use biomedgps::model::{init_sql::create_score_table, util::read_annotation_file};
 use biomedgps::{
@@ -111,7 +112,7 @@ pub struct InitTableArguments {
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// [Required] The table name to init. supports compound-disease-symptom etc.
+    /// [Required] The table name to init. supports compound-disease-symptom, knowledge-score etc.
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
@@ -357,6 +358,17 @@ async fn main() {
                     {
                         Ok(_) => info!("Init compound-disease-symptom table successfully."),
                         Err(e) => error!("Init compound-disease-symptom table failed: {}", e),
+                    }
+                }
+                "knowledge-score" => {
+                    match create_kg_score_table(
+                        &pool,
+                        Some(&arguments.table_prefix),
+                    )
+                    .await
+                    {
+                        Ok(_) => info!("Init kg score table successfully."),
+                        Err(e) => error!("Init kg score table failed: {}", e),
                     }
                 }
                 _ => {

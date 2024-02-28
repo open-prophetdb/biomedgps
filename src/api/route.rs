@@ -1138,7 +1138,7 @@ impl BiomedgpsApi {
 
         let mut graph = Graph::new();
         match graph
-            .fetch_linked_nodes(&pool_arc, &query, page, page_size, None)
+            .fetch_linked_nodes(&pool_arc, &query, page, page_size, Some("score DESC"))
             .await
         {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),

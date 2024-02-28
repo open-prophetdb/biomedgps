@@ -6,6 +6,7 @@
 //!
 
 use super::core::KnowledgeCuration;
+use super::init_sql::get_kg_score_table_name;
 use crate::model::core::{Entity, RecordResponse, Relation, DEFAULT_DATASET_NAME};
 use crate::model::init_sql::get_triple_entity_score_table_name;
 use crate::model::kge::{
@@ -1797,9 +1798,17 @@ impl Graph {
         page_size: Option<u64>,
         order_by: Option<&str>,
     ) -> Result<&Self, ValidationError> {
+        let table_name = if order_by.is_some() && order_by.unwrap().starts_with("score") {
+            // TODO: We need to add the model name to the query if we allow users to use different model.
+            // TODO: We need to ensure the table exists before we use it.
+            get_kg_score_table_name(DEFAULT_MODEL_NAME)
+        } else {
+            "biomedgps_relation".to_string()
+        };
+
         match RecordResponse::<Relation>::get_records(
             pool,
-            "biomedgps_relation",
+            table_name.as_str(),
             query,
             page,
             page_size,
@@ -1836,9 +1845,6 @@ impl Graph {
             }
         }
     }
-
-    // Fetch the linked nodes within n steps with some relation types or other conditions
-    pub async fn fetch_linked_nodes_within_steps() {}
 }
 
 #[cfg(test)]
