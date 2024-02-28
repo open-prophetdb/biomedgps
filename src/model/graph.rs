@@ -1177,7 +1177,7 @@ impl Graph {
                         target_id IN ('{source_id}') AND target_type = '{source_type}'
                     GROUP BY
                         target_id, target_type, source_id, source_type
-                    ORDER BY node_id ASC, score DESC
+                    ORDER BY score DESC, node_id ASC
                     LIMIT {topk};
                 ",
                 table_name = get_triple_entity_score_table_name(
