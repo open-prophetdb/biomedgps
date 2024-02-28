@@ -1,7 +1,7 @@
 extern crate log;
 
-use biomedgps::model::kge::DEFAULT_MODEL_NAME;
-use biomedgps::model::util::read_annotation_file;
+use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
+use biomedgps::model::{init_sql::create_score_table, util::read_annotation_file};
 use biomedgps::{
     build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
     run_migrations,
@@ -33,6 +33,8 @@ enum SubCommands {
     ImportGraph(ImportGraphArguments),
     #[structopt(name = "importkge")]
     ImportKGE(ImportKGEArguments),
+    #[structopt(name = "inittable")]
+    InitTable(InitTableArguments),
 }
 
 /// Init database.
@@ -99,6 +101,32 @@ pub struct ImportDBArguments {
     /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
+}
+
+/// Init tables for performance.
+#[derive(StructOpt, PartialEq, Debug)]
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - inittable", author="Jingcheng Yang <yjcyxky@163.com>")]
+pub struct InitTableArguments {
+    /// [Required] Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
+    #[structopt(name = "database_url", short = "d", long = "database-url")]
+    database_url: Option<String>,
+
+    /// [Required] The table name to init. supports compound-disease-symptom etc.
+    #[structopt(name = "table", short = "t", long = "table")]
+    table: String,
+
+    /// [Optional] Relation types for compound-disease-symptom table. Separated by comma. e.g. STRING::BINDING::Gene:Gene,STRING::BINDING::Gene:Gene. The number and order of relation types should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.
+    #[structopt(name = "relation_types", short = "r", long = "relation-types")]
+    relation_types: Option<String>,
+
+    /// [Optional] The table_prefix which is used to distinguish different models. e.g. biomedgps, mecfs, etc. This feature is used to distinguish different dataset combinations matched with your model. If you want to generate the score table for the KGE model, you need to specify the table_prefix which is consistent with the table name related to the KGE model.
+    #[structopt(
+        name = "table_prefix",
+        short = "T",
+        long = "table_prefix",
+        default_value = DEFAULT_MODEL_NAME
+    )]
+    table_prefix: String,
 }
 
 /// Import data files into a graph database.
@@ -189,10 +217,10 @@ pub struct ImportKGEArguments {
     #[structopt(name = "model_type", short = "M", long = "model-type")]
     model_type: String,
 
-    /// [Required] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model. 
-    /// 
+    /// [Required] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
+    ///
     /// If you have multiple datasets, you can use the --dataset option with multiple values. e.g. --dataset biomedgps --dataset mecfs
-    /// 
+    ///
     /// Each dataset must be registered in the relation table by the importdb command. If not, the import might fail.
     #[structopt(name = "dataset", long = "dataset", multiple = true)]
     dataset: Vec<String>,
@@ -251,6 +279,90 @@ async fn main() {
             match run_migrations(&database_url).await {
                 Ok(_) => info!("Init database successfully."),
                 Err(e) => error!("Init database failed: {}", e),
+            }
+        }
+        SubCommands::InitTable(arguments) => {
+            let database_url = arguments.database_url;
+
+            let database_url = if database_url.is_none() {
+                match std::env::var("DATABASE_URL") {
+                    Ok(v) => v,
+                    Err(_) => {
+                        error!("{}", "DATABASE_URL is not set.");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                database_url.unwrap()
+            };
+
+            let pool = match sqlx::PgPool::connect(&database_url).await {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("Connect to database failed: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            // Initialize KGE models.
+            let _ = match init_kge_models(&pool).await {
+                Ok(_) => {
+                    debug!("Initialize KGE models successfully.");
+                    Some(())
+                }
+                Err(err) => {
+                    error!("Initialize KGE models failed, {}", err);
+                    None
+                }
+            };
+
+            match arguments.table.as_str() {
+                "compound-disease-symptom" => {
+                    let default_relation_types =
+                        "DRUGBANK::treats::Compound:Disease,HSDN::has_symptom:Disease:Symptom";
+                    let relation_types = arguments.relation_types.unwrap_or(
+                        // TODO: the HSDN::has_symptom::Disease:Symptom is non-standard relation type. We need to change it to the standard format.
+                        default_relation_types.to_string(),
+                    );
+                    let relation_types = relation_types.split(",").collect::<Vec<&str>>();
+
+                    if relation_types.len() != 2 {
+                        error!("The number of relation types should be 2 and the order should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.");
+                        std::process::exit(1);
+                    }
+
+                    let compound_disease_relation_type = relation_types.get(0).unwrap();
+                    let disease_symptom_relation_type = relation_types.get(1).unwrap();
+
+                    if !compound_disease_relation_type.contains("Compound:Disease") {
+                        error!("The first relation type should be for compound-disease. e.g. DRUGBANK::treats::Compound:Disease");
+                        std::process::exit(1);
+                    }
+
+                    if !disease_symptom_relation_type.contains("Disease:Symptom") {
+                        error!("The second relation type should be for disease-symptom. e.g. HSDN::has_symptom::Disease:Symptom");
+                        std::process::exit(1);
+                    }
+
+                    match create_score_table(
+                        &pool,
+                        "Compound",
+                        "Disease",
+                        "Symptom",
+                        compound_disease_relation_type,
+                        disease_symptom_relation_type,
+                        Some(&arguments.table_prefix),
+                    )
+                    .await
+                    {
+                        Ok(_) => info!("Init compound-disease-symptom table successfully."),
+                        Err(e) => error!("Init compound-disease-symptom table failed: {}", e),
+                    }
+                }
+                _ => {
+                    error!("The table name is not supported.");
+                    std::process::exit(1);
+                }
             }
         }
         SubCommands::ImportDB(arguments) => {

@@ -8,10 +8,43 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, fmt, path::PathBuf};
 
 lazy_static! {
     static ref EXISTING_COLORS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
+
+/// Custom Error type for the graph module
+#[derive(Debug)]
+pub struct ValidationError {
+    pub details: String,
+    pub data: Vec<String>,
+}
+
+impl ValidationError {
+    pub fn new(msg: &str, data: Vec<String>) -> ValidationError {
+        ValidationError {
+            details: msg.to_string(),
+            data,
+        }
+    }
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for ValidationError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
 }
 
 /// A color map for the node labels.

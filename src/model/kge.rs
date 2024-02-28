@@ -1,17 +1,17 @@
 use super::core::{
-    CheckData, ValidationError, DEFAULT_DATASET_NAME, DEFAULT_MAX_LENGTH, DEFAULT_MIN_LENGTH,
-    ENTITY_ID_REGEX, ENTITY_LABEL_REGEX, ENTITY_NAME_MAX_LENGTH,
+    CheckData, DEFAULT_DATASET_NAME, DEFAULT_MAX_LENGTH, DEFAULT_MIN_LENGTH, ENTITY_ID_REGEX,
+    ENTITY_LABEL_REGEX, ENTITY_NAME_MAX_LENGTH,
 };
-use super::util::{drop_table, get_delimiter, parse_csv_error, read_annotation_file};
+use super::util::{drop_table, parse_csv_error, read_annotation_file, ValidationError};
 use crate::pgvector::Vector;
-use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
+use crate::query_builder::sql_builder::ComposeQuery;
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use poem_openapi::Object;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
@@ -53,6 +53,7 @@ async fn check_table_is_valid(
         if !all_table_names.contains(&table_name.to_string()) {
             return Err(ValidationError::new(
                 "The table name does not exist in the database.",
+                vec![],
             ));
         }
     }
@@ -91,16 +92,20 @@ pub async fn check_default_model_is_valid(pool: &sqlx::PgPool) -> Result<(), Val
             {
                 Ok(count) => count,
                 Err(e) => {
-                    return Err(ValidationError::new(&format!(
-                        "The default model does not exist in the database: {}",
-                        e.to_string()
-                    )));
+                    return Err(ValidationError::new(
+                        &format!(
+                            "The default model does not exist in the database: {}",
+                            e.to_string()
+                        ),
+                        vec![],
+                    ));
                 }
             };
 
             if count.0 == 0 {
                 return Err(ValidationError::new(
                     "The default model does not exist in the database.",
+                    vec![],
                 ));
             } else {
                 return Ok(());
@@ -474,10 +479,13 @@ impl EmbeddingMetadata {
             .await?;
 
         if count.0 > 0 {
-            return Err(Box::new(ValidationError::new(&format!(
-                "The table {} and model {} already exists.",
-                table_name, model_name
-            ))));
+            return Err(Box::new(ValidationError::new(
+                &format!(
+                    "The table {} and model {} already exists.",
+                    table_name, model_name
+                ),
+                vec![],
+            )));
         }
 
         let m = match metadata {
@@ -518,10 +526,10 @@ impl EmbeddingMetadata {
 
         if !err_msg.is_empty() {
             tx.rollback().await?;
-            return Err(Box::new(ValidationError::new(&format!(
-                "Create the entity embedding table failed: {}",
-                err_msg
-            ))));
+            return Err(Box::new(ValidationError::new(
+                &format!("Create the entity embedding table failed: {}", err_msg),
+                vec![],
+            )));
         } else {
             info!("The entity embedding table has been created successfully.");
         }
@@ -539,10 +547,10 @@ impl EmbeddingMetadata {
 
         if !err_msg.is_empty() {
             tx.rollback().await?;
-            return Err(Box::new(ValidationError::new(&format!(
-                "Create the relation embedding table failed: {}",
-                err_msg
-            ))));
+            return Err(Box::new(ValidationError::new(
+                &format!("Create the relation embedding table failed: {}", err_msg),
+                vec![],
+            )));
         } else {
             info!("The relation embedding table has been created successfully.");
         }
@@ -624,7 +632,7 @@ impl EmbeddingMetadata {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
-                    return Err(Box::new(ValidationError::new(&error_msg)));
+                    return Err(Box::new(ValidationError::new(&error_msg, vec![])));
                 }
             };
 
@@ -771,7 +779,7 @@ impl EntityEmbedding {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
-                    return Err(Box::new(ValidationError::new(&error_msg)));
+                    return Err(Box::new(ValidationError::new(&error_msg, vec![])));
                 }
             };
 
@@ -976,6 +984,7 @@ impl RelationEmbedding {
         if count.0 > 0 {
             return Err(Box::new(ValidationError::new(
                 "The relation type and formatted relation type already exists.",
+                vec![],
             )));
         }
 
@@ -1029,7 +1038,7 @@ impl RelationEmbedding {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
-                    return Err(Box::new(ValidationError::new(&error_msg)));
+                    return Err(Box::new(ValidationError::new(&error_msg, vec![])));
                 }
             };
 

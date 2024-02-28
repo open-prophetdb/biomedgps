@@ -5,3 +5,4 @@ pub mod util;
 pub mod graph;
 pub mod llm;
 pub mod kge;
+pub mod init_sql;

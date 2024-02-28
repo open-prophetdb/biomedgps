@@ -7,21 +7,22 @@
 
 use super::core::KnowledgeCuration;
 use crate::model::core::{Entity, RecordResponse, Relation, DEFAULT_DATASET_NAME};
+use crate::model::init_sql::get_triple_entity_score_table_name;
 use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
 };
 use crate::model::util::match_color;
-use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
+use crate::model::util::ValidationError;
+use crate::query_builder::sql_builder::ComposeQuery;
 use lazy_static::lazy_static;
 use log::{debug, error};
 use neo4rs::{Node as NeoNode, Relation as NeoRelation};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::vec;
-use std::{error::Error, fmt};
 
 // The delimiter is defined here, if we want to change it, please change it here.
 pub const COMPOSED_ENTITY_DELIMITER: &str = "::";
@@ -55,39 +56,6 @@ lazy_static! {
         v.push("Default");
         v
     };
-}
-
-/// Custom Error type for the graph module
-#[derive(Debug)]
-pub struct ValidationError {
-    details: String,
-    data: Vec<String>,
-}
-
-impl ValidationError {
-    pub fn new(msg: &str, data: Vec<String>) -> ValidationError {
-        ValidationError {
-            details: msg.to_string(),
-            data,
-        }
-    }
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for ValidationError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
 }
 
 /// A NodeKeyShape struct for the node rendering.
@@ -604,6 +572,7 @@ impl Edge {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow)]
 struct TargetNode {
+    query_node_id: String,
     node_id: String,
     score: Option<f32>, // The score is the distance between the nodes and the relation type
 }
@@ -626,7 +595,7 @@ impl TargetNode {
     ///
     pub async fn fetch_target_nodes(
         pool: &sqlx::PgPool,
-        node_id: &str,
+        node_id: &str, // The id of the node, it might be a list of node ids separated by comma
         relation_type: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
@@ -643,7 +612,17 @@ impl TargetNode {
             None => 10,
         };
 
-        let (entity_type, entity_id) = Node::parse_id(node_id);
+        let node_ids = node_id.split(",").collect::<Vec<&str>>();
+        let mut entity_types: Vec<String> = vec![];
+        let mut entity_ids: Vec<String> = vec![];
+        for id in node_ids {
+            let (entity_type, entity_id) = Node::parse_id(id);
+            entity_types.push(entity_type);
+            entity_ids.push(entity_id);
+        }
+
+        let entity_id = entity_ids.join(",");
+        let entity_type = entity_types.join(",");
 
         let embedding_metadata = match get_embedding_metadata(&model_or_table_name) {
             Some(metadata) => metadata,
@@ -680,17 +659,16 @@ impl TargetNode {
         );
 
         match sqlx::query_as::<_, Self>(sql_str.as_str())
-            .bind(node_id)
             .fetch_all(pool)
             .await
         {
-            Ok(similarity_nodes) => {
-                let filtered_similarity_nodes = similarity_nodes
+            Ok(nodes) => {
+                let filtered_nodes = nodes
                     .into_iter()
                     .filter(|node| node.score.is_some())
                     .collect::<Vec<Self>>();
 
-                if filtered_similarity_nodes.is_empty() {
+                if filtered_nodes.is_empty() {
                     let err_msg = format!(
                         "No similar nodes found for the node id `{}` and the relation type `{}`, you may need to check the node id or ask the admin to check if the embedding database matches the entity database",
                         node_id, relation_type
@@ -698,7 +676,7 @@ impl TargetNode {
                     error!("{}", &err_msg);
                     return Err(ValidationError::new(&err_msg, vec![]));
                 } else {
-                    return Ok(filtered_similarity_nodes);
+                    return Ok(filtered_nodes);
                 }
             }
             Err(err) => {
@@ -1119,13 +1097,27 @@ impl Graph {
     /// assert_eq!(trimmed_sql_str, trimmed_expected_sql_str);
     /// ```
     pub fn format_score_sql(
-        source_id: &str,
+        source_id: &str, // The id of the source node, it might be a list of ids separated by comma
         source_type: &str,
         relation_type: &str,
         embedding_metadata: &EmbeddingMetadata,
         topk: u64,
         gamma: f64,
     ) -> Result<String, ValidationError> {
+        let source_id = source_id.split(",").collect::<Vec<&str>>().join("', '");
+        let source_type_vec = source_type
+            .split(",")
+            .collect::<HashSet<&str>>()
+            .into_iter()
+            .collect::<Vec<&str>>();
+        if source_type_vec.len() > 1 {
+            return Err(ValidationError::new(
+                "The source type is not valid, it should be a single type",
+                vec![source_type_vec.join(",")],
+            ));
+        }
+        let source_type = source_type_vec[0];
+
         let (r_source_type, r_target_type) = match Graph::parse_relation_type(relation_type) {
             Ok((source_type, target_type)) => (source_type, target_type),
             Err(err) => {
@@ -1172,72 +1164,101 @@ impl Graph {
             "pgml.transe_l2_ndarray"
         };
 
-        // Example SQL:
-        // SELECT
-        //     ee1.entity_id AS head,
-        //     rte.relation_type AS relation_type,
-        //     ee2.entity_id AS tail,
-        //     pgml.transe_l2_ndarray(
-        //             vector_to_float4(ee1.embedding, 400, false),
-        //             vector_to_float4(rte.embedding, 400, false),
-        //             vector_to_float4(ee2.embedding, 400, false),
-        //             12.0,
-        //             true
-        //     ) AS score
-        // FROM
-        //     biomedgps_entity_embedding ee1,
-        //     biomedgps_relation_embedding rte,
-        //     biomedgps_entity_embedding ee2
-        // WHERE
-        //     ee1.entity_id = 'ENTREZ:6747'
-        //     AND ee1.entity_type = 'Gene'
-        //     AND ee2.entity_type = 'Gene'
-        //     AND rte.relation_type = 'STRING::BINDING::Gene:Gene'
-        // GROUP BY
-        //     ee1.embedding_id,
-        //     rte.embedding_id,
-        //     ee2.embedding_id
-        // ORDER BY score DESC
-        // LIMIT 10
-        let sql_str = format!(
-            "SELECT
-                COALESCE(ee2.entity_type, '') || '::' || COALESCE(ee2.entity_id, '') AS node_id,
-                {score_function_name}(
-                        vector_to_float4(ee1.embedding, {dimension}, false),
-                        vector_to_float4(rte.embedding, {dimension}, false),
-                        vector_to_float4(ee2.embedding, {dimension}, false),
-                        {gamma},
-                        true,
-                        {reverse}
-                ) AS score	
-            FROM
-                {entity_embedding_table} ee1,
-                {relation_type_embedding_table} rte,
-                {entity_embedding_table} ee2
-            WHERE
-                ee1.entity_id = '{source_id}' 
-                AND ee1.entity_type = '{source_type}'
-                AND ee2.entity_type = '{target_type}'
-                AND rte.relation_type = '{relation_type}'
-            GROUP BY
-                ee1.embedding_id,
-                rte.embedding_id,
-                ee2.embedding_id
-            ORDER BY score DESC
-            LIMIT {topk}",
-            source_id = source_id,
-            source_type = source_type,
-            target_type = target_type,
-            relation_type = relation_type,
-            dimension = embedding_metadata.dimension,
-            topk = topk,
-            reverse = reverse,
-            entity_embedding_table = get_entity_emb_table_name(&embedding_metadata.table_name),
-            relation_type_embedding_table =
-                get_relation_emb_table_name(&embedding_metadata.table_name),
-            score_function_name = score_function_name,
-            gamma = gamma
-        );
+        let sql_str = if relation_type == "DrugBank::treats::Compound:Symptom" {
+            format!(
+                "
+                    SELECT
+                        COALESCE(target_type, '') || '::' || COALESCE(target_id, '') AS query_node_id,
+                        COALESCE(source_type, '') || '::' || COALESCE(source_id, '') AS node_id,
+                        percentile_cont(0.5) WITHIN GROUP (ORDER BY score)::FLOAT4 AS score
+                    FROM
+                        {table_name} ee1
+                    WHERE
+                        target_id IN ('{source_id}') AND target_type = '{source_type}'
+                    GROUP BY
+                        target_id, target_type, source_id, source_type
+                    ORDER BY node_id ASC, score DESC
+                    LIMIT {topk};
+                ",
+                table_name = get_triple_entity_score_table_name(
+                    &embedding_metadata.table_name,
+                    "Compound",
+                    "Disease",
+                    "Symptom"
+                ),
+                source_id = source_id,
+                source_type = source_type,
+                topk = topk
+            )
+        } else {
+            // Example SQL:
+            // SELECT
+            //     ee1.entity_id AS head,
+            //     rte.relation_type AS relation_type,
+            //     ee2.entity_id AS tail,
+            //     pgml.transe_l2_ndarray(
+            //             vector_to_float4(ee1.embedding, 400, false),
+            //             vector_to_float4(rte.embedding, 400, false),
+            //             vector_to_float4(ee2.embedding, 400, false),
+            //             12.0,
+            //             true
+            //     ) AS score
+            // FROM
+            //     biomedgps_entity_embedding ee1,
+            //     biomedgps_relation_embedding rte,
+            //     biomedgps_entity_embedding ee2
+            // WHERE
+            //     ee1.entity_id = 'ENTREZ:6747'
+            //     AND ee1.entity_type = 'Gene'
+            //     AND ee2.entity_type = 'Gene'
+            //     AND rte.relation_type = 'STRING::BINDING::Gene:Gene'
+            // GROUP BY
+            //     ee1.embedding_id,
+            //     rte.embedding_id,
+            //     ee2.embedding_id
+            // ORDER BY score DESC
+            // LIMIT 10
+            format!(
+                "SELECT
+                    COALESCE(ee1.entity_type, '') || '::' || COALESCE(ee1.entity_id, '') AS query_node_id,
+                    COALESCE(ee2.entity_type, '') || '::' || COALESCE(ee2.entity_id, '') AS node_id,
+                    {score_function_name}(
+                            vector_to_float4(ee1.embedding, {dimension}, false),
+                            vector_to_float4(rte.embedding, {dimension}, false),
+                            vector_to_float4(ee2.embedding, {dimension}, false),
+                            {gamma},
+                            true,
+                            {reverse}
+                    ) AS score	
+                FROM
+                    {entity_embedding_table} ee1,
+                    {relation_type_embedding_table} rte,
+                    {entity_embedding_table} ee2
+                WHERE
+                    ee1.entity_id IN ('{source_id}')
+                    AND ee1.entity_type = '{source_type}'
+                    AND ee2.entity_type = '{target_type}'
+                    AND rte.relation_type = '{relation_type}'
+                GROUP BY
+                    ee1.embedding_id,
+                    rte.embedding_id,
+                    ee2.embedding_id
+                ORDER BY score DESC
+                LIMIT {topk}",
+                source_id = source_id,
+                source_type = source_type,
+                target_type = target_type,
+                relation_type = relation_type,
+                dimension = embedding_metadata.dimension,
+                topk = topk,
+                reverse = reverse,
+                entity_embedding_table = get_entity_emb_table_name(&embedding_metadata.table_name),
+                relation_type_embedding_table =
+                    get_relation_emb_table_name(&embedding_metadata.table_name),
+                score_function_name = score_function_name,
+                gamma = gamma
+            )
+        };
 
         Ok(sql_str)
     }
@@ -1535,7 +1556,7 @@ impl Graph {
     pub async fn fetch_predicted_nodes(
         &mut self,
         pool: &sqlx::PgPool,
-        node_id: &str,
+        node_id: &str, // The id of the source node, it might be a list of ids separated by comma
         relation_type: &str,
         query: &Option<ComposeQuery>,
         topk: Option<u64>,
@@ -1557,25 +1578,26 @@ impl Graph {
                     .map(|predicted_node| predicted_node.node_id.as_str())
                     .collect::<Vec<&str>>();
 
-                node_ids.push(node_id);
+                let node_id_vec = node_id.split(",").collect::<Vec<&str>>();
+                for id in &node_id_vec {
+                    node_ids.push(id);
+                }
 
                 // Convert predicted nodes to a hashmap which key is node id and value is distance.
                 let predicted_node_map = predicted_nodes
                     .iter()
                     .map(|predicted_node| {
-                        (
-                            predicted_node.node_id.as_str(),
-                            predicted_node.score.unwrap() as f64,
-                        )
+                        let key = format!(
+                            "{}-{}",
+                            predicted_node.query_node_id, predicted_node.node_id
+                        );
+                        (key, predicted_node.score.unwrap() as f64)
                     })
-                    .collect::<HashMap<&str, f64>>();
+                    .collect::<HashMap<String, f64>>();
 
                 // Allow to label the existing records with any relation type
                 let existing_records = match Relation::exist_records(
-                    pool,
-                    node_id,
-                    &node_ids,
-                    None,  // Some(relation_type),
+                    pool, node_id, &node_ids, None, // Some(relation_type),
                     true,
                 )
                 .await
@@ -1589,71 +1611,87 @@ impl Graph {
                     }
                 };
 
-                let edges = match self.fetch_nodes_by_ids(pool, &node_ids).await {
-                    Ok(graph) => {
-                        let nodes = &graph.nodes;
-                        let source_node = nodes.iter().find(|node| node.id == node_id).unwrap();
+                for node_id in &node_id_vec {
+                    let edges = match self.fetch_nodes_by_ids(pool, &node_ids).await {
+                        Ok(graph) => {
+                            let nodes = &graph.nodes;
+                            let source_node =
+                                match nodes.iter().find(|node| node.id == node_id.to_string()) {
+                                    Some(node) => node,
+                                    None => {
+                                        return Err(ValidationError::new(
+                                            &format!("The source node {} is not found", node_id),
+                                            vec![node_id.to_string()],
+                                        ))
+                                    }
+                                };
 
-                        let mut edges = vec![];
-                        for node in nodes {
-                            let distance = predicted_node_map.get(node.id.as_str());
-                            match distance {
-                                Some(&d) => {
-                                    if node.id == source_node.id {
+                            let mut edges = vec![];
+                            for node in nodes {
+                                let key = format!("{}-{}", source_node.id, node.id);
+                                let distance = predicted_node_map.get(&key);
+                                match distance {
+                                    Some(&d) => {
+                                        if node.id == source_node.id {
+                                            continue;
+                                        }
+
+                                        let first_node_id = format!(
+                                            "{}{}{}",
+                                            source_node.data.label,
+                                            COMPOSED_ENTITY_DELIMITER,
+                                            source_node.data.id
+                                        );
+                                        let second_node_id = format!(
+                                            "{}{}{}",
+                                            node.data.label,
+                                            COMPOSED_ENTITY_DELIMITER,
+                                            node.data.id
+                                        );
+                                        let ordered_key_str = Relation::gen_composed_key(
+                                            &first_node_id,
+                                            &second_node_id,
+                                        );
+                                        let edge = match existing_records.get(&ordered_key_str) {
+                                            Some(record) => Edge::new(
+                                                &record.relation_type,
+                                                source_node.data.id.as_str(),
+                                                source_node.data.label.as_str(),
+                                                node.data.id.as_str(),
+                                                node.data.label.as_str(),
+                                                Some(d),
+                                            ),
+                                            None => Edge::new(
+                                                PREDICTED_EDGE_TYPE,
+                                                source_node.data.id.as_str(),
+                                                source_node.data.label.as_str(),
+                                                node.data.id.as_str(),
+                                                node.data.label.as_str(),
+                                                Some(d),
+                                            ),
+                                        };
+
+                                        edges.push(edge);
+                                    }
+                                    None => {
                                         continue;
                                     }
-
-                                    let first_node_id = format!(
-                                        "{}{}{}",
-                                        source_node.data.label,
-                                        COMPOSED_ENTITY_DELIMITER,
-                                        source_node.data.id
-                                    );
-                                    let second_node_id = format!(
-                                        "{}{}{}",
-                                        node.data.label, COMPOSED_ENTITY_DELIMITER, node.data.id
-                                    );
-                                    let ordered_key_str =
-                                        Relation::gen_composed_key(&first_node_id, &second_node_id);
-                                    let edge = match existing_records.get(&ordered_key_str) {
-                                        Some(record) => Edge::new(
-                                            &record.relation_type,
-                                            source_node.data.id.as_str(),
-                                            source_node.data.label.as_str(),
-                                            node.data.id.as_str(),
-                                            node.data.label.as_str(),
-                                            Some(d),
-                                        ),
-                                        None => Edge::new(
-                                            PREDICTED_EDGE_TYPE,
-                                            source_node.data.id.as_str(),
-                                            source_node.data.label.as_str(),
-                                            node.data.id.as_str(),
-                                            node.data.label.as_str(),
-                                            Some(d),
-                                        ),
-                                    };
-
-                                    edges.push(edge);
-                                }
-                                None => {
-                                    continue;
                                 }
                             }
+
+                            edges
                         }
+                        Err(e) => {
+                            return Err(ValidationError::new(
+                                &format!("Error in fetch_nodes_by_ids: {}", e),
+                                vec![],
+                            ))
+                        }
+                    };
 
-                        edges
+                    for edge in edges {
+                        self.add_edge(edge);
                     }
-                    Err(e) => {
-                        return Err(ValidationError::new(
-                            &format!("Error in fetch_nodes_by_ids: {}", e),
-                            vec![],
-                        ))
-                    }
-                };
-
-                for edge in edges {
-                    self.add_edge(edge);
                 }
 
                 Ok(self)

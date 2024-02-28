@@ -1,20 +1,19 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
 use super::graph::COMPOSED_ENTITY_DELIMITER;
-use super::util::{get_delimiter, parse_csv_error};
+use super::util::{get_delimiter, parse_csv_error, ValidationError};
 use std::collections::HashMap;
 // use crate::model::util::match_color;
-use crate::query_builder::sql_builder::{ComposeQuery, QueryItem};
+use crate::query_builder::sql_builder::ComposeQuery;
 use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::{debug, error, info, warn};
+use log::{debug, info};
 use poem_openapi::Object;
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{error::Error, fmt, option::Option, path::PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{error::Error, option::Option, path::PathBuf};
 use validator::Validate;
 
 pub const DEFAULT_DATASET_NAME: &str = "biomedgps";
@@ -34,36 +33,6 @@ lazy_static! {
     pub static ref JSON_REGEX: Regex = Regex::new(r"^(\{.*\}|\[.*\])$").expect("Failed to compile regex");
 }
 
-#[derive(Debug)]
-pub struct ValidationError {
-    details: String,
-}
-
-impl ValidationError {
-    pub fn new(msg: &str) -> ValidationError {
-        ValidationError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for ValidationError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
-}
-
 pub trait CheckData {
     fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>>;
 
@@ -78,10 +47,10 @@ pub trait CheckData {
         let delimiter = match get_delimiter(filepath) {
             Ok(d) => d,
             Err(e) => {
-                validation_errors.push(Box::new(ValidationError::new(&format!(
-                    "Failed to get delimiter: ({})",
-                    e
-                ))));
+                validation_errors.push(Box::new(ValidationError::new(
+                    &format!("Failed to get delimiter: ({})", e),
+                    vec![],
+                )));
                 return validation_errors;
             }
         };
@@ -94,10 +63,10 @@ pub trait CheckData {
         {
             Ok(r) => r,
             Err(e) => {
-                validation_errors.push(Box::new(ValidationError::new(&format!(
-                    "Failed to read CSV: ({})",
-                    e
-                ))));
+                validation_errors.push(Box::new(ValidationError::new(
+                    &format!("Failed to read CSV: ({})", e),
+                    vec![],
+                )));
                 return validation_errors;
             }
         };
@@ -118,17 +87,20 @@ pub trait CheckData {
                         continue;
                     }
                     Err(e) => {
-                        validation_errors.push(Box::new(ValidationError::new(&format!(
-                            "Failed to validate the data, line: {}, details: ({})",
-                            line_number, e
-                        ))));
+                        validation_errors.push(Box::new(ValidationError::new(
+                            &format!(
+                                "Failed to validate the data, line: {}, details: ({})",
+                                line_number, e
+                            ),
+                            vec![],
+                        )));
                         continue;
                     }
                 },
                 Err(e) => {
                     let error_msg = parse_csv_error(&e);
 
-                    validation_errors.push(Box::new(ValidationError::new(&error_msg)));
+                    validation_errors.push(Box::new(ValidationError::new(&error_msg, vec![])));
 
                     continue;
                 }
@@ -1107,6 +1079,7 @@ impl Relation {
         relation_type: Option<&str>,
         ignore_direction: bool,
     ) -> Result<HashMap<String, Relation>, anyhow::Error> {
+        let node_id = node_id.split(",").collect::<Vec<&str>>().join("', '");
         let other_node_ids_str = other_node_ids
             .iter()
             .map(|x| format!("'{}'", x))

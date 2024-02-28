@@ -372,7 +372,7 @@ impl NodeIdsQuery {
 pub struct PredictedNodeQuery {
     /// The ID of the object.
     #[validate(regex(
-        path = "COMPOSED_ENTITY_REGEX",
+        path = "COMPOSED_ENTITIES_REGEX",
         message = "Invalid node id, it must be composed of entity type, ::, and entity id. e.g. Disease::MESH:D001"
     ))]
     pub node_id: String,
