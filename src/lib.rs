@@ -30,7 +30,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::vec;
 
 use crate::model::core::{
-    CheckData, Entity, Entity2D, KnowledgeCuration, Relation, RelationAttribute, RelationMetadata,
+    CheckData, Entity, Entity2D, KnowledgeCuration, Relation, RelationMetadata,
     Subgraph,
 };
 use crate::model::graph::Node;
@@ -333,44 +333,6 @@ pub async fn prepare_entity_attr_queries(
     Ok(queries)
 }
 
-pub async fn prepare_relation_attr_queries(
-    records: Vec<RelationAttribute>,
-) -> Result<Vec<Query>, Box<dyn Error>> {
-    let mut queries = Vec::new();
-
-    for record in records {
-        let relation_id = record.relation_id;
-        let relation_id = relation_id.split("|").collect::<Vec<&str>>();
-        let label = relation_id[0];
-        // The relation_type is like "<DB>::<RELATION>::<SOURCE_TYPE>:<TARGET_TYPE>". We need to split it to get the source_type and target_type.
-        let types = label.split("::").collect::<Vec<&str>>();
-        let source_type = types[2].split(":").collect::<Vec<&str>>()[0];
-        let target_type = types[2].split(":").collect::<Vec<&str>>()[1];
-        let source_id = relation_id[1];
-        let target_id = relation_id[2];
-        let moa_ids = record.moa_ids.split("|").collect::<Vec<&str>>();
-
-        let query_string = format!(
-            "
-            MATCH (e1:{} {{idx: $source_idx}})-[r:`{}`]->(e2:{} {{idx: $target_idx}})
-            SET r.attention_score = $attention_score
-            SET r.moa_ids = $moa_ids
-            ",
-            source_type, label, target_type
-        );
-        let query = Query::new(query_string)
-            .param("source_idx", Node::format_id(source_type, source_id))
-            .param("target_idx", Node::format_id(target_type, target_id))
-            .param("label", label)
-            .param("attention_score", record.attention_score)
-            .param("moa_ids", moa_ids);
-
-        queries.push(query);
-    }
-
-    Ok(queries)
-}
-
 pub async fn batch_insert(
     graph: &Graph,
     queries: Vec<Query>,
@@ -541,9 +503,7 @@ pub async fn import_graph_data(
             } else if filetype == "relation" {
                 Relation::check_csv_is_valid(&file)
             } else if filetype == "entity_attribute" {
-                RelationAttribute::check_csv_is_valid(&file)
-            } else if filetype == "relation_attribute" {
-                RelationAttribute::check_csv_is_valid(&file)
+                EntityAttribute::check_csv_is_valid(&file)
             } else {
                 error!("Invalid file type: {}", filetype);
                 // Stop the program if the file type is invalid.
@@ -581,9 +541,6 @@ pub async fn import_graph_data(
         } else if filetype == "entity_attribute" {
             let records = EntityAttribute::get_records(&file).unwrap();
             prepare_entity_attr_queries(records).await.unwrap()
-        } else if filetype == "relation_attribute" {
-            let records = RelationAttribute::get_records(&file).unwrap();
-            prepare_relation_attr_queries(records).await.unwrap()
         } else {
             error!("Invalid file type: {}", filetype);
             // Stop the program if the file type is invalid.

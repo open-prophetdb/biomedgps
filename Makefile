@@ -9,7 +9,7 @@ test-db: clean-test-db create-docker create-db
 create-docker:
 	@printf "\nLaunch postgres database...(default password: password)\n"
 	# Make it compatible with mac and linux, the temp folder is different, so we need to mount both
-	@docker run -v /tmp:/tmp -v /var/folders:/var/folders --name biomedgps -e POSTGRES_PASSWORD=password -e POSTGRES_USER=postgres -p 5432:5432 -d nordata/postgre_postgresml:14-27b1f33
+	@docker run -v /tmp:/tmp -v /var/folders:/var/folders --name biomedgps -e POSTGRES_PASSWORD=password -e POSTGRES_USER=postgres -p 5432:5432 -d nordata/postgresml:v2.8.3-1c11927
 	@sleep 3
 
 create-db:

@@ -1185,45 +1185,6 @@ impl CheckData for Relation {
     }
 }
 
-/// For checking the graph data in csv file is valid or not.
-/// Temporarily, we only use it to test our models, after getting stable models, we will remove it or change its attributes.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
-pub struct RelationAttribute {
-    #[validate(length(
-        max = "RELATION_ID_MAX_LENGTH",
-        min = "DEFAULT_MIN_LENGTH",
-        message = "The length of relation_type must be between 1 and 255."
-    ))]
-    #[validate(regex(
-        path = "RELATION_ID_REGEX",
-        message = "The relation_id must match the RELATION_ID_REGEX pattern."
-    ))]
-    pub relation_id: String,
-
-    pub attention_score: f64,
-
-    // A relation might belong to multiple moa paths, so we need to use a vector to store them. But we can join them into a string with | as the delimiter.
-    pub moa_ids: String,
-}
-
-impl CheckData for RelationAttribute {
-    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
-        Self::check_csv_is_valid_default::<Relation>(filepath)
-    }
-
-    fn unique_fields() -> Vec<String> {
-        vec!["relation_id".to_string()]
-    }
-
-    fn fields() -> Vec<String> {
-        vec![
-            "relation_id".to_string(),
-            "attention_score".to_string(),
-            "moa_ids".to_string(),
-        ]
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct RelationCount {
     #[validate(length(

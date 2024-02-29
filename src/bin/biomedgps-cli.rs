@@ -1,8 +1,8 @@
 extern crate log;
 
-use biomedgps::model::init_sql::create_kg_score_table;
+use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
-use biomedgps::model::{init_sql::create_score_table, util::read_annotation_file};
+use biomedgps::model::{init_db::create_score_table, util::read_annotation_file};
 use biomedgps::{
     build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
     run_migrations,
@@ -28,14 +28,14 @@ struct Opt {
 enum SubCommands {
     #[structopt(name = "initdb")]
     InitDB(InitDbArguments),
+    #[structopt(name = "inittable")]
+    InitTable(InitTableArguments),
     #[structopt(name = "importdb")]
     ImportDB(ImportDBArguments),
     #[structopt(name = "importgraph")]
     ImportGraph(ImportGraphArguments),
     #[structopt(name = "importkge")]
     ImportKGE(ImportKGEArguments),
-    #[structopt(name = "inittable")]
-    InitTable(InitTableArguments),
 }
 
 /// Init database.
@@ -104,7 +104,7 @@ pub struct ImportDBArguments {
     show_all_errors: bool,
 }
 
-/// Init tables for performance.
+/// Init tables for performance. You must run this command after the importdb command.
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - inittable", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct InitTableArguments {
@@ -142,7 +142,7 @@ pub struct ImportGraphArguments {
     #[structopt(name = "filepath", short = "f", long = "filepath")]
     filepath: Option<String>,
 
-    /// [Required] The file type of the data file to import. It may be entity, relation, entity_attribute and relation_attribute.
+    /// [Required] The file type of the data file to import. It may be entity, relation, entity_attribute.
     #[structopt(name = "filetype", short = "t", long = "filetype")]
     filetype: Option<String>,
 
@@ -193,7 +193,7 @@ pub struct ImportKGEArguments {
     relation_embedding_file: String,
 
     /// [Required] The file path of the metadata file to import. It must be a json file which contains the metadata of the model. Such as the model name, model type, description, learning rate, batch size, epochs, etc. If you don't have the metadata file, you can use a empty json file. e.g. {}
-    #[structopt(name = "metadata_file", short = "m", long = "metadata-file")]
+    #[structopt(name = "metadata_file", short = "f", long = "metadata-file")]
     metadata_file: String,
 
     /// [Optional] The table name you want to name. e.g. biomedgps, mecfs, etc. This feature is used to distinguish different dataset combinations matched with your model. If not set, we will use the biomedgps as default. But in this case, the dimension of the embedding should be 400.
@@ -227,7 +227,7 @@ pub struct ImportKGEArguments {
     dataset: Vec<String>,
 
     /// [Optional] Description of the model.
-    #[structopt(name = "description", short = "D", long = "description")]
+    #[structopt(name = "description", long = "description")]
     description: Option<String>,
 
     /// [Optional] Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
@@ -239,7 +239,7 @@ pub struct ImportKGEArguments {
     skip_check: bool,
 
     /// [Optional] Show the first 3 errors when import data.
-    #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
+    #[structopt(name = "show_all_errors", short = "E", long = "show-all-errors")]
     show_all_errors: bool,
 
     /// [Optional] Annotation file path. This option is only required for legacy relation_embedding file which only contains id, embedding columns.
@@ -464,7 +464,6 @@ async fn main() {
             if filetype == "entity"
                 || filetype == "relation"
                 || filetype == "entity_attribute"
-                || filetype == "relation_attribute"
             {
                 import_graph_data(
                     &graph,

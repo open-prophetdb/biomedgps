@@ -2,8 +2,7 @@ version: '3'
 
 services:
   postgres-ml:
-    image: nordata/postgresml:2.7.13
-    # image: nordata/postgre_postgresml:14-27b1f33
+    image: nordata/postgresml:v2.8.3-1c11927
     container_name: biomedgps-postgresql-ml
     restart: "on-failure"
     environment:

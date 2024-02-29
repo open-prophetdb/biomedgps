@@ -160,7 +160,7 @@ pub async fn add_default_model(pool: &sqlx::PgPool) -> Result<(), anyhow::Error>
 pub async fn init_kge_models(
     pool: &sqlx::PgPool,
 ) -> Result<HashMap<String, EmbeddingMetadata>, anyhow::Error> {
-    add_default_model(pool).await;
+    let _ = add_default_model(pool).await;
 
     let mut kge_models = KGE_MODELS.lock().unwrap();
 
@@ -328,6 +328,7 @@ pub struct EmbeddingMetadata {
     #[oai(read_only)]
     pub id: i64,
 
+    // A prefix of the table name, such as biomedgps, mecfs, etc. It is used as the prefix of the entity embedding table and relation embedding table. It's for the user to distinguish different scenarios. Each scenario has its own table name prefix and a set of models. Each model has its own entity embedding table and relation embedding table.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
@@ -335,6 +336,7 @@ pub struct EmbeddingMetadata {
     ))]
     pub table_name: String,
 
+    // The model name, such as transe_mecfs, transe_biomedgps, etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
@@ -342,6 +344,7 @@ pub struct EmbeddingMetadata {
     ))]
     pub model_name: String,
 
+    // The model type, such as TransE, TransH, TransR, TransD, RotatE etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
@@ -349,6 +352,7 @@ pub struct EmbeddingMetadata {
     ))]
     pub model_type: String,
 
+    // The description of the model.
     pub description: String,
 
     pub datasets: Vec<String>, // Dataset name, such as hsdn, drkg, ctdbase, etc.
@@ -364,6 +368,56 @@ pub struct EmbeddingMetadata {
 }
 
 impl EmbeddingMetadata {
+    /// Get the score function name of the model type.
+    ///
+    /// # Returns
+    /// * `&'static str` - The score function name.
+    ///
+    /// # Example
+    /// ```
+    /// let metadata = EmbeddingMetadata {
+    ///     id: 1,
+    ///     table_name: "biomedgps".to_string(),
+    ///     model_name: "biomedgps".to_string(),
+    ///     model_type: "TransE".to_string(),
+    ///     description: "The default model of BiomedGPS".to_string(),
+    ///     datasets: vec!["hsdn".to_string()],
+    ///     created_at: Utc::now(),
+    ///     dimension: 400,
+    ///     metadata: None,
+    /// };
+    ///
+    /// let score_function_name = metadata.detect_score_fn();
+    /// assert_eq!(score_function_name, "pgml.transe_l2_ndarray");
+    /// ```
+    ///
+    pub fn detect_score_fn(&self) -> &'static str {
+        // TODO: We need to add more score functions here
+        let score_function_name = if self.model_type == "TransE_l2" {
+            "pgml.transe_l2_ndarray"
+        } else if self.model_type == "TransE_l1" {
+            "pgml.transe_l1_ndarray"
+        } else if self.model_type == "DistMult" {
+            "pgml.distmult_ndarray"
+        } else if self.model_type == "ComplEx" {
+            "pgml.complex_ndarray"
+        } else {
+            "pgml.transe_l2_ndarray"
+        };
+
+        score_function_name
+    }
+
+    /// Create an empty table for storing entity embeddings.
+    ///
+    /// # Arguments
+    /// * `tx` - The database transaction.
+    /// * `table_name` - The table name of embedding metadata.
+    /// * `dimension` - The dimension of embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<(), Box<dyn Error>>` - The result of creating the entity embedding table.
+    ///
     async fn create_entity_emb_table(
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         table_name: &str,
@@ -393,6 +447,16 @@ impl EmbeddingMetadata {
         };
     }
 
+    /// Create an empty table for storing relation embeddings.
+    ///
+    /// # Arguments
+    /// * `tx` - The database transaction.
+    /// * `table_name` - The table name of embedding metadata.
+    /// * `dimension` - The dimension of embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<(), Box<dyn Error>>` - The result of creating the relation embedding table.
+    ///
     async fn create_relation_emb_table(
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         table_name: &str,
@@ -425,6 +489,13 @@ impl EmbeddingMetadata {
     }
 
     /// Insert a record into the embedding metadata table. If the table name and model name already exists, it will return an error and rollback the transaction.
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool.
+    ///
+    /// # Returns
+    /// * `Result<EmbeddingMetadata, Box<dyn Error>>` - The embedding metadata.
+    ///
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EmbeddingMetadata, Box<dyn Error>> {
         return EmbeddingMetadata::init_embedding_table(
             pool,
@@ -573,6 +644,15 @@ impl EmbeddingMetadata {
         })
     }
 
+    /// Get the embedding metadata by the id.
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool.
+    /// * `id` - The id of embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<EmbeddingMetadata, Box<dyn Error>>` - The embedding metadata.
+    ///
     pub async fn get_embedding_metadata_by_id(
         pool: &sqlx::PgPool,
         id: i64,
@@ -587,6 +667,18 @@ impl EmbeddingMetadata {
         Ok(metadata)
     }
 
+    /// Get a list of embedding metadata.
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool.
+    /// * `query` - The query of embedding metadata.
+    /// * `page` - The page index of embedding metadata.
+    /// * `page_size` - The page size of embedding metadata.
+    /// * `order_by` - The order by of embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<EmbeddingRecordResponse<EmbeddingMetadata>, anyhow::Error>` - The response of embedding metadata.
+    ///
     pub async fn get_embedding_metadata(
         pool: &sqlx::PgPool,
         query: &Option<ComposeQuery>,
@@ -605,6 +697,17 @@ impl EmbeddingMetadata {
         .await
     }
 
+    /// Import the embedding metadata into the database from a csv file.
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool.
+    /// * `filepath` - The file path of embedding metadata.
+    /// * `delimiter` - The delimiter of embedding metadata.
+    /// * `drop` - Whether to drop the table before importing the embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<(), Box<dyn Error>>` - The result of importing the embedding metadata.
+    ///
     pub async fn import_embedding_metadata(
         pool: &sqlx::PgPool,
         filepath: &PathBuf,

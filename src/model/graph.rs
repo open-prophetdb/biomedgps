@@ -6,9 +6,9 @@
 //!
 
 use super::core::KnowledgeCuration;
-use super::init_sql::get_kg_score_table_name;
+use super::init_db::get_kg_score_table_name;
 use crate::model::core::{Entity, RecordResponse, Relation, DEFAULT_DATASET_NAME};
-use crate::model::init_sql::get_triple_entity_score_table_name;
+use crate::model::init_db::get_triple_entity_score_table_name;
 use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
@@ -1152,18 +1152,7 @@ impl Graph {
             r_target_type
         };
 
-        // TODO: We need to add more score functions here
-        let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
-            "pgml.transe_l2_ndarray"
-        } else if embedding_metadata.model_type == "TransE_l1" {
-            "pgml.transe_l1_ndarray"
-        } else if embedding_metadata.model_type == "DistMult" {
-            "pgml.distmult_ndarray"
-        } else if embedding_metadata.model_type == "ComplEx" {
-            "pgml.complex_ndarray"
-        } else {
-            "pgml.transe_l2_ndarray"
-        };
+        let score_function_name = embedding_metadata.detect_score_fn();
 
         let sql_str = if relation_type == "DrugBank::treats::Compound:Symptom" {
             format!(

@@ -8,6 +8,24 @@ use crate::model::util::ValidationError;
 use log::{debug, error};
 use sqlx::PgPool;
 
+/// Generate a table name for the score table of the triple entity.
+///
+/// # Arguments
+/// * `table_prefix` - The prefix of the table name, such as "biomedgps".
+/// * `first_entity_type` - The type of the first entity, such as "Compound".
+/// * `second_entity_type` - The type of the second entity, such as "Disease".
+/// * `third_entity_type` - The type of the third entity, such as "Symptom".
+///
+/// # Returns
+/// `String` - The table name for the score table of the triple entity, such as "biomedgps_compound_disease_symptom_score".
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::get_triple_entity_score_table_name;
+/// let table_name = get_triple_entity_score_table_name("biomedgps", "Compound", "Disease", "Symptom");
+/// assert_eq!(table_name, "biomedgps_compound_disease_symptom_score");
+/// ```
+///
 pub fn get_triple_entity_score_table_name(
     table_prefix: &str,
     first_entity_type: &str,  // Such as "Compound"
@@ -24,6 +42,38 @@ pub fn get_triple_entity_score_table_name(
     )
 }
 
+/// Generate the SQL query for initializing the score table for a triple entity.
+///
+/// # Arguments
+/// * `first_entity_type` - The type of the first entity, such as "Compound".
+/// * `second_entity_type` - The type of the second entity, such as "Disease".
+/// * `third_entity_type` - The type of the third entity, such as "Symptom".
+/// * `first_second_relation_type` - The relation type between the first and second entities.
+/// * `second_third_relation_type` - The relation type between the second and third entities.
+/// * `table_prefix` - Optional prefix for the table name. If not provided, the default model name will be used.
+/// * `gamma` - The gamma value used in the score calculation.
+/// * `embedding_metadata` - The metadata of the embeddings used in the score calculation.
+///
+/// # Returns
+/// `String` - The SQL query for initializing the score table.
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::init_score_sql;
+/// let sql_query = init_score_sql(
+///     "Compound",
+///     "Disease",
+///     "Symptom",
+///     "has_compound",
+///     "has_disease",
+///     Some("biomedgps"),
+///     12.0,
+///     &embedding_metadata,
+/// );
+///
+/// assert!(sql_query.contains("biomedgps_compound_disease_symptom_score"));
+/// ```
+///
 pub fn init_score_sql(
     first_entity_type: &str,  // Such as "Compound"
     second_entity_type: &str, // Such as "Disease"
@@ -42,18 +92,7 @@ pub fn init_score_sql(
         third_entity_type,
     );
 
-    // TODO: We need to add more score functions here
-    let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
-        "pgml.transe_l2_ndarray"
-    } else if embedding_metadata.model_type == "TransE_l1" {
-        "pgml.transe_l1_ndarray"
-    } else if embedding_metadata.model_type == "DistMult" {
-        "pgml.distmult_ndarray"
-    } else if embedding_metadata.model_type == "ComplEx" {
-        "pgml.complex_ndarray"
-    } else {
-        "pgml.transe_l2_ndarray"
-    };
+    let score_function_name = embedding_metadata.detect_score_fn();
 
     format!(
         r#"
@@ -145,6 +184,49 @@ pub fn init_score_sql(
     )
 }
 
+/// Create the score table for a triple entity.
+///
+/// # Arguments
+/// * `pool` - The database connection pool.
+/// * `first_entity_type` - The type of the first entity, such as "Compound".
+/// * `second_entity_type` - The type of the second entity, such as "Disease".
+/// * `third_entity_type` - The type of the third entity, such as "Symptom".
+/// * `first_second_relation_type` - The relation type between the first and second entities.
+/// * `second_third_relation_type` - The relation type between the second and third entities.
+/// * `table_prefix` - Optional prefix for the table name. If not provided, the default model name will be used.
+///
+/// # Returns
+/// `Result<(), ValidationError>` - The result of creating the score table.
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::create_score_table;
+/// use sqlx::PgPool;
+/// use std::env;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in the environment variables");
+///     let pool = PgPool::connect(&db_url).await.unwrap();
+///     let first_entity_type = "Compound";
+///     let second_entity_type = "Disease";
+///     let third_entity_type = "Symptom";
+///     let first_second_relation_type = "treats";
+///     let second_third_relation_type = "causes";
+///     let table_prefix = "biomedgps";
+///     let result = create_score_table(
+///         &pool,
+///         first_entity_type,
+///         second_entity_type,
+///         third_entity_type,
+///         first_second_relation_type,
+///         second_third_relation_type,
+///         Some(table_prefix),
+///     ).await;
+///     assert!(result.is_ok());
+/// }
+/// ```
+///
 pub async fn create_score_table(
     pool: &PgPool,
     first_entity_type: &str,  // Such as "Compound"
@@ -254,6 +336,21 @@ pub async fn create_score_table(
     }
 }
 
+/// Generate a table name for the score table of the knowledge graph.
+///
+/// # Arguments
+/// * `table_prefix` - The prefix of the table name, such as "biomedgps".
+///
+/// # Returns
+/// `String` - The table name for the score table of the knowledge graph, such as "biomedgps_relation_with_score".
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::get_kg_score_table_name;
+/// let table_name = get_kg_score_table_name("biomedgps");
+/// assert_eq!(table_name, "biomedgps_relation_with_score");
+/// ```
+///
 pub fn get_kg_score_table_name(table_prefix: &str) -> String {
     format!("{}_relation_with_score", table_prefix)
 }
@@ -265,19 +362,7 @@ pub fn init_kg_score_sql(
 ) -> String {
     let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
     let score_table_name = get_kg_score_table_name(table_prefix);
-
-    // TODO: We need to add more score functions here
-    let score_function_name = if embedding_metadata.model_type == "TransE_l2" {
-        "pgml.transe_l2_ndarray"
-    } else if embedding_metadata.model_type == "TransE_l1" {
-        "pgml.transe_l1_ndarray"
-    } else if embedding_metadata.model_type == "DistMult" {
-        "pgml.distmult_ndarray"
-    } else if embedding_metadata.model_type == "ComplEx" {
-        "pgml.complex_ndarray"
-    } else {
-        "pgml.transe_l2_ndarray"
-    };
+    let score_function_name = embedding_metadata.detect_score_fn();
 
     format!(
         r#"
@@ -329,6 +414,31 @@ pub fn init_kg_score_sql(
     )
 }
 
+/// Create the score table for the knowledge graph.
+///
+/// # Arguments
+/// * `pool` - The database connection pool.
+/// * `table_prefix` - Optional prefix for the table name. If not provided, the default model name will be used.
+///
+/// # Returns
+/// `Result<(), ValidationError>` - The result of creating the score table.
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::create_kg_score_table;
+/// use sqlx::PgPool;
+/// use std::env;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in the environment variables");
+///     let pool = PgPool::connect(&db_url).await.unwrap();
+///     let table_prefix = "biomedgps";
+///     let result = create_kg_score_table(&pool, Some(table_prefix)).await;
+///     assert!(result.is_ok());
+/// }
+/// ```
+///
 pub async fn create_kg_score_table(
     pool: &PgPool,
     table_prefix: Option<&str>,
@@ -348,19 +458,13 @@ pub async fn create_kg_score_table(
     };
 
     let gamma = 12.0;
-    let init_sql = init_kg_score_sql(
-        table_prefix,
-        gamma,
-        &embedding_metadata,
-    );
+    let init_sql = init_kg_score_sql(table_prefix, gamma, &embedding_metadata);
 
     debug!("init_sql: {}", init_sql);
     let mut tx = pool.begin().await.unwrap();
     let delete_sql_str = format!(
         "DROP TABLE IF EXISTS {score_table};",
-        score_table = get_kg_score_table_name(
-            table_prefix.unwrap_or(DEFAULT_MODEL_NAME),
-        )
+        score_table = get_kg_score_table_name(table_prefix.unwrap_or(DEFAULT_MODEL_NAME),)
     );
     match sqlx::query(&delete_sql_str).execute(&mut tx).await {
         Ok(_) => {
@@ -398,5 +502,110 @@ pub async fn create_kg_score_table(
                 vec![],
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::setup_test_db;
+    use chrono::{DateTime, NaiveDateTime, Utc};
+
+    #[test]
+    fn test_get_triple_entity_score_table_name() {
+        let table_name =
+            get_triple_entity_score_table_name("biomedgps", "Compound", "Disease", "Symptom");
+        assert_eq!(table_name, "biomedgps_compound_disease_symptom_score");
+    }
+
+    #[test]
+    fn test_init_score_sql() {
+        let table_prefix = "biomedgps";
+        let first_entity_type = "Compound";
+        let second_entity_type = "Disease";
+        let third_entity_type = "Symptom";
+        let first_second_relation_type = "treats";
+        let second_third_relation_type = "causes";
+        let gamma = 12.0;
+        let embedding_metadata = EmbeddingMetadata {
+            id: 1,
+            metadata: None,
+            model_name: "biomedgps_transe_l2".to_string(),
+            model_type: "TransE_l2".to_string(),
+            dimension: 400,
+            table_name: "biomedgps".to_string(),
+            created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            datasets: vec!["STRING".to_string()],
+            description: "The entity embedding trained by the TransE_l2 model".to_string(),
+        };
+
+        let sql = init_score_sql(
+            first_entity_type,
+            second_entity_type,
+            third_entity_type,
+            first_second_relation_type,
+            second_third_relation_type,
+            Some(table_prefix),
+            gamma,
+            &embedding_metadata,
+        );
+        println!("sql: {}", sql);
+        assert!(sql.contains("biomedgps_compound_disease_symptom_score"));
+    }
+
+    #[tokio::test]
+    async fn test_create_score_table() {
+        let pool = setup_test_db().await;
+        let first_entity_type = "Compound";
+        let second_entity_type = "Disease";
+        let third_entity_type = "Symptom";
+        let first_second_relation_type = "treats";
+        let second_third_relation_type = "causes";
+        let table_prefix = "biomedgps";
+        let result = create_score_table(
+            &pool,
+            first_entity_type,
+            second_entity_type,
+            third_entity_type,
+            first_second_relation_type,
+            second_third_relation_type,
+            Some(table_prefix),
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_kg_score_table_name() {
+        let table_name = get_kg_score_table_name("biomedgps");
+        assert_eq!(table_name, "biomedgps_relation_with_score");
+    }
+
+    #[test]
+    fn test_init_kg_score_sql() {
+        let table_prefix = "biomedgps";
+        let gamma = 12.0;
+        let embedding_metadata = EmbeddingMetadata {
+            id: 1,
+            metadata: None,
+            model_name: "biomedgps_transe_l2".to_string(),
+            model_type: "TransE_l2".to_string(),
+            dimension: 400,
+            table_name: "biomedgps".to_string(),
+            created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            datasets: vec!["STRING".to_string()],
+            description: "The entity embedding trained by the TransE_l2 model".to_string(),
+        };
+        let sql = init_kg_score_sql(Some(table_prefix), gamma, &embedding_metadata);
+        println!("sql: {}", sql);
+        assert!(sql.contains("biomedgps_relation_with_score"));
+    }
+
+    #[tokio::test]
+    async fn test_create_kg_score_table() {
+        let pool = setup_test_db().await;
+        let table_prefix = "biomedgps";
+        let result = create_kg_score_table(&pool, Some(table_prefix)).await;
+        assert!(result.is_ok());
     }
 }
