@@ -9,81 +9,67 @@ use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, FunctionCa
 use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4};
 use poem_openapi::{Enum, Object};
 use regex::Regex;
+use log::{warn};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use validator::Validate;
 
-lazy_static! {
-    pub static ref UUID_REGEX: Regex =
-        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
-    // Only for predicted edge
-    pub static ref PROMPT_TEMPLATE: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
-
-        m.insert("node_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts, such as {{entity_type}}.\n\nWhat's the {{entity_name}} which id is {{entity_id}}?");
-
-        m.insert("edge_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\nWhat's the {{source_name}}[{{source_id}}, {{source_type}}] -> {{relation_type}} -> {{target_name}}[{{target_id}}, {{target_type}}?");
-
-        m.insert("custom_question", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\n{{custom_question}}");
-        m
-    };
+#[derive(Debug, Deserialize, Serialize, Object, sqlx::FromRow)]
+pub struct LlmResponse {
+    pub prompt: String,
+    pub response: String,
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    pub created_at: DateTime<Utc>,
 }
 
-/// The expanded relation is used to store the relation between two entities.
+/// The context is used to store the context for the LLM. The context can be an entity, an expanded relation, or a symptoms with disease context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
-pub struct ExpandedRelation {
-    pub relation: Relation,
-    pub source: Entity,
-    pub target: Entity,
+pub struct Context {
+    pub entity: Option<Entity>,
+    pub expanded_relation: Option<ExpandedRelation>,
+    pub symptoms_with_disease_ctx: Option<SymptomsWithDiseaseCtx>,
 }
 
-/// The prompt template category is used to store the category of prompt template. Each category has a prompt template.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Enum)]
-pub enum PromptTemplateCategoryEnum {
-    NodeSummary,
-    EdgeSummary,
-    CustomQuestion,
-}
+impl Context {
+    pub async fn answer(self, chatbot: &ChatBot, prompt_template_id: &str) -> Result<LlmResponse, anyhow::Error> {
+        let resp = if self.entity.is_some() {
+            let entity = self.entity.unwrap();
+            let mut llm_msg = LlmMessage::new(&prompt_template_id, entity, None).unwrap();
+            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            Ok(LlmResponse {
+                prompt: answer.prompt.to_owned(),
+                response: answer.message.to_owned(),
+                created_at: answer.created_at,
+            })
+        } else if self.expanded_relation.is_some() {
+            let expanded_relation = self.expanded_relation.unwrap();
+            let mut llm_msg =
+                LlmMessage::new(&prompt_template_id, expanded_relation, None).unwrap();
+            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            Ok(LlmResponse {
+                prompt: answer.prompt.to_owned(),
+                response: answer.message.to_owned(),
+                created_at: answer.created_at,
+            })
+        } else if self.symptoms_with_disease_ctx.is_some() {
+            let symptoms_with_disease_ctx = self.symptoms_with_disease_ctx.unwrap();
+            let mut llm_msg =
+                LlmMessage::new(&prompt_template_id, symptoms_with_disease_ctx, None).unwrap();
+            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            Ok(LlmResponse {
+                prompt: answer.prompt.to_owned(),
+                response: answer.message.to_owned(),
+                created_at: answer.created_at,
+            })
+        } else {
+            let err =
+                "One of entity, expanded_relation or symptoms_with_disease_ctx must be provided."
+                    .to_string();
+            Err(anyhow::anyhow!(err))
+        };
 
-/// A wrapper for prompt template category.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
-pub struct PromptTemplateCategory {
-    value: PromptTemplateCategoryEnum,
-}
-
-/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
-impl From<String> for PromptTemplateCategory {
-    fn from(v: String) -> Self {
-        match v.as_str() {
-            "node_summary" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::NodeSummary,
-            },
-            "edge_summary" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::EdgeSummary,
-            },
-            "custom_question" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::CustomQuestion,
-            },
-            _ => panic!("Invalid prompt template category"),
-        }
-    }
-}
-
-/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
-impl Into<PromptTemplateCategoryEnum> for PromptTemplateCategory {
-    fn into(self) -> PromptTemplateCategoryEnum {
-        self.value
-    }
-}
-
-/// Implement the conversion between PromptTemplateCategory and String.
-impl Into<String> for PromptTemplateCategory {
-    fn into(self) -> String {
-        match self.value {
-            PromptTemplateCategoryEnum::NodeSummary => "node_summary".to_string(),
-            PromptTemplateCategoryEnum::EdgeSummary => "edge_summary".to_string(),
-            PromptTemplateCategoryEnum::CustomQuestion => "custom_question".to_string(),
-        }
+        return resp;
     }
 }
 
@@ -107,6 +93,14 @@ impl LlmContext for Entity {
     }
 }
 
+/// The expanded relation is used to store the relation between two entities.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct ExpandedRelation {
+    pub relation: Relation,
+    pub source: Entity,
+    pub target: Entity,
+}
+
 impl LlmContext for ExpandedRelation {
     fn get_context(&self) -> Self {
         self.clone()
@@ -122,6 +116,105 @@ impl LlmContext for ExpandedRelation {
         prompt = prompt.replace("{{target_id}}", &self.target.id);
         prompt = prompt.replace("{{target_type}}", &self.target.label);
         prompt
+    }
+}
+
+// The SymptomsWithDiseaseCtx is used to store the context for the symptoms with disease.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct SymptomsWithDiseaseCtx {
+    pub disease_name: String,
+    pub subgraph: String,
+    pub symptoms: Vec<String>,
+}
+
+impl LlmContext for SymptomsWithDiseaseCtx {
+    fn get_context(&self) -> Self {
+        self.clone()
+    }
+
+    fn render_prompt(&self, prompt_template: &str) -> String {
+        let mut prompt = prompt_template.to_string();
+        prompt = prompt.replace("{{disease_name}}", &self.disease_name);
+        prompt = prompt.replace("{{subgraph}}", &self.subgraph);
+        prompt = prompt.replace("{{symptoms}}", &self.symptoms.join(", "));
+        prompt
+    }
+}
+
+lazy_static! {
+    pub static ref UUID_REGEX: Regex =
+        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
+    // Only for predicted edge
+    pub static ref PROMPT_TEMPLATE: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+
+        m.insert("node_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts, such as {{entity_type}}.\n\nWhat's the {{entity_name}} which id is {{entity_id}}?");
+
+        m.insert("edge_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\nWhat's the {{source_name}}[{{source_id}}, {{source_type}}] -> {{relation_type}} -> {{target_name}}[{{target_id}}, {{target_type}}?");
+
+        m.insert("custom_question", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\n{{custom_question}}");
+
+        // You need to prepare two fields: 1) subgraph: a json string; 2) disease_name: a string.
+        m.insert("subgraph_symptoms_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nQuestions:\nI have a new Knowledge Subgraph focusing on {{disease_name}} that encompasses related symptoms, diseases, medications, and genes/pathways. This Subgraph includes: 1) Associations between {{disease_name}} related symptoms and various diseases; 2) Medications and genes/pathways related to these diseases; 3) How medications exert therapeutic effects through specific genes or pathways for these diseases. 4) {{disease_name}} related symptoms: {{symptoms}}. I am looking to understand:\n1) Which diseases are directly associated with {{disease_name}} symptoms and the common treatment medications for these diseases.\n2) How these medications work by affecting certain genes or pathways.3) If there are any new studies or predictive relationships indicating unrecognized medications that could be beneficial for {{disease_name}} symptoms.\n\nPlease answer the above questions according to the knowledge subgraph and your knowledges.");
+
+        m
+    };
+}
+
+/// The prompt template category is used to store the category of prompt template. Each category has a prompt template.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Enum)]
+pub enum PromptTemplateCategoryEnum {
+    NodeSummary,
+    EdgeSummary,
+    CustomQuestion,
+    SubgraphSymptomsWithDiseaseCtx,
+}
+
+/// A wrapper for prompt template category.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct PromptTemplateCategory {
+    value: PromptTemplateCategoryEnum,
+}
+
+/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
+impl From<String> for PromptTemplateCategory {
+    fn from(v: String) -> Self {
+        match v.as_str() {
+            "node_summary" => PromptTemplateCategory {
+                value: PromptTemplateCategoryEnum::NodeSummary,
+            },
+            "edge_summary" => PromptTemplateCategory {
+                value: PromptTemplateCategoryEnum::EdgeSummary,
+            },
+            "custom_question" => PromptTemplateCategory {
+                value: PromptTemplateCategoryEnum::CustomQuestion,
+            },
+            "subgraph_symptoms_with_disease_ctx" => PromptTemplateCategory {
+                value: PromptTemplateCategoryEnum::SubgraphSymptomsWithDiseaseCtx,
+            },
+            _ => panic!("Invalid prompt template category"),
+        }
+    }
+}
+
+/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
+impl Into<PromptTemplateCategoryEnum> for PromptTemplateCategory {
+    fn into(self) -> PromptTemplateCategoryEnum {
+        self.value
+    }
+}
+
+/// Implement the conversion between PromptTemplateCategory and String.
+impl Into<String> for PromptTemplateCategory {
+    fn into(self) -> String {
+        match self.value {
+            PromptTemplateCategoryEnum::NodeSummary => "node_summary".to_string(),
+            PromptTemplateCategoryEnum::EdgeSummary => "edge_summary".to_string(),
+            PromptTemplateCategoryEnum::CustomQuestion => "custom_question".to_string(),
+            PromptTemplateCategoryEnum::SubgraphSymptomsWithDiseaseCtx => {
+                "subgraph_symptoms_with_disease_ctx".to_string()
+            }
+        }
     }
 }
 

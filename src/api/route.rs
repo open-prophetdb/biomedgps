@@ -11,6 +11,7 @@ use crate::model::core::{
     RelationMetadata, Statistics, Subgraph,
 };
 use crate::model::graph::Graph;
+use crate::model::llm::{ChatBot, Context, LlmResponse};
 use crate::model::util::match_color;
 use crate::query_builder::cypher_builder::query_nhops;
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
@@ -531,7 +532,7 @@ impl BiomedgpsApi {
         };
 
         match payload.insert(&pool_arc).await {
-            Ok(kc) => PostResponse::Created(Json(kc)),
+            Ok(kc) => PostResponse::created(kc),
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
@@ -574,7 +575,7 @@ impl BiomedgpsApi {
         };
 
         match payload.update(&pool_arc, id).await {
-            Ok(kc) => PostResponse::Created(Json(kc)),
+            Ok(kc) => PostResponse::created(kc),
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
@@ -905,7 +906,7 @@ impl BiomedgpsApi {
         };
 
         match payload.insert(&pool_arc).await {
-            Ok(kc) => PostResponse::Created(Json(kc)),
+            Ok(kc) => PostResponse::created(kc),
             Err(e) => {
                 let err = format!("Failed to insert curated knowledge: {}", e);
                 warn!("{}", err);
@@ -957,7 +958,7 @@ impl BiomedgpsApi {
         }
 
         match payload.update(&pool_arc, &id).await {
-            Ok(kc) => PostResponse::Created(Json(kc)),
+            Ok(kc) => PostResponse::created(kc),
             Err(e) => {
                 let err = format!("Failed to update subgraph: {}", e);
                 warn!("{}", err);
@@ -1205,7 +1206,14 @@ impl BiomedgpsApi {
 
         let mut graph = Graph::new();
         match graph
-            .fetch_predicted_nodes(&pool_arc, &node_id, &relation_type, &query, topk, model_name.0)
+            .fetch_predicted_nodes(
+                &pool_arc,
+                &node_id,
+                &relation_type,
+                &query,
+                topk,
+                model_name.0,
+            )
             .await
         {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
@@ -1268,56 +1276,43 @@ impl BiomedgpsApi {
         GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
     }
 
-    // /// Call `/api/v1/llm` with query params to get answer from LLM.
-    // #[oai(
-    //     path = "/llm",
-    //     method = "post",
-    //     tag = "ApiTags::KnowledgeGraph",
-    //     operation_id = "askLLM"
-    // )]
-    // async fn ask_llm(
-    //     &self,
-    //     pool: Data<&Arc<neo4rs::Graph>>,
-    //     prompt_template_id: Query<String>,
-    //     context: Query<String>,
-    //     nhops: Query<Option<usize>>,
-    //     _token: CustomSecurityScheme,
-    // ) -> GetGraphResponse {
-    //     let pool_arc = pool.clone();
-    //     let start_node_id = start_node_id.0;
-    //     let end_node_id = end_node_id.0;
-    //     let nhops = match nhops.0 {
-    //         Some(nhops) => nhops,
-    //         None => {
-    //             warn!("nhops is empty.");
-    //             2
-    //         }
-    //     };
+    /// Call `/api/v1/llm` with query params to get answer from LLM.
+    #[oai(
+        path = "/llm",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "askLLM"
+    )]
+    async fn ask_llm(
+        &self,
+        prompt_template_id: Query<String>,
+        context: Json<Context>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<LlmResponse> {
+        let prompt_template_id = prompt_template_id.0;
+        let context = context.0;
+        debug!("Prompt template id: {}", prompt_template_id);
+        debug!("Context: {:?}", context);
 
-    //     let (nodes, edges) = match query_nhops(&pool_arc, &start_node_id, &end_node_id, nhops).await
-    //     {
-    //         Ok((nodes, edges)) => (nodes, edges),
-    //         Err(e) => {
-    //             let err = format!("Failed to fetch paths: {}", e);
-    //             warn!("{}", err);
-    //             return GetGraphResponse::bad_request(err);
-    //         }
-    //     };
+        let openai_api_key = match std::env::var("OPENAI_API_KEY") {
+            Ok(openai_api_key) => openai_api_key,
+            Err(e) => {
+                let err = format!("Failed to get OPENAI_API_KEY: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
 
-    //     if nodes.len() == 0 {
-    //         let err = format!(
-    //             "No path found between {} and {} with {} hops.",
-    //             start_node_id, end_node_id, nhops
-    //         );
-    //         warn!("{}", err);
-    //         return GetGraphResponse::bad_request(err);
-    //     };
-
-    //     let nodes = nodes.iter().collect();
-    //     let edges = edges.iter().collect();
-    //     let graph = Graph::from_data(nodes, edges);
-    //     GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
-    // }
+        let chatbot = ChatBot::new("GPT4", &openai_api_key);
+        match context.answer(&chatbot, &prompt_template_id).await {
+            Ok(llm_response) => PostResponse::created(llm_response),
+            Err(e) => {
+                let err = format!("Failed to get answer from LLM: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
