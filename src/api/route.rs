@@ -11,14 +11,15 @@ use crate::model::core::{
     RelationMetadata, Statistics, Subgraph,
 };
 use crate::model::graph::Graph;
+use crate::model::init_db::get_kg_score_table_name;
+use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse};
 use crate::model::util::match_color;
-use crate::query_builder::cypher_builder::query_nhops;
+use crate::query_builder::cypher_builder::{query_shared_nodes, query_nhops};
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
-use sqlx::pool;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -692,13 +693,17 @@ impl BiomedgpsApi {
             }
         };
 
+        // TODO: We need to add the model name to the query if we allow users to use different model.
+        // TODO: We need to ensure the table exists before we use it.
+        let table_name = get_kg_score_table_name(DEFAULT_MODEL_NAME);
+
         match RecordResponse::<Relation>::get_records(
             &pool_arc,
-            "biomedgps_relation",
+            table_name.as_str(),
             &query,
             page,
             page_size,
-            Some("id ASC"),
+            Some("score ASC"),
         )
         .await
         {
@@ -810,6 +815,7 @@ impl BiomedgpsApi {
             }
         };
 
+        // TODO: Could we compute the 2d embedding on the fly or by the biomedgps-cli tool?
         match RecordResponse::<Entity2D>::get_records(
             &pool_arc,
             "biomedgps_entity2d",
@@ -1101,7 +1107,12 @@ impl BiomedgpsApi {
         }
 
         let node_ids: Vec<&str> = node_ids.split(",").collect();
-        match graph.auto_connect_nodes(&pool_arc, &node_ids).await {
+        // TODO: we need to get the model_table_prefix from the parameter, so users can get the score from a specific model.
+        let model_table_prefix = Some(DEFAULT_MODEL_NAME);
+        match graph
+            .auto_connect_nodes(&pool_arc, &node_ids, model_table_prefix)
+            .await
+        {
             Ok(graph) => GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap()),
             Err(e) => {
                 let err = format!("Failed to fetch nodes: {}", e);
@@ -1163,6 +1174,7 @@ impl BiomedgpsApi {
         };
 
         let mut graph = Graph::new();
+        // score DESC is the order_by clause for making the engine generate results with scores which computed by the model.
         match graph
             .fetch_linked_nodes(&pool_arc, &query, page, page_size, Some("score DESC"))
             .await
@@ -1250,6 +1262,102 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/shared-nodes` with query params to fetch shared nodes.
+    #[oai(
+        path = "/shared-nodes",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchSharedNodes"
+    )]
+    async fn fetch_shared_nodes(
+        &self,
+        pool: Data<&Arc<neo4rs::Graph>>,
+        node_ids: Query<String>,
+        target_node_types: Query<Option<String>>,
+        topk: Query<Option<u64>>,
+        nhops: Query<Option<usize>>,
+        nums_shared_by: Query<Option<u64>>,
+        _token: CustomSecurityScheme,
+    ) -> GetGraphResponse {
+        let pool_arc = pool.clone();
+        let node_ids = node_ids.0;
+        let target_node_types = target_node_types.0;
+
+        match NodeIdsQuery::new(&node_ids) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate node ids: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
+
+        let graph = Graph::new();
+
+        if node_ids == "" {
+            return GetGraphResponse::ok(graph);
+        }
+
+        let node_ids: Vec<&str> = node_ids.split(",").collect();
+
+        let target_node_type_vec = match &target_node_types {
+            Some(t) => {
+                // TODO: We need to validate the target_node_types.
+                let target_node_types: Vec<&str> = t.split(",").collect();
+                Some(target_node_types)
+            }
+            None => None,
+        };
+
+        let topk = match topk.0 {
+            Some(topk) => topk,
+            None => 10,
+        };
+
+        let nhops = match nhops.0 {
+            Some(nhops) => nhops,
+            None => 2,
+        };
+
+        let nums_shared_by = match nums_shared_by.0 {
+            Some(nums_shared_by) => nums_shared_by,
+            None => 2,
+        };
+
+        let (nodes, edges) = match query_shared_nodes(
+            &pool_arc,
+            &node_ids,
+            target_node_type_vec,
+            nhops as usize,
+            topk as usize,
+            nums_shared_by as usize,
+        )
+        .await
+        {
+            Ok((nodes, edges)) => (nodes, edges),
+            Err(e) => {
+                let err = format!("Failed to fetch paths: {}", e);
+                warn!("{}", err);
+                return GetGraphResponse::bad_request(err);
+            }
+        };
+
+        if nodes.len() == 0 {
+            let err = format!(
+                "No shared nodes found between {:?} with {:?} hops and {:?} node types.",
+                node_ids, nhops, target_node_types
+            );
+            warn!("{}", err);
+            return GetGraphResponse::bad_request(err);
+        };
+
+        let nodes = nodes.iter().collect();
+        let edges = edges.iter().collect();
+        // TODO: How to get the topk paths based on the scores?
+        let graph = Graph::from_data(nodes, edges);
+        GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
+    }
+
     /// Call `/api/v1/paths` with query params to fetch paths.
     #[oai(
         path = "/paths",
@@ -1297,6 +1405,7 @@ impl BiomedgpsApi {
 
         let nodes = nodes.iter().collect();
         let edges = edges.iter().collect();
+        // TODO: How to get the topk paths based on the scores?
         let graph = Graph::from_data(nodes, edges);
         GetGraphResponse::ok(graph.to_owned().get_graph(None).unwrap())
     }

@@ -1,5 +1,6 @@
 use crate::model::graph::{EdgeData, NodeData, COMPOSED_ENTITY_DELIMITER, COMPOSED_ENTITY_REGEX};
-use neo4rs::{query, Graph, Node as NeoNode, Relation};
+use log::{debug, error, info};
+use neo4rs::{query, Graph, Node as NeoNode, Relation, RowStream};
 use std::collections::HashMap;
 
 /// Split the composed entity id into two parts: the entity type and the entity id.
@@ -84,6 +85,46 @@ fn gen_nhops_query_str(
     query_str
 }
 
+async fn parse_nhops_results(
+    result: &mut RowStream,
+) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
+    let mut node_map: HashMap<i64, NodeData> = HashMap::new();
+    let mut edges = Vec::new();
+    let mut relations = Vec::new();
+
+    while let Some(row) = result.next().await? {
+        match row.get::<NeoNode>("node") {
+            Some(node) => {
+                let id = node.id();
+                let node = NodeData::from_neo_node(node);
+                node_map.insert(id, node);
+            }
+            None => continue,
+        };
+
+        let relation: Relation = match row.get::<Relation>("edge") {
+            Some(relation) => relation,
+            None => continue,
+        };
+        relations.push(relation);
+    }
+
+    for relation in relations.iter() {
+        let start_node_id = relation.start_node_id();
+        let end_node_id = relation.end_node_id();
+        let start_node = node_map.get(&start_node_id).unwrap();
+        let end_node = node_map.get(&end_node_id).unwrap();
+        let edge = EdgeData::from_neo_edge(relation, start_node, end_node);
+        edges.push(edge);
+    }
+
+    let nodes: Vec<NodeData> = node_map.into_values().collect();
+    info!("Number of nodes: {}", &nodes.len());
+    info!("Number of edges: {}", &edges.len());
+
+    Ok((nodes, edges))
+}
+
 /// Query the graph database to get the nodes and edges between two nodes.
 ///
 /// # Arguments
@@ -110,14 +151,30 @@ pub async fn query_nhops(
         &end_node_id,
         nhops,
     );
-    let mut result = graph.execute(query(&query_str)).await?;
 
+    let mut result = graph.execute(query(&query_str)).await?;
+    let r = parse_nhops_results(&mut result).await?;
+    Ok(r)
+}
+
+// Parse the shared nodes and edges from the result.
+// NOTE: the name of the results should be 'common', 'relatedStartNodes', and 'relations'.
+//
+// # Arguments
+// * `result` - The result of the query.
+//
+// # Returns
+// * `Ok((nodes, edges))` - The nodes and edges between the start node and the end node.
+// * `Err(e)` - The error message.
+async fn parse_shared_results(
+    result: &mut RowStream,
+) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
     let mut node_map: HashMap<i64, NodeData> = HashMap::new();
     let mut edges = Vec::new();
     let mut relations = Vec::new();
 
     while let Some(row) = result.next().await? {
-        match row.get::<NeoNode>("node") {
+        match row.get::<NeoNode>("common") {
             Some(node) => {
                 let id = node.id();
                 let node = NodeData::from_neo_node(node);
@@ -126,11 +183,28 @@ pub async fn query_nhops(
             None => continue,
         };
 
-        let relation = match row.get::<Relation>("edge") {
-            Some(relation) => relation,
+        match row.get::<Vec<NeoNode>>("relatedStartNodes") {
+            Some(related_start_nodes) => {
+                for node in related_start_nodes {
+                    let id = node.id();
+                    let node = NodeData::from_neo_node(node);
+                    node_map.insert(id, node);
+                }
+            }
             None => continue,
         };
-        relations.push(relation);
+
+        // If you want to know the format of the relations, you can run the related cypher query in the Neo4j Browser.
+        match row.get::<Vec<Vec<Relation>>>("relations") {
+            Some(relation) => {
+                for r1 in relation {
+                    for r2 in r1 {
+                        relations.push(r2);
+                    }
+                }
+            }
+            None => continue,
+        };
     }
 
     for relation in relations.iter() {
@@ -142,9 +216,101 @@ pub async fn query_nhops(
         edges.push(edge);
     }
 
-    let nodes = node_map.into_values().collect();
+    let nodes: Vec<NodeData> = node_map.into_values().collect();
+    info!("Number of nodes: {}", &nodes.len());
+    info!("Number of edges: {}", &edges.len());
 
     Ok((nodes, edges))
+}
+
+// Query the graph database to get the shared shared nodes between the start nodes.
+//
+// # Arguments
+// * `graph` - The graph database connection.
+// * `node_ids` - The start node ids. Such as ['Compound::DrugBank:DB00818', 'Disease::MONDO:0005404']
+// * `target_node_types` - The target node types. Such as ['Disease']
+// * `nhops` - The number of hops between the start node and the end node.
+// * `topk` - The number of top k shared nodes.
+// * `nums_shared_by` - The number of nodes shared by.
+//
+// # Returns
+// * `Ok((nodes, edges))` - The nodes and edges between the start node and the end node.
+// * `Err(e)` - The error message.
+pub async fn query_shared_nodes(
+    graph: &Graph,
+    node_ids: &Vec<&str>,
+    target_node_types: Option<Vec<&str>>,
+    nhops: usize,
+    topk: usize,
+    nums_shared_by: usize,
+) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
+    // Example query string:
+    // WITH ['MONDO:0100233', 'MONDO:0005404'] AS diseaseIds
+    // UNWIND diseaseIds AS diseaseId
+    // MATCH (start:Disease) WHERE start.id = diseaseId
+    // WITH COLLECT(DISTINCT start) AS startNodes
+    // UNWIND startNodes AS startNode
+    // MATCH p=(startNode)-[r*1]-(common:Disease)
+    // WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common)
+    // WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+    // WHERE sharedBy = 2
+    // RETURN common, relatedStartNodes, relations
+    // ORDER BY sharedBy DESC
+    // LIMIT 100
+
+    // Build the startNodesDetails string
+    let mut start_nodes_details = String::new();
+    for (i, node_id) in node_ids.iter().enumerate() {
+        let (node_type, node_id) = split_id(node_id)?;
+        start_nodes_details.push_str(&format!("{{label: '{}', id: '{}'}}", node_type, node_id));
+        if i < node_ids.len() - 1 {
+            start_nodes_details.push_str(", ");
+        }
+    }
+
+    let where_clauses = match target_node_types {
+        Some(target_node_types) => {
+            format!(
+                "sharedBy = {} AND common.label in ['{}']",
+                nums_shared_by,
+                target_node_types.join("', '")
+            )
+        }
+        None => format!("sharedBy = {}", nums_shared_by),
+    };
+
+    let hop_str = match nhops {
+        1 => "*1",
+        2 => "*1..2",
+        _ => "",
+    };
+
+    let query_str = format!("
+        WITH [{start_nodes_details}] AS startNodesDetails
+        UNWIND startNodesDetails AS nodeDetails
+        MATCH (start)
+        WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
+        WITH COLLECT(DISTINCT start) AS startNodes
+        UNWIND startNodes AS startNode
+        MATCH p=(startNode)-[r{hop_str}]-(common)
+        WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common) AND startNode IN startNodes
+        WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+        WHERE {where_clauses}
+        WITH common, relatedStartNodes, relations, sharedBy
+        ORDER BY sharedBy DESC
+        LIMIT {topk}
+        RETURN common, relatedStartNodes, relations",
+        topk = topk,
+        start_nodes_details = start_nodes_details,
+        hop_str = hop_str,
+        where_clauses = where_clauses
+    );
+
+    info!("query_shared_nodes's query_str: {}", query_str);
+    let mut result = graph.execute(query(&query_str)).await?;
+    let r = parse_shared_results(&mut result).await?;
+
+    Ok(r)
 }
 
 #[cfg(test)]

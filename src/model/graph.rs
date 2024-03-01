@@ -1316,7 +1316,7 @@ impl Graph {
     /// use biomedgps::model::graph::Graph;
     ///
     /// let node_ids = vec!["Compound::MESH:D001", "Compound::MESH:D002"];
-    /// let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
+    /// let query_str = Graph::gen_relation_query_from_node_ids(&node_ids, None);
     /// let re = Regex::new(r"\s+").unwrap();
     /// let query_str = re.replace_all(query_str.as_str(), " ");
     /// assert_eq!(query_str, "SELECT * FROM biomedgps_relation WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('Compound::MESH:D001', 'Compound::MESH:D002') AND COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('Compound::MESH:D001', 'Compound::MESH:D002');");
@@ -1330,7 +1330,10 @@ impl Graph {
     ///
     /// Returns a query string.
     ///
-    pub fn gen_relation_query_from_node_ids(node_ids: &Vec<&str>) -> String {
+    pub fn gen_relation_query_from_node_ids(
+        node_ids: &Vec<&str>,
+        model_table_prefix: Option<&str>,
+    ) -> String {
         debug!("Raw node_ids: {:?}", node_ids);
 
         // Remove invalid node ids
@@ -1349,15 +1352,19 @@ impl Graph {
         if filtered_node_ids.len() == 0 {
             return "".to_string();
         } else {
+            let table_name = match model_table_prefix {
+                Some(prefix) => get_kg_score_table_name(prefix),
+                None => "biomedgps_relation".to_string(),
+            };
+
             let query_str = format!(
                 "SELECT * 
-                 FROM biomedgps_relation
-                 WHERE COALESCE(source_type, '') || '{}' || COALESCE(source_id, '') in ('{}') AND 
-                       COALESCE(target_type, '') || '{}' || COALESCE(target_id, '') in ('{}');",
-                COMPOSED_ENTITY_DELIMITER,
-                filtered_node_ids.join("', '"),
-                COMPOSED_ENTITY_DELIMITER,
-                filtered_node_ids.join("', '"),
+                 FROM {table_name}
+                 WHERE COALESCE(source_type, '') || '{delimiter}' || COALESCE(source_id, '') in ('{filtered_node_ids}') AND 
+                       COALESCE(target_type, '') || '{delimiter}' || COALESCE(target_id, '') in ('{filtered_node_ids}');",
+                table_name = table_name,
+                delimiter= COMPOSED_ENTITY_DELIMITER,
+                filtered_node_ids = filtered_node_ids.join("', '"),
             );
 
             query_str
@@ -1407,8 +1414,9 @@ impl Graph {
         &mut self,
         pool: &sqlx::PgPool,
         node_ids: &Vec<&str>,
+        model_table_prefix: Option<&str>,
     ) -> Result<&Self, anyhow::Error> {
-        let query_str = Self::gen_relation_query_from_node_ids(node_ids);
+        let query_str = Self::gen_relation_query_from_node_ids(node_ids, model_table_prefix);
 
         debug!("query_str: {}", query_str);
 
@@ -1779,6 +1787,44 @@ impl Graph {
     }
 
     /// Fetch the linked nodes with some relation types or other conditions, but only one step
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool
+    /// * `query` - The query to filter the nodes
+    /// * `page` - The page number
+    /// * `page_size` - The page size
+    /// * `order_by` - The order by clause
+    ///
+    /// # Returns
+    /// * `Ok(&Self)` - The graph
+    /// * `Err(ValidationError)` - The error message
+    ///
+    /// # Examples
+    /// ```
+    /// use sqlx::postgres::PgPool;
+    /// use biomedgps::model::graph::Graph;
+    /// use biomedgps::query_builder::sql_builder::ComposeQuery;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let database_url = "postgres://postgres:password@localhost:5432/test_biomedgps";
+    ///     let pool = PgPool::connect(database_url).await.unwrap();
+    ///     let mut graph = Graph::new();
+    ///     let query = None;
+    ///     let page = Some(1);
+    ///     let page_size = Some(10);
+    ///     let order_by = None;
+    ///
+    ///     match graph.fetch_linked_nodes(&pool, &query, page, page_size, order_by).await {
+    ///         Ok(graph) => {
+    ///             println!("graph: {:?}", graph);
+    ///         }
+    ///         Err(e) => {
+    ///             println!("Error: {}", e);
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub async fn fetch_linked_nodes(
         &mut self,
         pool: &sqlx::PgPool,
@@ -1876,7 +1922,7 @@ mod tests {
     fn test_gen_relation_query_from_node_ids() {
         let _ = init_logger("biomedgps-test", LevelFilter::Debug);
         let node_ids = vec!["Gene::ENTREZ:1", "Gene::ENTREZ:2", "Gene::ENTREZ:3"];
-        let query_str = Graph::gen_relation_query_from_node_ids(&node_ids);
+        let query_str = Graph::gen_relation_query_from_node_ids(&node_ids, None);
 
         // Remove the newlines and unnecessary spaces by using regex
         let re = Regex::new(r"\s+").unwrap();
@@ -1885,7 +1931,7 @@ mod tests {
         assert_eq!(query_str, "SELECT * FROM biomedgps_relation WHERE COALESCE(source_type, '') || '::' || COALESCE(source_id, '') in ('Gene::ENTREZ:1', 'Gene::ENTREZ:2', 'Gene::ENTREZ:3') AND COALESCE(target_type, '') || '::' || COALESCE(target_id, '') in ('Gene::ENTREZ:1', 'Gene::ENTREZ:2', 'Gene::ENTREZ:3');".to_string());
 
         let invalid_node_ids = vec!["Gene:ENTREZ::001", "Gene:ENTREZ::002", "Gene::ENTREZ::003"];
-        let query_str = Graph::gen_relation_query_from_node_ids(&invalid_node_ids);
+        let query_str = Graph::gen_relation_query_from_node_ids(&invalid_node_ids, None);
 
         // Remove the newlines and unnecessary spaces by using regex
         let re = Regex::new(r"\s+").unwrap();
@@ -1907,7 +1953,7 @@ mod tests {
             "Gene::ENTREZ:108715297",
         ];
 
-        graph.auto_connect_nodes(&pool, &node_ids).await.unwrap();
+        graph.auto_connect_nodes(&pool, &node_ids, None).await.unwrap();
 
         println!("graph: {:?}", graph);
         assert_eq!(graph.nodes.len(), 3);

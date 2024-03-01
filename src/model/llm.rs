@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::warn;
 use openai_api_rs::v1::api::Client;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, FunctionCall, MessageRole};
-use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4};
+use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4, GPT4_1106_PREVIEW};
 use openssl::hash::{hash, MessageDigest};
 use poem_openapi::{Enum, Object};
 use regex::Regex;
@@ -366,7 +366,10 @@ pub struct ChatBot {
 impl ChatBot {
     pub fn new(model_name: &str, openai_api_key: &str) -> Self {
         let model = if model_name == "GPT4" {
-            GPT4.to_string()
+            // GPT4 or GPT4_1106_PREVIEW
+            // https://platform.openai.com/account/limits
+            // 
+            GPT4_1106_PREVIEW.to_string()
         } else {
             GPT3_5_TURBO.to_string()
         };
