@@ -15,7 +15,7 @@ use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse};
 use crate::model::util::match_color;
-use crate::query_builder::cypher_builder::{query_shared_nodes, query_nhops};
+use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
 use log::{debug, info, warn};
 use poem::web::Data;
@@ -1304,7 +1304,11 @@ impl BiomedgpsApi {
             Some(t) => {
                 // TODO: We need to validate the target_node_types.
                 let target_node_types: Vec<&str> = t.split(",").collect();
-                Some(target_node_types)
+                if target_node_types.len() == 0 {
+                    None
+                } else {
+                    Some(target_node_types)
+                }
             }
             None => None,
         };
@@ -1321,7 +1325,7 @@ impl BiomedgpsApi {
 
         let nums_shared_by = match nums_shared_by.0 {
             Some(nums_shared_by) => nums_shared_by,
-            None => 2,
+            None => node_ids.len() as u64,
         };
 
         let (nodes, edges) = match query_shared_nodes(

@@ -268,10 +268,16 @@ pub async fn query_shared_nodes(
         }
     }
 
+    let nums_shared_by = if nums_shared_by == 0 || nums_shared_by > node_ids.len() {
+        node_ids.len()
+    } else {
+        nums_shared_by
+    };
+
     let where_clauses = match target_node_types {
         Some(target_node_types) => {
             format!(
-                "sharedBy = {} AND common.label in ['{}']",
+                "sharedBy = {} AND ANY(label IN labels(common) WHERE label IN ['{}'])",
                 nums_shared_by,
                 target_node_types.join("', '")
             )
