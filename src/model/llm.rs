@@ -1,15 +1,16 @@
 //! This module defines the data model for LLMs (Large Language Model), such as OpenAI GPT-3/4, etc. Also, it can use the LLM to answer the question.
 
-use super::core::{Entity, RecordResponse, Relation};
+use super::core::{Entity, Relation};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use log::warn;
 use openai_api_rs::v1::api::Client;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, FunctionCall, MessageRole};
 use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4};
+use openssl::hash::{hash, MessageDigest};
 use poem_openapi::{Enum, Object};
 use regex::Regex;
-use log::{warn};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use validator::Validate;
@@ -32,11 +33,16 @@ pub struct Context {
 }
 
 impl Context {
-    pub async fn answer(self, chatbot: &ChatBot, prompt_template_id: &str) -> Result<LlmResponse, anyhow::Error> {
+    pub async fn answer(
+        self,
+        chatbot: &ChatBot,
+        prompt_template_id: &str,
+        pool: Option<&sqlx::PgPool>,
+    ) -> Result<LlmResponse, anyhow::Error> {
         let resp = if self.entity.is_some() {
             let entity = self.entity.unwrap();
             let mut llm_msg = LlmMessage::new(&prompt_template_id, entity, None).unwrap();
-            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            let answer = llm_msg.answer(&chatbot, pool).await.unwrap();
             Ok(LlmResponse {
                 prompt: answer.prompt.to_owned(),
                 response: answer.message.to_owned(),
@@ -46,7 +52,7 @@ impl Context {
             let expanded_relation = self.expanded_relation.unwrap();
             let mut llm_msg =
                 LlmMessage::new(&prompt_template_id, expanded_relation, None).unwrap();
-            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            let answer = llm_msg.answer(&chatbot, pool).await.unwrap();
             Ok(LlmResponse {
                 prompt: answer.prompt.to_owned(),
                 response: answer.message.to_owned(),
@@ -56,7 +62,15 @@ impl Context {
             let symptoms_with_disease_ctx = self.symptoms_with_disease_ctx.unwrap();
             let mut llm_msg =
                 LlmMessage::new(&prompt_template_id, symptoms_with_disease_ctx, None).unwrap();
-            let answer = llm_msg.answer(&chatbot, None).await.unwrap();
+            let answer = match llm_msg.answer(&chatbot, pool).await {
+                Ok(answer) => answer,
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Failed to answer the question: {}",
+                        e.to_string()
+                    ));
+                }
+            };
             Ok(LlmResponse {
                 prompt: answer.prompt.to_owned(),
                 response: answer.message.to_owned(),
@@ -94,7 +108,7 @@ impl LlmContext for Entity {
 }
 
 /// The expanded relation is used to store the relation between two entities.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
 pub struct ExpandedRelation {
     pub relation: Relation,
     pub source: Entity,
@@ -120,7 +134,7 @@ impl LlmContext for ExpandedRelation {
 }
 
 // The SymptomsWithDiseaseCtx is used to store the context for the symptoms with disease.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
 pub struct SymptomsWithDiseaseCtx {
     pub disease_name: String,
     pub subgraph: String,
@@ -161,60 +175,21 @@ lazy_static! {
     };
 }
 
-/// The prompt template category is used to store the category of prompt template. Each category has a prompt template.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Enum)]
-pub enum PromptTemplateCategoryEnum {
-    NodeSummary,
-    EdgeSummary,
-    CustomQuestion,
-    SubgraphSymptomsWithDiseaseCtx,
-}
-
-/// A wrapper for prompt template category.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
-pub struct PromptTemplateCategory {
-    value: PromptTemplateCategoryEnum,
-}
-
-/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
-impl From<String> for PromptTemplateCategory {
-    fn from(v: String) -> Self {
-        match v.as_str() {
-            "node_summary" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::NodeSummary,
-            },
-            "edge_summary" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::EdgeSummary,
-            },
-            "custom_question" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::CustomQuestion,
-            },
-            "subgraph_symptoms_with_disease_ctx" => PromptTemplateCategory {
-                value: PromptTemplateCategoryEnum::SubgraphSymptomsWithDiseaseCtx,
-            },
-            _ => panic!("Invalid prompt template category"),
-        }
-    }
-}
-
-/// Implement the conversion between PromptTemplateCategory and PromptTemplateCategoryEnum.
-impl Into<PromptTemplateCategoryEnum> for PromptTemplateCategory {
-    fn into(self) -> PromptTemplateCategoryEnum {
-        self.value
-    }
-}
-
-/// Implement the conversion between PromptTemplateCategory and String.
-impl Into<String> for PromptTemplateCategory {
-    fn into(self) -> String {
-        match self.value {
-            PromptTemplateCategoryEnum::NodeSummary => "node_summary".to_string(),
-            PromptTemplateCategoryEnum::EdgeSummary => "edge_summary".to_string(),
-            PromptTemplateCategoryEnum::CustomQuestion => "custom_question".to_string(),
-            PromptTemplateCategoryEnum::SubgraphSymptomsWithDiseaseCtx => {
-                "subgraph_symptoms_with_disease_ctx".to_string()
-            }
-        }
+pub async fn fetch_by_session_uuid(
+    session_uuid: &str,
+    pool: &sqlx::PgPool,
+) -> Result<LlmResponse, anyhow::Error> {
+    let sql_str = "SELECT prompt, message as response, created_at FROM biomedgps_ai_message WHERE session_uuid = $1";
+    match sqlx::query_as::<_, LlmResponse>(sql_str)
+        .bind(session_uuid)
+        .fetch_one(pool)
+        .await
+    {
+        Ok(llm_response) => Ok(llm_response),
+        Err(e) => Err(anyhow::anyhow!(
+            "Failed to fetch the message by session_uuid: {}",
+            e.to_string()
+        )),
     }
 }
 
@@ -237,7 +212,7 @@ pub struct LlmMessage<
     ))]
     pub session_uuid: String,
     pub prompt_template: String,
-    pub prompt_template_category: PromptTemplateCategory,
+    pub prompt_template_category: String,
 
     pub context: T,
     pub prompt: String,
@@ -261,7 +236,8 @@ where
         + Sync
         + poem_openapi::types::Type
         + poem_openapi::types::ParseFromJSON
-        + poem_openapi::types::ToJSON,
+        + poem_openapi::types::ToJSON
+        + Serialize,
 {
     pub fn new(
         // TODO: User how to know the right prompt template category for a given context?
@@ -269,20 +245,27 @@ where
         context: T,
         session_uuid: Option<String>,
     ) -> Result<Self, anyhow::Error> {
-        let session_uuid = match session_uuid {
-            Some(session_uuid) => session_uuid,
-            None => uuid::Uuid::new_v4().to_string(),
-        };
-
         let prompt_template = match PROMPT_TEMPLATE.get(prompt_template_category) {
             Some(prompt_template) => prompt_template.to_string(),
             None => return Err(anyhow::anyhow!("Invalid prompt template category")),
         };
 
         let prompt = context.render_prompt(prompt_template.as_str());
+        let session_uuid = match session_uuid {
+            Some(session_uuid) => session_uuid,
+            None => {
+                let md5sum = hash(MessageDigest::md5(), prompt.as_bytes()).unwrap();
+                let md5sum_uuid = uuid::Uuid::from_slice(&md5sum).unwrap();
+                md5sum_uuid.to_string()
+            }
+        };
         let message = "".to_string();
 
-        let prompt_template_category = PromptTemplateCategory::from(prompt_template_category.to_string());
+        let prompt_template_category = if PROMPT_TEMPLATE.contains_key(prompt_template_category) {
+            prompt_template_category.to_string()
+        } else {
+            return Err(anyhow::anyhow!("Invalid prompt template category"));
+        };
 
         Ok(LlmMessage {
             id: 0,
@@ -323,24 +306,51 @@ where
         };
     }
 
-    pub async fn answer(&mut self, chatbot: &ChatBot, pool: Option<&sqlx::PgPool>) -> Result<&Self, anyhow::Error> {
+    pub async fn answer(
+        &mut self,
+        chatbot: &ChatBot,
+        pool: Option<&sqlx::PgPool>,
+    ) -> Result<&Self, anyhow::Error> {
         let prompt = self.prompt.clone();
-        self.message = chatbot.answer(prompt)?;
-        self.updated_at = Utc::now();
-
-        if pool.is_none() {
-            return Ok(self);
-        }
-
-        match self.save2db(pool.unwrap()).await {
-            Ok(_) => {
-                Ok(self)
+        self.message = if pool.is_some() {
+            match fetch_by_session_uuid(&self.session_uuid, pool.unwrap()).await {
+                Ok(llm_response) => llm_response.response,
+                Err(_) => "".to_string(),
             }
-            Err(e) => Err(anyhow::anyhow!(
-                "Failed to save message to database: {}",
-                e.to_string()
-            )),
-        }
+        } else {
+            "".to_string()
+        };
+
+        if self.message.len() > 0 {
+            return Ok(self);
+        } else {
+            self.message = match chatbot.answer(prompt) {
+                Ok(message) => message,
+                Err(e) => {
+                    warn!("Failed to answer the question: {}", e.to_string());
+                    return Err(anyhow::anyhow!(
+                        "Failed to answer the question: {}",
+                        e.to_string()
+                    ));
+                }
+            };
+
+            self.updated_at = Utc::now();
+
+            if pool.is_some() {
+                match self.save2db(pool.unwrap()).await {
+                    Ok(_) => return Ok(self),
+                    Err(e) => {
+                        return Err(anyhow::anyhow!(
+                            "Failed to save message to database: {}",
+                            e.to_string()
+                        ))
+                    }
+                }
+            } else {
+                return Ok(self);
+            }
+        };
     }
 }
 
@@ -394,7 +404,6 @@ impl ChatBot {
         }
     }
 }
-
 
 // Write unit tests
 #[cfg(test)]

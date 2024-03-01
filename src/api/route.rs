@@ -18,6 +18,7 @@ use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_b
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
+use sqlx::pool;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -1285,10 +1286,12 @@ impl BiomedgpsApi {
     )]
     async fn ask_llm(
         &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
         prompt_template_id: Query<String>,
         context: Json<Context>,
         _token: CustomSecurityScheme,
     ) -> PostResponse<LlmResponse> {
+        let pool_arc = pool.clone();
         let prompt_template_id = prompt_template_id.0;
         let context = context.0;
         debug!("Prompt template id: {}", prompt_template_id);
@@ -1304,7 +1307,10 @@ impl BiomedgpsApi {
         };
 
         let chatbot = ChatBot::new("GPT4", &openai_api_key);
-        match context.answer(&chatbot, &prompt_template_id).await {
+        match context
+            .answer(&chatbot, &prompt_template_id, Some(&pool_arc))
+            .await
+        {
             Ok(llm_response) => PostResponse::created(llm_response),
             Err(e) => {
                 let err = format!("Failed to get answer from LLM: {}", e);
