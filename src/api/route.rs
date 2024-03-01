@@ -156,11 +156,13 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
+        model_table_prefix: Query<Option<String>>, // A prefix of the entity embedding table name, such as "biomedgps"
         _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Entity> {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let model_table_prefix = model_table_prefix.0;
 
         let query_str = match query_str.0 {
             Some(query_str) => query_str,
@@ -198,23 +200,45 @@ impl BiomedgpsApi {
             None => "id ASC".to_string(),
         };
 
-        match RecordResponse::<Entity>::get_records(
-            &pool_arc,
-            "biomedgps_entity",
-            &query,
-            page,
-            page_size,
-            Some(order_by_clause.as_str()),
-        )
-        .await
-        {
-            Ok(entities) => GetRecordsResponse::ok(entities),
-            Err(e) => {
-                let err = format!("Failed to fetch entities: {}", e);
-                warn!("{}", err);
-                return GetRecordsResponse::bad_request(err);
+        let resp = if model_table_prefix.is_none() {
+            match RecordResponse::<Entity>::get_records(
+                &pool_arc,
+                "biomedgps_entity",
+                &query,
+                page,
+                page_size,
+                Some(order_by_clause.as_str()),
+            )
+            .await
+            {
+                Ok(entities) => GetRecordsResponse::ok(entities),
+                Err(e) => {
+                    let err = format!("Failed to fetch entities: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
             }
-        }
+        } else {
+            match Entity::get_valid_records(
+                &pool_arc,
+                &model_table_prefix.unwrap(),
+                &query,
+                page,
+                page_size,
+                Some(order_by_clause.as_str()),
+            )
+            .await
+            {
+                Ok(entities) => GetRecordsResponse::ok(entities),
+                Err(e) => {
+                    let err = format!("Failed to fetch entities: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        resp
     }
 
     /// Call `/api/v1/curated-graph` with query params to fetch curated graph.

@@ -1,6 +1,7 @@
 //! The database schema for the application. These are the models that will be used to interact with the database.
 
 use super::graph::COMPOSED_ENTITY_DELIMITER;
+use super::kge::get_entity_emb_table_name;
 use super::util::{get_delimiter, parse_csv_error, ValidationError};
 use std::collections::HashMap;
 // use crate::model::util::match_color;
@@ -384,6 +385,93 @@ pub struct Entity {
 
     #[oai(skip_serializing_if_is_none)]
     pub xrefs: Option<String>,
+}
+
+impl Entity {
+    /// Get the valid records in both entity and entity embedding tables
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool
+    /// * `table_prefix` - The prefix of the entity embedding table name, such as "biomedgps"
+    /// * `query` - The query condition
+    /// * `page` - The page index
+    /// * `page_size` - The page size
+    /// * `order_by` - The order by condition
+    ///
+    /// # Returns
+    /// * `Result<RecordResponse<Entity>, anyhow::Error>` - The valid records or an error
+    pub async fn get_valid_records(
+        pool: &sqlx::PgPool,
+        table_prefix: &str,
+        query: &Option<ComposeQuery>,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<RecordResponse<Entity>, anyhow::Error> {
+        let mut query_str = match query {
+            Some(ComposeQuery::QueryItem(item)) => item.format(),
+            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        };
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let pagination_str = if page.is_none() && page_size.is_none() {
+            "LIMIT 10 OFFSET 0".to_string()
+        } else {
+            let page = match page {
+                Some(page) => page,
+                None => 1,
+            };
+
+            let page_size = match page_size {
+                Some(page_size) => page_size,
+                None => 10,
+            };
+
+            let limit = page_size;
+            let offset = (page - 1) * page_size;
+
+            format!("LIMIT {} OFFSET {}", limit, offset)
+        };
+
+        let joined_table_name = get_entity_emb_table_name(table_prefix);
+        let sql_str = format!(
+            "SELECT * FROM biomedgps_entity RIGHT JOIN {joined_table_name} ON biomedgps_entity.id = {joined_table_name}.entity_id AND biomedgps_entity.label = {joined_table_name}.entity_type WHERE {query_str} {order_by_str} {pagination_str}",
+            joined_table_name = joined_table_name, 
+            query_str = query_str, 
+            order_by_str = order_by_str, 
+            pagination_str = pagination_str
+        );
+
+        let records = sqlx::query_as::<_, Entity>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!(
+            "SELECT COUNT(*) FROM biomedgps_entity RIGHT JOIN {joined_table_name} ON biomedgps_entity.id = {joined_table_name}.entity_id AND biomedgps_entity.label = {joined_table_name}.entity_type WHERE {query_str}",
+            joined_table_name = joined_table_name, query_str = query_str
+        );
+
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(RecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page.unwrap_or(1),
+            page_size: page_size.unwrap_or(10),
+        })
+    }
 }
 
 impl CheckData for Entity {
