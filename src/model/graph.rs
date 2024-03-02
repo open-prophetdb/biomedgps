@@ -190,6 +190,21 @@ pub struct NodeData {
     pub description: Option<String>,
     pub resource: String,
     // In future, we can add more fields here after we add additional fields for the Entity struct
+    #[serde(deserialize_with = "convert_null_to_empty_string")]
+    #[oai(skip_serializing_if_is_none)]
+    pub xrefs: Option<String>,
+
+    #[serde(deserialize_with = "convert_null_to_empty_string")]
+    #[oai(skip_serializing_if_is_none)]
+    pub pmids: Option<String>,
+    
+    #[serde(deserialize_with = "convert_null_to_empty_string")]
+    #[oai(skip_serializing_if_is_none)]
+    pub taxid: Option<String>,
+    
+    #[serde(deserialize_with = "convert_null_to_empty_string")]
+    #[oai(skip_serializing_if_is_none)]
+    pub synonyms: Option<String>,
 }
 
 impl NodeData {
@@ -204,6 +219,10 @@ impl NodeData {
             name: entity.name.clone(),
             description: entity.description.clone(),
             resource: entity.resource.clone(),
+            xrefs: entity.xrefs.clone(),
+            pmids: entity.pmids.clone(),
+            taxid: entity.taxid.clone(),
+            synonyms: entity.synonyms.clone(),
         }
     }
 
@@ -219,6 +238,10 @@ impl NodeData {
             name: node.get::<String>("name").unwrap_or_default(),
             description: node.get::<String>("description"),
             resource: node.get::<String>("resource").unwrap_or_default(),
+            xrefs: node.get::<String>("xrefs"),
+            pmids: node.get::<String>("pmids"),
+            taxid: node.get::<String>("taxid"),
+            synonyms: node.get::<String>("synonyms"),
         }
     }
 
@@ -1953,7 +1976,10 @@ mod tests {
             "Gene::ENTREZ:108715297",
         ];
 
-        graph.auto_connect_nodes(&pool, &node_ids, None).await.unwrap();
+        graph
+            .auto_connect_nodes(&pool, &node_ids, None)
+            .await
+            .unwrap();
 
         println!("graph: {:?}", graph);
         assert_eq!(graph.nodes.len(), 3);
