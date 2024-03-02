@@ -2,13 +2,17 @@ extern crate log;
 
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
-use biomedgps::model::{init_db::create_score_table, util::read_annotation_file};
+use biomedgps::model::{
+    init_db::{create_score_table, kg_score_table2graphdb},
+    util::read_annotation_file,
+};
 use biomedgps::{
     build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
     run_migrations,
 };
 use log::*;
 use std::path::PathBuf;
+use std::sync::Arc;
 use structopt::StructOpt;
 
 /// A cli for biomedgps service.
@@ -111,6 +115,10 @@ pub struct InitTableArguments {
     /// [Required] Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
+
+    /// [Optional] Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
+    #[structopt(name = "neo4j_url", short = "n", long = "neo4j-url")]
+    neo4j_url: Option<String>,
 
     /// [Required] The table name to init. supports compound-disease-symptom, knowledge-score etc.
     #[structopt(name = "table", short = "t", long = "table")]
@@ -361,14 +369,38 @@ async fn main() {
                     }
                 }
                 "knowledge-score" => {
-                    match create_kg_score_table(
-                        &pool,
-                        Some(&arguments.table_prefix),
-                    )
-                    .await
-                    {
+                    let neo4j_url = if arguments.neo4j_url.is_none() {
+                        match std::env::var("NEO4J_URL") {
+                            Ok(v) => v,
+                            Err(_) => {
+                                error!("{}", "NEO4J_URL is not set.");
+                                "".to_owned()
+                            }
+                        }
+                    } else {
+                        arguments.neo4j_url.unwrap()
+                    };
+
+                    match create_kg_score_table(&pool, Some(&arguments.table_prefix)).await {
                         Ok(_) => info!("Init kg score table successfully."),
                         Err(e) => error!("Init kg score table failed: {}", e),
+                    }
+
+                    if neo4j_url == "" {
+                        error!("{}", "NEO4J_URL is not set, skip to import kg score table to graph database.");
+                        std::process::exit(0);
+                    } else {
+                        let graph = Arc::new(connect_graph_db(&neo4j_url).await);
+                        match kg_score_table2graphdb(&pool, &graph, Some(&arguments.table_prefix))
+                            .await
+                        {
+                            Ok(_) => {
+                                info!("Import kg score table to graph database successfully.")
+                            }
+                            Err(e) => {
+                                error!("Import kg score table to graph database failed: {}", e)
+                            }
+                        }
                     }
                 }
                 _ => {
@@ -461,10 +493,7 @@ async fn main() {
                 arguments.batch_size.unwrap()
             };
 
-            if filetype == "entity"
-                || filetype == "relation"
-                || filetype == "entity_attribute"
-            {
+            if filetype == "entity" || filetype == "relation" || filetype == "entity_attribute" {
                 import_graph_data(
                     &graph,
                     &arguments.filepath,

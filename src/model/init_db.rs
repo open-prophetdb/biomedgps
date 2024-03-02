@@ -1,12 +1,16 @@
 //! SQL initialization strings for creating tables.
 
+use crate::model::core::Relation;
 use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
 };
 use crate::model::util::ValidationError;
-use log::{debug, error};
+use futures::stream::{FuturesUnordered, StreamExt};
+use log::{debug, error, info};
+use neo4rs::{query, Graph};
 use sqlx::PgPool;
+use std::sync::Arc;
 
 /// Generate a table name for the score table of the triple entity.
 ///
@@ -503,6 +507,146 @@ pub async fn create_kg_score_table(
             ));
         }
     }
+}
+
+/// Generate the attribute name for the score of the relation in the graph database.
+///
+/// # Arguments
+/// * `table_prefix` - The prefix of the table name, such as "biomedgps".
+///
+/// # Returns
+/// `String` - The attribute name for the score of the relation in the graph database, such as "biomedgps_score".
+///
+/// # Example
+/// ```
+/// use biomedgps::model::init_db::get_score_attr_name;
+/// let attr_name = get_score_attr_name("biomedgps");
+/// assert_eq!(attr_name, "biomedgps_score");
+/// ```
+///
+fn get_score_attr_name(table_prefix: &str) -> String {
+    format!("{}_score", table_prefix)
+}
+
+pub async fn kg_score_table2graphdb(
+    pool: &PgPool,
+    graphdb: &Arc<Graph>,
+    table_prefix: Option<&str>,
+) -> Result<(), ValidationError> {
+    let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
+    let score_table_name = get_kg_score_table_name(table_prefix);
+
+    let score_attr_name = get_score_attr_name(table_prefix);
+
+    let query_str = format!(
+        r#"
+            SELECT
+                id,
+                source_id,
+                source_type,
+                target_id,
+                target_type,
+                relation_type,
+                formatted_relation_type,
+                key_sentence,
+                resource,
+                dataset,
+                pmids,
+                score
+            FROM {score_table};
+        "#,
+        score_table = score_table_name,
+    );
+
+    let rows = match sqlx::query_as::<_, Relation>(&query_str)
+        .fetch_all(pool)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            error!("Failed to get the rows from the score table: {}", e);
+            return Err(ValidationError::new(
+                &format!("Failed to get the rows from the score table: {}", e),
+                vec![],
+            ));
+        }
+    };
+
+    for row in rows {
+        let query_str = format!(
+            r#"
+                MATCH (source:{source_type} {{id: '{source_id}'}})
+                MATCH (target:{target_type} {{id: '{target_id}'}})
+                MATCH (source)-[r:`{relation_type}`]->(target)
+                SET r.{score_attr_name} = {score};
+            "#,
+            source_type = row.source_type,
+            source_id = row.source_id,
+            target_type = row.target_type,
+            target_id = row.target_id,
+            relation_type = row.relation_type,
+            score_attr_name = score_attr_name,
+            score = row.score.unwrap_or(0.0),
+        );
+
+        match graphdb.execute(query(&query_str)).await {
+            Ok(_) => {
+                debug!(
+                    "The score is set successfully for the relation: {}",
+                    row.relation_type
+                );
+            }
+            Err(e) => {
+                error!("Failed to set the score for the relation: {}", e);
+                return Err(ValidationError::new(
+                    &format!("Failed to set the score for the relation: {}", e),
+                    vec![],
+                ));
+            }
+        }
+    }
+
+    // let futures = rows
+    //     .into_iter()
+    //     .map(|row| {
+    //         let graphdb = graphdb.clone();
+    //         let query_str = format!(
+    //             r#"
+    //             MATCH (source:{source_type} {{id: '{source_id}'}})
+    //             MATCH (target:{target_type} {{id: '{target_id}'}})
+    //             MATCH (source)-[r:`{relation_type}`]->(target)
+    //             SET r.{score_attr_name} = {score};
+    //         "#,
+    //             source_type = row.source_type,
+    //             source_id = row.source_id,
+    //             target_type = row.target_type,
+    //             target_id = row.target_id,
+    //             relation_type = row.relation_type,
+    //             score_attr_name = score_attr_name,
+    //             score = row.score.unwrap_or(0.0),
+    //         );
+
+    //         async move {
+    //             graphdb.execute(query(&query_str)).await.map_err(|e| {
+    //                 error!("Failed to set the score for the relation: {}", e);
+    //                 ValidationError::new(
+    //                     &format!("Failed to set the score for the relation: {}", e),
+    //                     vec![],
+    //                 )
+    //             })
+    //         }
+    //     })
+    //     .collect::<FuturesUnordered<_>>();
+
+    // futures
+    //     .collect::<Vec<_>>()
+    //     .await
+    //     .into_iter()
+    //     .collect::<Result<Vec<_>, _>>()?;
+
+    info!("The score table is converted to the graph database successfully");
+
+    Ok(())
 }
 
 #[cfg(test)]
