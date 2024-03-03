@@ -28,9 +28,9 @@ def build(repo, output_file, repo_name):
             current_date = date_match.group(1)
 
         log_message = re.sub(r'\s*\([^)]*\)\s*', ' ', line[11:]).strip()
-        log_message = re.sub(r"\d{2}:\d{2}:\d{2}\s+[\-\+]\d{4}\s+", "", log_message)
+        # log_message = re.sub(r"\d{2}:\d{2}:\d{2}\s+[\-\+]\d{4}\s+", "", log_message)
 
-        log_message = re.sub(r"Upgrade biominer-components to v?\d+\.\d+\.\d+", "Upgrade the BioMedGPS UI", log_message)
+        # log_message = re.sub(r"Upgrade biominer-components to v?\d+\.\d+\.\d+", "Upgrade the BioMedGPS UI", log_message)
         # Split the log_message to two parts, the first part is the message, the second part is the commit hash
         commit_hash = log_message.split("\t")[1]
         log_message = log_message.split("\t")[0] + f" ([{commit_hash}]({link_map[repo_name]}/commit/{commit_hash}))"
@@ -47,6 +47,7 @@ def build(repo, output_file, repo_name):
     new_log_content = f"## {repo_name}\n\n"
     for date, messages in sorted(changelog.items(), reverse=True):
         new_log_content += f"- {date}\n"
+        messages = sorted(messages, reverse=True)
         for message in messages:
             new_log_content += f"  - {message}\n"
         new_log_content += "\n"
