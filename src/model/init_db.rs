@@ -575,15 +575,19 @@ pub async fn kg_score_table2graphdb(
     for row in rows {
         let query_str = format!(
             r#"
-                MATCH (source:{source_type} {{id: '{source_id}'}})
-                MATCH (target:{target_type} {{id: '{target_id}'}})
-                MATCH (source)-[r:`{relation_type}`]->(target)
-                SET r.{score_attr_name} = {score};
+                CALL apoc.periodic.iterate(
+                    "MATCH (source:{source_type} {{idx: '{source_node_id}'}})
+                     MATCH (target:{target_type} {{idx: '{target_node_id}'}})
+                     MATCH (source)-[r:`{relation_type}`]->(target)
+                     RETURN r",
+                    "SET r.{score_attr_name} = {score}",
+                    {{batchSize:1000, parallel: true, iterateList: true, retries: 3}}
+                );
             "#,
             source_type = row.source_type,
-            source_id = row.source_id,
+            source_node_id = format!("{}::{}", row.source_type, row.source_id),
             target_type = row.target_type,
-            target_id = row.target_id,
+            target_node_id = format!("{}::{}", row.target_type, row.target_id),
             relation_type = row.relation_type,
             score_attr_name = score_attr_name,
             score = row.score.unwrap_or(0.0),
@@ -604,45 +608,7 @@ pub async fn kg_score_table2graphdb(
                 ));
             }
         }
-    }
-
-    // let futures = rows
-    //     .into_iter()
-    //     .map(|row| {
-    //         let graphdb = graphdb.clone();
-    //         let query_str = format!(
-    //             r#"
-    //             MATCH (source:{source_type} {{id: '{source_id}'}})
-    //             MATCH (target:{target_type} {{id: '{target_id}'}})
-    //             MATCH (source)-[r:`{relation_type}`]->(target)
-    //             SET r.{score_attr_name} = {score};
-    //         "#,
-    //             source_type = row.source_type,
-    //             source_id = row.source_id,
-    //             target_type = row.target_type,
-    //             target_id = row.target_id,
-    //             relation_type = row.relation_type,
-    //             score_attr_name = score_attr_name,
-    //             score = row.score.unwrap_or(0.0),
-    //         );
-
-    //         async move {
-    //             graphdb.execute(query(&query_str)).await.map_err(|e| {
-    //                 error!("Failed to set the score for the relation: {}", e);
-    //                 ValidationError::new(
-    //                     &format!("Failed to set the score for the relation: {}", e),
-    //                     vec![],
-    //                 )
-    //             })
-    //         }
-    //     })
-    //     .collect::<FuturesUnordered<_>>();
-
-    // futures
-    //     .collect::<Vec<_>>()
-    //     .await
-    //     .into_iter()
-    //     .collect::<Result<Vec<_>, _>>()?;
+    };
 
     info!("The score table is converted to the graph database successfully");
 
