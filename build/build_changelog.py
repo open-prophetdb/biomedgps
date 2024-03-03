@@ -4,6 +4,12 @@ import click
 from collections import defaultdict
 
 
+link_map = {
+    "BioMedGPS": "https://github.com/open-prophetdb/biomedgps",
+    "BioMedGPS UI": "https://github.com/open-prophetdb/biominer-components"
+}
+
+
 @click.command("Build Changelog")
 @click.option("--repo", help="The repository to build the changelog for", required=True)
 @click.option("--repo-name", help="The name of the repository to use in the changelog", required=True)
@@ -13,7 +19,7 @@ def build(repo, output_file, repo_name):
     current_date = ""
 
     print(f"Building changelog for {repo_name}")
-    output = subprocess.check_output(['git', 'log', '--pretty=format:%ai %d %s', '--date=short', '--reverse'], cwd=repo)
+    output = subprocess.check_output(['git', 'log', '--pretty=format:%ai %d %s\t%h', '--date=short', '--reverse'], cwd=repo)
     log = output.decode('utf-8')
 
     for line in log.split('\n'):
@@ -22,9 +28,12 @@ def build(repo, output_file, repo_name):
             current_date = date_match.group(1)
 
         log_message = re.sub(r'\s*\([^)]*\)\s*', ' ', line[11:]).strip()
-        log_message = re.sub(r"\d{2}:\d{2}:\d{2}\s+-\d{4}\s+", "", log_message)
+        log_message = re.sub(r"\d{2}:\d{2}:\d{2}\s+[\-\+]\d{4}\s+", "", log_message)
 
         log_message = re.sub(r"Upgrade biominer-components to v?\d+\.\d+\.\d+", "Upgrade the BioMedGPS UI", log_message)
+        # Split the log_message to two parts, the first part is the message, the second part is the commit hash
+        commit_hash = log_message.split("\t")[1]
+        log_message = log_message.split("\t")[0] + f" ([{commit_hash}]({link_map[repo_name]}/commit/{commit_hash}))"
 
         if log_message:
             changelog[current_date].add(log_message)
