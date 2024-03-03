@@ -59,3 +59,8 @@ build-service:
 	@printf "Building service based on openapi...\n"
 	@curl -H "Accept: application/json" http://localhost:3000/spec
 	@cd studio && yarn && yarn openapi && cd ..
+
+changelog:
+	@printf "Generate changelog...\n"
+	@python build/build_changelog.py --repo ../biominer-components --output-file ./studio/public/README/changelog.md --repo-name 'BioMedGPS UI'
+	@python build/build_changelog.py --repo . --output-file ./studio/public/README/changelog.md --repo-name BioMedGPS
