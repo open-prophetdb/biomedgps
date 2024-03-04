@@ -1,18 +1,16 @@
 name: Build and Release Binaries
 
 on:
+  push:
+    branches:
+      - dev
   workflow_dispatch:
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
-        include:
-          - os: macos-latest
-            arch: [amd64, arm64]
-          - os: ubuntu-latest
-            arch: [amd64, arm64]
+        os: [macos-arm64, macos-x64, ubuntu-arm64, ubuntu-x64]
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -55,8 +53,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-${{ matrix.os }}-${{ matrix.arch }}
-        asset_name: biomedgps-${{ matrix.os }}-${{ matrix.arch }}
+        asset_path: ./target/release/biomedgps-${{ matrix.os }}
+        asset_name: biomedgps
         asset_content_type: application/octet-stream
 
     - name: Upload Release Asset (biomedgps-cli)
@@ -65,6 +63,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-cli-${{ matrix.os }}-${{ matrix.arch }}
-        asset_name: biomedgps-cli-${{ matrix.os }}-${{ matrix.arch }}
+        asset_path: ./target/release/biomedgps-cli-${{ matrix.os }}
+        asset_name: biomedgps-cli-${{ matrix.os }}
         asset_content_type: application/octet-stream
