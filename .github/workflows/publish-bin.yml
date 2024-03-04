@@ -8,14 +8,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: amd64
-          - os: ubuntu-latest
-            arch: arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v2
@@ -25,24 +18,22 @@ jobs:
       with:
         node-version: '16.13.1'
 
-    - name: Install musl-tools
-      run: sudo apt-get update && sudo apt-get install musl-tools
-        
-    - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-        target: ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
-
-    - name: Build project
+    - name: Build frontend
       run: |
         printf "Building studio based on openapi...\n"
         mkdir -p assets
         cd studio && yarn && yarn openapi || true
         cd studio && yarn build:embed && cd ..
-        cargo build --release --target ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
+
+    - name: Build with messense/rust-musl-cross
+      if: matrix.arch == 'x86_64'
+      run: |
+        docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:x86_64-musl cargo build --release --target x86_64-unknown-linux-musl
+
+    - name: Build with messense/rust-musl-cross
+      if: matrix.arch == 'arm64'
+      run: |
+        docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:aarch64-musl cargo build --release --target aarch64-unknown-linux-musl
 
     - name: Create Release
       id: create_release
@@ -57,20 +48,48 @@ jobs:
 
     - name: Upload Release Asset (biomedgps)
       uses: actions/upload-release-asset@v1
+      if: matrix.arch == 'x86_64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}/biomedgps
-        asset_name: biomedgps-${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
+        asset_path: ./target/x86_64-unknown-linux-musl/biomedgps
+        asset_name: biomedgps-x86_64-unknown-linux-musl
         asset_content_type: application/octet-stream
+        draft: ${{ github.event_name != 'workflow_dispatch' }}
 
     - name: Upload Release Asset (biomedgps-cli)
       uses: actions/upload-release-asset@v1
+      if: matrix.arch == 'x86_64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}/biomedgps-cli
-        asset_name: biomedgps-cli-${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
+        asset_path: ./target/x86_64-unknown-linux-musl/biomedgps-cli
+        asset_name: biomedgps-cli-x86_64-unknown-linux-musl
         asset_content_type: application/octet-stream
+        draft: ${{ github.event_name != 'workflow_dispatch' }}
+
+    - name: Upload Release Asset (biomedgps)
+      uses: actions/upload-release-asset@v1
+      if: matrix.arch == 'arm64'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/aarch64-unknown-linux-musl/biomedgps
+        asset_name: biomedgps-aarch64-unknown-linux-musl
+        asset_content_type: application/octet-stream
+        draft: ${{ github.event_name != 'workflow_dispatch' }}
+
+    - name: Upload Release Asset (biomedgps-cli)
+      uses: actions/upload-release-asset@v1
+      if: matrix.arch == 'arm64'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/aarch64-unknown-linux-musl/biomedgps-cli
+        asset_name: biomedgps-cli-aarch64-unknown-linux-musl
+        asset_content_type: application/octet-stream
+        draft: ${{ github.event_name != 'workflow_dispatch' }}
