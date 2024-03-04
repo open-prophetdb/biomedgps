@@ -10,8 +10,14 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-arm64, macos-x64, ubuntu-arm64, ubuntu-x64]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            name: "x86_64-unknown-linux-gnu"
+          - os: ubuntu-latest
+            arch: arm64
+            name: "aarch64-unknown-linux-gnu"
+    runs-on: ${{ matrix.name }}
     
     steps:
     - uses: actions/checkout@v2
@@ -34,7 +40,7 @@ jobs:
         mkdir -p assets
         cd studio && yarn && yarn openapi || true
         cd studio && yarn build:embed && cd ..
-        cargo build --release
+        cargo build --release 
 
     - name: Create Release
       id: create_release
@@ -53,7 +59,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-${{ matrix.os }}
+        asset_path: ./target/release/biomedgps-${{ matrix.name }}
         asset_name: biomedgps
         asset_content_type: application/octet-stream
 
@@ -63,6 +69,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-cli-${{ matrix.os }}
-        asset_name: biomedgps-cli-${{ matrix.os }}
+        asset_path: ./target/release/biomedgps-cli-${{ matrix.name }}
+        asset_name: biomedgps-cli
         asset_content_type: application/octet-stream
