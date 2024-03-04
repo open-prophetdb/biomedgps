@@ -13,11 +13,9 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: amd64
-            name: "x86_64-unknown-linux-gnu"
           - os: ubuntu-latest
             arch: arm64
-            name: "aarch64-unknown-linux-gnu"
-    runs-on: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     
     steps:
     - uses: actions/checkout@v2
@@ -33,6 +31,7 @@ jobs:
         profile: minimal
         toolchain: stable
         override: true
+        target: ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
 
     - name: Build project
       run: |
@@ -40,7 +39,7 @@ jobs:
         mkdir -p assets
         cd studio && yarn && yarn openapi || true
         cd studio && yarn build:embed && cd ..
-        cargo build --release 
+        cargo build --release --target ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
 
     - name: Create Release
       id: create_release
@@ -59,8 +58,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-${{ matrix.name }}
-        asset_name: biomedgps
+        asset_path: ./target/${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}/biomedgps
+        asset_name: biomedgps-${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
         asset_content_type: application/octet-stream
 
     - name: Upload Release Asset (biomedgps-cli)
@@ -69,6 +68,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/biomedgps-cli-${{ matrix.name }}
-        asset_name: biomedgps-cli
+        asset_path: ./target/${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}/biomedgps-cli
+        asset_name: biomedgps-cli-${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
         asset_content_type: application/octet-stream
