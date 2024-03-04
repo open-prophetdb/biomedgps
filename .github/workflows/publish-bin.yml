@@ -22,6 +22,7 @@ jobs:
       run: |
         printf "Building studio based on openapi...\n"
         mkdir -p assets
+        git submodule update --init --recursive
         cd studio && yarn && yarn openapi || true
         cd studio && yarn build:embed && cd ..
 
