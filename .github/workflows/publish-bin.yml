@@ -1,0 +1,70 @@
+name: Build and Release Binaries
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            arch: [amd64, arm64]
+          - os: ubuntu-latest
+            arch: [amd64, arm64]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16.13.1'
+        
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Build project
+      run: |
+        printf "Building studio based on openapi...\n"
+        mkdir -p assets
+        cd studio && yarn && yarn openapi || true
+        cd studio && yarn build:embed && cd ..
+        cargo build --release
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset (biomedgps)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/release/biomedgps-${{ matrix.os }}-${{ matrix.arch }}
+        asset_name: biomedgps-${{ matrix.os }}-${{ matrix.arch }}
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (biomedgps-cli)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/release/biomedgps-cli-${{ matrix.os }}-${{ matrix.arch }}
+        asset_name: biomedgps-cli-${{ matrix.os }}-${{ matrix.arch }}
+        asset_content_type: application/octet-stream
