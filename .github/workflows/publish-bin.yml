@@ -54,7 +54,7 @@ jobs:
       with:
         tag_name: ${{ steps.release_name.outputs.tag }}
         release_name: Release ${{ steps.release_name.outputs.tag }}
-        draft: {{ github.event_name != 'workflow_dispatch' }}
+        draft: ${{ github.event_name != 'workflow_dispatch' }}
         prerelease: false
 
     - name: Upload Release Asset (biomedgps)
