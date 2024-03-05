@@ -37,12 +37,10 @@ jobs:
         yarn build:embed
 
     - name: Build with messense/rust-musl-cross
-      if: matrix.arch == 'x86_64'
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:x86_64-musl cargo build --release --target x86_64-unknown-linux-musl
 
     - name: Build with messense/rust-musl-cross
-      if: matrix.arch == 'arm64'
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:aarch64-musl cargo build --release --target aarch64-unknown-linux-musl
 
@@ -59,7 +57,6 @@ jobs:
 
     - name: Upload Release Asset (biomedgps)
       uses: actions/upload-release-asset@v1
-      if: matrix.arch == 'x86_64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -71,7 +68,6 @@ jobs:
 
     - name: Upload Release Asset (biomedgps-cli)
       uses: actions/upload-release-asset@v1
-      if: matrix.arch == 'x86_64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -83,7 +79,6 @@ jobs:
 
     - name: Upload Release Asset (biomedgps)
       uses: actions/upload-release-asset@v1
-      if: matrix.arch == 'arm64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -95,7 +90,6 @@ jobs:
 
     - name: Upload Release Asset (biomedgps-cli)
       uses: actions/upload-release-asset@v1
-      if: matrix.arch == 'arm64'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
