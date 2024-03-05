@@ -31,7 +31,7 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
       history.push('/not-authorized');
     } else {
       // Initialize the chatbot
-      initChat();
+      // initChat();
     }
   }, [isAuthenticated])
 

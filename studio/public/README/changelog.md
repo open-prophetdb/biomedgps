@@ -1,7 +1,23 @@
 ## BioMedGPS
 
+- 2024-03-05
+  - 02:44:20 -0500 Remove the husky. ([d28cf73](https://github.com/open-prophetdb/biomedgps/commit/d28cf73))
+  - 02:41:07 -0500  Upgrade umijs from v3 to v4 and rewrite a part of components. ([0aa9363](https://github.com/open-prophetdb/biomedgps/commit/0aa9363))
+
 - 2024-03-04
-  - 00:06:43 -0500 Add an icon area for doing something conveniently. ([dc9858c](https://github.com/open-prophetdb/biomedgps/commit/dc9858c))
+  - 12:56:35 -0500 [Fix Bug] Cannot find the frontend. ([196e7e1](https://github.com/open-prophetdb/biomedgps/commit/196e7e1))
+  - 12:50:09 -0500  [Fix Bug] Cannot find the frontend. ([a3881be](https://github.com/open-prophetdb/biomedgps/commit/a3881be))
+  - 12:41:05 -0500  [Fix Bug] Cannot find the frontend. ([5a254e0](https://github.com/open-prophetdb/biomedgps/commit/5a254e0))
+  - 12:39:29 -0500  [Fix Bug] Cannot build the binaries. ([49d2369](https://github.com/open-prophetdb/biomedgps/commit/49d2369))
+  - 12:26:30 -0500  [Fix Bug] Cannot build the binaries. ([2ecf079](https://github.com/open-prophetdb/biomedgps/commit/2ecf079))
+  - 12:20:48 -0500  [Fix Bug] Cannot build the binaries. ([8e99105](https://github.com/open-prophetdb/biomedgps/commit/8e99105))
+  - 12:16:28 -0500  [Fix Bug] Cannot build the binaries. ([cbb442f](https://github.com/open-prophetdb/biomedgps/commit/cbb442f))
+  - 12:03:30 -0500  Don't need a docker image. ([72a0828](https://github.com/open-prophetdb/biomedgps/commit/72a0828))
+  - 11:51:41 -0500  Improve the showing of the hover info & github actions for building binaries. ([a4dc6ca](https://github.com/open-prophetdb/biomedgps/commit/a4dc6ca))
+  - 08:39:31 -0500  1. Add a new action for building and releasing binaries. 2. Add the yarn.lock into the repo. ([12bdad3](https://github.com/open-prophetdb/biomedgps/commit/12bdad3))
+  - 07:51:27 -0500  Draft Release v0.3.0. ([39cb1dc](https://github.com/open-prophetdb/biomedgps/commit/39cb1dc))
+  - 00:11:46 -0500  Improve the styles. ([0695807](https://github.com/open-prophetdb/biomedgps/commit/0695807))
+  - 00:06:43 -0500  Add an icon area for doing something conveniently. ([dc9858c](https://github.com/open-prophetdb/biomedgps/commit/dc9858c))
 
 - 2024-03-03
   - 17:16:35 -0500  Improve the styles for the changelog page. ([3809c7c](https://github.com/open-prophetdb/biomedgps/commit/3809c7c))
@@ -152,7 +168,7 @@
   - 07:52:29 -0500  Add a script to generate initial embeddings for entities and relation types. ([3571b65](https://github.com/open-prophetdb/biomedgps/commit/3571b65))
 
 - 2023-10-29
-  - 14:42:58 -0500 Add a description column for explaining the related relation type. ([097ce1c](https://github.com/open-prophetdb/biomedgps/commit/097ce1c))
+  - 14:42:58 -0500  Add a description column for explaining the related relation type. ([097ce1c](https://github.com/open-prophetdb/biomedgps/commit/097ce1c))
   - 14:30:01 -0500  Add a description column for explaining the related relation type. ([2a79796](https://github.com/open-prophetdb/biomedgps/commit/2a79796))
 
 - 2023-10-25
@@ -276,7 +292,10 @@
 ## BioMedGPS UI
 
 - 2024-03-04
-  - 00:05:25 -0500 Add an icon area for doing something conveniently. ([4210654](https://github.com/open-prophetdb/biominer-components/commit/4210654))
+  - 15:16:19 -0500 [Fix Bug] Cannot show the hovertext of edges. ([470677a](https://github.com/open-prophetdb/biominer-components/commit/470677a))
+  - 11:44:05 -0500  Improve the showing of the hover info. ([f6401d8](https://github.com/open-prophetdb/biominer-components/commit/f6401d8))
+  - 01:05:40 -0500  Add a help doc. ([094d52f](https://github.com/open-prophetdb/biominer-components/commit/094d52f))
+  - 00:05:25 -0500  Add an icon area for doing something conveniently. ([4210654](https://github.com/open-prophetdb/biominer-components/commit/4210654))
 
 - 2024-03-03
   - 16:01:11 -0500  [Fix Bug] Cannot switch to other page from the knowledge graph page. ([8183f8f](https://github.com/open-prophetdb/biominer-components/commit/8183f8f))
@@ -286,7 +305,7 @@
   - 12:07:06 -0500  1. [Fix Bug] Only need to update a part of nodes. 2. Improve the help messages. ([5b86892](https://github.com/open-prophetdb/biominer-components/commit/5b86892))
 
 - 2024-03-02
-  - 20:55:34 -0500 Improve the layout function. ([f4e3d85](https://github.com/open-prophetdb/biominer-components/commit/f4e3d85))
+  - 20:55:34 -0500  Improve the layout function. ([f4e3d85](https://github.com/open-prophetdb/biominer-components/commit/f4e3d85))
   - 18:58:22 -0500  Improve the layout settings. ([2c081b0](https://github.com/open-prophetdb/biominer-components/commit/2c081b0))
   - 18:20:28 -0500  Improve the information showing. ([2e9ca34](https://github.com/open-prophetdb/biominer-components/commit/2e9ca34))
   - 17:16:00 -0500  [Fix Bug] Cannot execute several menu action correctly. ([489a563](https://github.com/open-prophetdb/biominer-components/commit/489a563))

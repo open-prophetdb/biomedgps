@@ -8,7 +8,7 @@ import defaultSettings, { CustomSettings, AppVersion } from '../config/defaultSe
 
 // 运行时配置
 // @ts-ignore
-const publicPath = window.publicPath || '/';
+const publicPath = window.publicPath || process.env.PUBLIC_PATH || '/';
 const defaultCustomSettings = {
   changeLogUrl: `${publicPath}README/changelog.md`,
   aboutUrl: `${publicPath}README/about.md`,

@@ -19,10 +19,10 @@ export default defineConfig({
   model: {},
   initialState: {},
   request: {},
-  plugins: ['@umijs/plugins/dist/request'],
+  // plugins: ['@umijs/plugins/dist/request'],
   npmClient: 'yarn',
   dva: {},
-  chainWebpack: (config, { webpack }) => {
+  chainWebpack: (config: any) => {
     config.merge({
       resolve: {
         fallback: {
@@ -33,7 +33,7 @@ export default defineConfig({
 
     // https://github.com/webpack/webpack/discussions/13585
     config.resolve.alias.set('perf_hooks', path.resolve(__dirname, 'perf_hooks.ts'));
-    console.log("config.resolve.alias", config.resolve.alias);
+    // console.log("config.resolve.alias", config.resolve.alias);
   },
   define: {
     // Whether the frontend is separated from the backend.
@@ -44,7 +44,7 @@ export default defineConfig({
     locale: false,
   },
   targets: {
-    ie: 11,
+    chrome: 80
   },
   // umi routes: https://umijs.org/docs/routing
   // We load routes dynamically from the config file.
@@ -65,7 +65,7 @@ export default defineConfig({
   },
   // Fast Refresh 热更新
   fastRefresh: true,
-  runtimePublicPath: {},
+  // https://pro.ant.design/docs/openapi
   // openAPI: [
   //   {
   //     requestLibPath: "import { request } from 'umi'",
