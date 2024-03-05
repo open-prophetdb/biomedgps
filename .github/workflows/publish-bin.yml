@@ -39,12 +39,12 @@ jobs:
     - name: Build with messense/rust-musl-cross
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:x86_64-musl cargo build --release --target x86_64-unknown-linux-musl
-        find ./target -type f -name "biomedgps*" -exec ls -l {}
+        find ./target -type f -name "biomedgps*" -exec ls -l {} \;
 
     - name: Build with messense/rust-musl-cross
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:aarch64-musl cargo build --release --target aarch64-unknown-linux-musl
-        find ./target -type f -name "biomedgps*" -exec ls -l {}
+        find ./target -type f -name "biomedgps*" -exec ls -l {} \;
 
     - name: Create Release
       id: create_release
