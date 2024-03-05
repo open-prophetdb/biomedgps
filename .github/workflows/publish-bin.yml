@@ -39,10 +39,12 @@ jobs:
     - name: Build with messense/rust-musl-cross
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:x86_64-musl cargo build --release --target x86_64-unknown-linux-musl
+        find ./target -type f -name "biomedgps*" -exec ls -l {}
 
     - name: Build with messense/rust-musl-cross
       run: |
         docker run --rm -v "${{ github.workspace }}:/home/rust/src" messense/rust-musl-cross:aarch64-musl cargo build --release --target aarch64-unknown-linux-musl
+        find ./target -type f -name "biomedgps*" -exec ls -l {}
 
     - name: Create Release
       id: create_release
@@ -64,7 +66,6 @@ jobs:
         asset_path: ./target/x86_64-unknown-linux-musl/biomedgps
         asset_name: biomedgps-x86_64-unknown-linux-musl
         asset_content_type: application/octet-stream
-        draft: ${{ github.event_name != 'workflow_dispatch' }}
 
     - name: Upload Release Asset (biomedgps-cli)
       uses: actions/upload-release-asset@v1
@@ -75,7 +76,6 @@ jobs:
         asset_path: ./target/x86_64-unknown-linux-musl/biomedgps-cli
         asset_name: biomedgps-cli-x86_64-unknown-linux-musl
         asset_content_type: application/octet-stream
-        draft: ${{ github.event_name != 'workflow_dispatch' }}
 
     - name: Upload Release Asset (biomedgps)
       uses: actions/upload-release-asset@v1
@@ -86,7 +86,6 @@ jobs:
         asset_path: ./target/aarch64-unknown-linux-musl/biomedgps
         asset_name: biomedgps-aarch64-unknown-linux-musl
         asset_content_type: application/octet-stream
-        draft: ${{ github.event_name != 'workflow_dispatch' }}
 
     - name: Upload Release Asset (biomedgps-cli)
       uses: actions/upload-release-asset@v1
@@ -97,4 +96,3 @@ jobs:
         asset_path: ./target/aarch64-unknown-linux-musl/biomedgps-cli
         asset_name: biomedgps-cli-aarch64-unknown-linux-musl
         asset_content_type: application/octet-stream
-        draft: ${{ github.event_name != 'workflow_dispatch' }}
