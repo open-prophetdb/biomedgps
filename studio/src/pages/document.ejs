@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="theme-color" content="#1890ff" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="keywords"
+    content="<%= context.config.define.isStatic ? context.config.layout.keywords : '{{ website_keywords }}' %>" />
+  <meta name="description"
+    content="<%= context.config.define.isStatic ? context.config.layout.description : '{{ website_description }}' %>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+  <title>
+    <%= context.config.define.isStatic ? context.config.layout.title : "{{ website_title }}" %>
+  </title>
+  <!-- <link rel="shortcut icon" href="<%= JSON.stringify(context) %>" type="image/x-icon" /> -->
+</head>
+
+<body>
+  <noscript>
+    <div class="noscript-container">
+      Hi there! Please
+      <div class="noscript-enableJS">
+        <a href="https://www.enablejavascript.io/en" target="_blank" rel="noopener noreferrer">
+          <b>enable Javascript</b>
+        </a>
+      </div>
+      in your browser to use <%= context.config.define.isStatic ? context.config.layout.title : "{{ website_title }}" %>
+        !
+    </div>
+  </noscript>
+  <div id="root">
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      #root {
+        background-repeat: no-repeat;
+        background-size: 100% auto;
+      }
+
+      .noscript-container {
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        margin-top: 90px;
+        font-size: 20px;
+        font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode',
+          Geneva, Verdana, sans-serif;
+      }
+
+      .noscript-enableJS {
+        padding-right: 3px;
+        padding-left: 3px;
+      }
+
+      /* Hide the page view tool */
+      body > iframe[style^="background"] {
+        display: none !important;
+      }
+    </style>
+  </div>
+  <script type="">
+    const hideHeader = function() {
+      // Get the current URL
+      var currentUrl = window.location.href;
+
+      // Function to extract query string parameters
+      function getParameterByName(name, url) {
+        if (!url) url = window.location.href;
+        name = name.replace(/[[\]]/g, '\\$&');
+        var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+          results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, ' '));
+      }
+
+      // Check if the "show_header" parameter is present
+      var showHeader = getParameterByName('show_header', currentUrl);
+      console.log('currentUrl', currentUrl, showHeader);
+      if (showHeader === 'false') {
+        // Create a <style> element
+        var styleElement = document.createElement('style');
+
+        // Add your CSS rules inside the <style> element
+        styleElement.textContent = `
+        .ant-layout-header { display: none; }
+        .react-chat-viewerBox { height: 100vh !important; }
+        .ant-layout-content { height: 100% !important; }
+        .footer-container { display: none; }
+        `;
+
+        // Append the <style> element to the <head> section
+        document.head.appendChild(styleElement);
+      }
+    }
+
+    window.addEventListener('load', function() {
+      // Function to run after page load
+      hideHeader();
+    });
+  </script>
+  <script type="text/javascript"
+    src="//rf.revolvermaps.com/0/0/3.js?i=506fpu66up3&amp;b=0&amp;s=40&amp;m=2&amp;cl=ffffff&amp;co=007eff&amp;cd=ffc000&amp;v0=60&amp;v1=60&amp;r=1"
+    async="async"></script>
+</body>
+
+</html>
