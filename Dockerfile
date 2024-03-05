@@ -24,7 +24,7 @@ RUN wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-L
     bash miniconda.sh -b -p /opt/miniconda && \
     rm miniconda.sh
 RUN conda create -n biomedgps nodejs=16.13.1
-RUN npm install -g yarn
+RUN npm install -g yarn@1.22.19
 
 # Add the rest of the source
 ADD . .

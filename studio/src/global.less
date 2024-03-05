@@ -1,0 +1,143 @@
+@screen-xs: 480px;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.colorWeak {
+  filter: invert(80%);
+}
+
+.ant-layout {
+  min-height: 100vh;
+
+  .ant-layout-header {
+    height: 48px !important;
+  }
+
+  .ant-pro-top-nav-header {
+    box-shadow: unset;
+  }
+
+  .ant-pro-top-nav-header-logo,
+  .ant-pro-top-nav-header-main-left {
+    min-width: unset;
+  }
+
+  .ant-layout-content {
+    height: calc(100vh - 48px);
+    margin: 0;
+    padding: 0;
+    // overflow-y: scroll;
+  }
+
+  .ant-pro-top-nav-header-logo a>svg,
+  .ant-pro-top-nav-header-logo img {
+    height: 45px;
+  }
+}
+
+.ant-pro-sider.ant-layout-sider.ant-pro-sider-fixed {
+  left: unset;
+}
+
+canvas {
+  display: block;
+}
+
+body {
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  .knowledge-graph-container {
+    height: calc(100vh - 48px);
+  }
+}
+
+ul,
+ol {
+  list-style: none;
+  margin-bottom: 0;
+}
+
+@media (max-width: @screen-xs) {
+  .ant-table {
+    width: 100%;
+    overflow-x: auto;
+
+    &-thead>tr,
+    &-tbody>tr {
+      >th,
+      >td {
+        white-space: pre;
+
+        >span {
+          display: block;
+        }
+      }
+    }
+  }
+}
+
+// Compatible with IE11
+@media screen and(-ms-high-contrast: active),
+  (-ms-high-contrast: none) {
+  body .ant-design-pro>.ant-layout {
+    min-height: 100vh;
+  }
+}
+
+// You need to uncomment these codes when mix layout mode.
+// .ant-menu-submenu .ant-menu-item {
+//   margin: 0 0 !important;
+//   padding-left: 42px !important;
+
+//   .ant-menu-title-content::before {
+//     position: absolute;
+//     right: auto;
+//     bottom: auto;
+//     left: 23px;
+//     z-index: 1;
+//     width: 8px;
+//     height: 8px;
+//     margin-top: 15px;
+//     background: #425668;
+//     border-radius: 50%;
+//     content: '';
+//   }
+
+//   .ant-menu-title-content::after {
+//     position: absolute;
+//     top: 0;
+//     bottom: 0;
+//     left: 27px;
+//     border-left: 1px solid #425668;
+//     content: '';
+//   }
+// }
+
+// .ant-layout {
+//   .ant-pro-global-header-layout-mix {
+//     background-color: #0083ff;
+
+//     .ant-menu.ant-menu-dark,
+//     .ant-menu-dark .ant-menu-sub,
+//     .ant-menu.ant-menu-dark .ant-menu-sub {
+//       background-color: #0083ff;
+//     }
+//   }
+// }
+
+&::-webkit-scrollbar {
+  display: none;
+}
+
+.page-loading-warp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 98px;
+}

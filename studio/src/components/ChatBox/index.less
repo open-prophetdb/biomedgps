@@ -1,0 +1,23 @@
+.react-chat-container {
+  max-width: 100% !important;
+
+  .react-chat-bubble {
+    font-size: 0.9rem;
+  }
+
+  .react-chat-viewerBox {
+    height: calc(100vh - 48px) !important;
+  }
+
+  // Hide all chatbox icons except the first one
+  .chatbox-icon {
+    display: none !important;
+    width: 15px;
+    height: 15px;
+    margin: 3px 3px 0 0;
+  }
+
+  .chatbox-icon:last-child {
+    display: block !important;
+  }
+}
