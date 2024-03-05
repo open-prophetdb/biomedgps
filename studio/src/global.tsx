@@ -51,5 +51,6 @@ if ('serviceWorker' in navigator && isHttps) {
     if (sw) sw.unregister();
   });
 
-  clearCache();
+  // TODO: Does it matter if we don't clear the cache?
+  // clearCache();
 }

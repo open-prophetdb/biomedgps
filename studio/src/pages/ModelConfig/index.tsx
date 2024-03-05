@@ -809,7 +809,7 @@ const ModelConfig: React.FC = (props) => {
           {models.map((model, index) => (
             <Menu.Item key={index} icon={null} disabled={model.disabled}>
               <Tooltip title={`${model.disabled ? 'Disabled' : ''} > ${model.name} | ${model.description}`} placement="right" key={index}>
-                <Button icon={model.icon} shape='circle' size='large' style={{ color: detectColor(model.name) }}></Button>
+                <Button icon={model.icon} size='large' style={{ color: detectColor(model.name) }}></Button>
               </Tooltip>
               <span>{model.shortName}</span>
             </Menu.Item>

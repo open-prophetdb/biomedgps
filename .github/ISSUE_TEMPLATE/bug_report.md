@@ -1,26 +1,38 @@
-## Bug Report
+---
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: 'bug'
+assignees: '@yjcyxky'
 
-**Title**: [Short description of the bug]
+---
 
-**Environment**: [Environment where the bug was observed (e.g., production, staging, development, operating system, browser, device type)]
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-**Version**: [Version of the software where the bug was observed]
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-**Description**: [Detailed description of the bug]
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-**Steps to Reproduce**:
-1. [First Step]
-2. [Second Step]
-3. [and so on...]
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
 
-**Expected Result**: [What you expect to happen]
+**Desktop (please complete the following information):**
+ - OS: [e.g. iOS]
+ - Browser [e.g. chrome, safari]
+ - Version [e.g. 22]
 
-**Actual Result**: [What actually happens]
+**Smartphone (please complete the following information):**
+ - Device: [e.g. iPhone6]
+ - OS: [e.g. iOS8.1]
+ - Browser [e.g. stock browser, safari]
+ - Version [e.g. 22]
 
-**Frequency**: [How often does the bug occur? Every time, sometimes, rarely]
-
-**Severity**: [How severe is the bug? Is it a blocker, critical, minor, trivial]
-
-**Attachments**: [Screenshots, logs, or other relevant files if any]
-
-**Additional Information**: [Any other information that may be relevant]
+**Additional context**
+Add any other context about the problem here.
