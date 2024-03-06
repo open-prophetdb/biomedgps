@@ -73,13 +73,19 @@ fn gen_nhops_query_str(
     end_node_id: &str,
     nhops: usize,
 ) -> String {
+    let hop_str = match nhops {
+        1 => "*1",
+        2 => "*1..2",
+        _ => "",
+    };
+
     let query_str = format!(
-        "MATCH path = (n:{})-[r*..{}]-(m:{}) WHERE n.id IN ['{}'] AND m.id IN ['{}'] UNWIND nodes(path) AS node UNWIND relationships(path) AS edge RETURN DISTINCT node, edge",
-        start_node_type,
-        nhops,
-        end_node_type,
-        start_node_id,
-        end_node_id,
+        "MATCH path = (n:{start_node_type})-[r{hop_str}]-(m:{end_node_type}) WHERE n.id IN ['{start_node_id}'] AND m.id IN ['{end_node_id}'] UNWIND nodes(path) AS node UNWIND relationships(path) AS edge RETURN DISTINCT node, edge",
+        start_node_type = start_node_type,
+        hop_str = hop_str,
+        end_node_type = end_node_type,
+        start_node_id = start_node_id,
+        end_node_id = end_node_id
     );
 
     query_str
@@ -243,31 +249,8 @@ pub async fn query_shared_nodes(
     nhops: usize,
     topk: usize,
     nums_shared_by: usize,
+    start_node_id: Option<&str>,
 ) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
-    // Example query string:
-    // WITH ['MONDO:0100233', 'MONDO:0005404'] AS diseaseIds
-    // UNWIND diseaseIds AS diseaseId
-    // MATCH (start:Disease) WHERE start.id = diseaseId
-    // WITH COLLECT(DISTINCT start) AS startNodes
-    // UNWIND startNodes AS startNode
-    // MATCH p=(startNode)-[r*1]-(common:Disease)
-    // WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common)
-    // WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
-    // WHERE sharedBy = 2
-    // RETURN common, relatedStartNodes, relations
-    // ORDER BY sharedBy DESC
-    // LIMIT 100
-
-    // Build the startNodesDetails string
-    let mut start_nodes_details = String::new();
-    for (i, node_id) in node_ids.iter().enumerate() {
-        let (node_type, node_id) = split_id(node_id)?;
-        start_nodes_details.push_str(&format!("{{label: '{}', id: '{}'}}", node_type, node_id));
-        if i < node_ids.len() - 1 {
-            start_nodes_details.push_str(", ");
-        }
-    }
-
     let nums_shared_by = if nums_shared_by == 0 || nums_shared_by > node_ids.len() {
         node_ids.len()
     } else {
@@ -291,26 +274,91 @@ pub async fn query_shared_nodes(
         _ => "",
     };
 
-    let query_str = format!("
-        WITH [{start_nodes_details}] AS startNodesDetails
-        UNWIND startNodesDetails AS nodeDetails
-        MATCH (start)
-        WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
-        WITH COLLECT(DISTINCT start) AS startNodes
-        UNWIND startNodes AS startNode
-        MATCH p=(startNode)-[r{hop_str}]-(common)
-        WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common) AND startNode IN startNodes
-        WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
-        WHERE {where_clauses}
-        WITH common, relatedStartNodes, relations, sharedBy
-        ORDER BY sharedBy DESC
-        LIMIT {topk}
-        RETURN common, relatedStartNodes, relations",
-        topk = topk,
-        start_nodes_details = start_nodes_details,
-        hop_str = hop_str,
-        where_clauses = where_clauses
-    );
+    let query_str = if start_node_id.is_none() {
+        // Example query string:
+        // WITH ['MONDO:0100233', 'MONDO:0005404'] AS diseaseIds
+        // UNWIND diseaseIds AS diseaseId
+        // MATCH (start:Disease) WHERE start.id = diseaseId
+        // WITH COLLECT(DISTINCT start) AS startNodes
+        // UNWIND startNodes AS startNode
+        // MATCH p=(startNode)-[r*1]-(common:Disease)
+        // WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common)
+        // WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+        // WHERE sharedBy = 2
+        // RETURN common, relatedStartNodes, relations
+        // ORDER BY sharedBy DESC
+        // LIMIT 100
+
+        // Build the startNodesDetails string
+        let mut start_nodes_details = String::new();
+        for (i, node_id) in node_ids.iter().enumerate() {
+            let (node_type, node_id) = split_id(node_id)?;
+            start_nodes_details.push_str(&format!("{{label: '{}', id: '{}'}}", node_type, node_id));
+            if i < node_ids.len() - 1 {
+                start_nodes_details.push_str(", ");
+            }
+        };
+
+        format!("
+            WITH [{start_nodes_details}] AS startNodesDetails
+            UNWIND startNodesDetails AS nodeDetails
+            MATCH (start)
+            WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
+            WITH COLLECT(DISTINCT start) AS startNodes
+            UNWIND startNodes AS startNode
+            MATCH p=(startNode)-[r{hop_str}]-(common)
+            WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common) AND startNode IN startNodes
+            WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+            WHERE {where_clauses}
+            WITH common, relatedStartNodes, relations, sharedBy
+            ORDER BY sharedBy DESC
+            LIMIT {topk}
+            RETURN common, relatedStartNodes, relations",
+            topk = topk,
+            start_nodes_details = start_nodes_details,
+            hop_str = hop_str,
+            where_clauses = where_clauses
+        )
+    } else {
+        let start_node_id = start_node_id.unwrap();
+        let (start_node_label, start_node_id) = split_id(start_node_id)?;
+        let other_nodes_details = node_ids
+            .iter()
+            .filter(|id| *id != &start_node_id)
+            .map(|id| {
+                let (label, id) = split_id(id).unwrap();
+                format!("{{label: '{}', id: '{}'}}", label, id)
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        format!("
+            // 假设 start_node_id 和 start_node_label 代表我们感兴趣的起始节点的ID和标签
+            MATCH (start)
+            WHERE start.id = '{start_node_id}' AND ANY(label IN labels(start) WHERE label = '{start_node_label}')
+            WITH start AS startNode
+            // 这里不再需要收集起始节点，因为我们只有一个起始节点
+            UNWIND [{other_nodes_details}] AS otherNodeDetails
+            MATCH (other)
+            WHERE other.id = otherNodeDetails.id AND ANY(label IN labels(other) WHERE label = otherNodeDetails.label)
+            WITH COLLECT(DISTINCT other) AS otherNodes, startNode
+            UNWIND otherNodes AS otherNode
+            MATCH p=(startNode)-[r{hop_str}]-(common)
+            WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN otherNodes OR x = common) AND startNode = startNode
+            WITH common, COLLECT(DISTINCT otherNode) AS relatedOtherNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT otherNode) AS sharedBy
+            WHERE {where_clauses}
+            WITH common, relatedOtherNodes, relations, sharedBy
+            ORDER BY sharedBy DESC
+            LIMIT {topk}
+            RETURN common, relatedOtherNodes, relations",
+            topk = topk,
+            other_nodes_details = other_nodes_details, // 该变量需要提供其他节点的详情，例如ID和标签
+            hop_str = hop_str,
+            where_clauses = where_clauses,
+            start_node_id = start_node_id, // 指定的起始节点ID
+            start_node_label = start_node_label // 指定的起始节点标签
+        )
+    };
 
     info!("query_shared_nodes's query_str: {}", query_str);
     let mut result = graph.execute(query(&query_str)).await?;

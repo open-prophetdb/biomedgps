@@ -1274,6 +1274,7 @@ impl BiomedgpsApi {
         pool: Data<&Arc<neo4rs::Graph>>,
         node_ids: Query<String>,
         target_node_types: Query<Option<String>>,
+        start_node_id: Query<Option<String>>,
         topk: Query<Option<u64>>,
         nhops: Query<Option<usize>>,
         nums_shared_by: Query<Option<u64>>,
@@ -1282,6 +1283,7 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let node_ids = node_ids.0;
         let target_node_types = target_node_types.0;
+        let start_node_id = start_node_id.0;
 
         match NodeIdsQuery::new(&node_ids) {
             Ok(_) => {}
@@ -1335,6 +1337,7 @@ impl BiomedgpsApi {
             nhops as usize,
             topk as usize,
             nums_shared_by as usize,
+            start_node_id.as_deref(),
         )
         .await
         {
