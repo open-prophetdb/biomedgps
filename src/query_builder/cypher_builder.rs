@@ -164,7 +164,7 @@ pub async fn query_nhops(
 }
 
 // Parse the shared nodes and edges from the result.
-// NOTE: the name of the results should be 'common', 'relatedStartNodes', and 'relations'.
+// NOTE: the name of the results should be 'common', 'relatedNodes', and 'relations'.
 //
 // # Arguments
 // * `result` - The result of the query.
@@ -186,10 +186,10 @@ async fn parse_shared_results(
                 let node = NodeData::from_neo_node(node);
                 node_map.insert(id, node);
             }
-            None => continue,
+            None => (),
         };
 
-        match row.get::<Vec<NeoNode>>("relatedStartNodes") {
+        match row.get::<Vec<NeoNode>>("relatedNodes") {
             Some(related_start_nodes) => {
                 for node in related_start_nodes {
                     let id = node.id();
@@ -197,7 +197,16 @@ async fn parse_shared_results(
                     node_map.insert(id, node);
                 }
             }
-            None => continue,
+            None => (),
+        };
+
+        match row.get::<NeoNode>("startNode") {
+            Some(node) => {
+                let id = node.id();
+                let node = NodeData::from_neo_node(node);
+                node_map.insert(id, node);
+            }
+            None => (),
         };
 
         // If you want to know the format of the relations, you can run the related cypher query in the Neo4j Browser.
@@ -209,9 +218,29 @@ async fn parse_shared_results(
                     }
                 }
             }
-            None => continue,
+            None => (),
+        };
+
+        match row.get::<Vec<Relation>>("relations1") {
+            Some(relation) => {
+                for r in relation {
+                    relations.push(r);
+                }
+            }
+            None => (),
+        };
+
+        match row.get::<Vec<Relation>>("relations2") {
+            Some(relation) => {
+                for r in relation {
+                    relations.push(r);
+                }
+            }
+            None => (),
         };
     }
+    info!("Number of entities: {}", &node_map.len());
+    info!("Number of relations: {}", &relations.len());
 
     for relation in relations.iter() {
         let start_node_id = relation.start_node_id();
@@ -251,27 +280,14 @@ pub async fn query_shared_nodes(
     nums_shared_by: usize,
     start_node_id: Option<&str>,
 ) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
-    let nums_shared_by = if nums_shared_by == 0 || nums_shared_by > node_ids.len() {
-        node_ids.len()
-    } else {
-        nums_shared_by
+    if nums_shared_by > node_ids.len() {
+        return Err(anyhow::anyhow!(
+            "The number of shared nodes should be less than the number of start nodes."
+        ));
     };
 
-    let where_clauses = match target_node_types {
-        Some(target_node_types) => {
-            format!(
-                "sharedBy = {} AND ANY(label IN labels(common) WHERE label IN ['{}'])",
-                nums_shared_by,
-                target_node_types.join("', '")
-            )
-        }
-        None => format!("sharedBy = {}", nums_shared_by),
-    };
-
-    let hop_str = match nhops {
-        1 => "*1",
-        2 => "*1..2",
-        _ => "",
+    if nhops > 2 {
+        return Err(anyhow::anyhow!("The number of hops should be less than 3."));
     };
 
     let query_str = if start_node_id.is_none() {
@@ -283,9 +299,9 @@ pub async fn query_shared_nodes(
         // UNWIND startNodes AS startNode
         // MATCH p=(startNode)-[r*1]-(common:Disease)
         // WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common)
-        // WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+        // WITH common, COLLECT(DISTINCT startNode) AS relatedNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
         // WHERE sharedBy = 2
-        // RETURN common, relatedStartNodes, relations
+        // RETURN common, relatedNodes, relations
         // ORDER BY sharedBy DESC
         // LIMIT 100
 
@@ -297,28 +313,65 @@ pub async fn query_shared_nodes(
             if i < node_ids.len() - 1 {
                 start_nodes_details.push_str(", ");
             }
+        }
+        let nums_shared_by = if nums_shared_by == 0 || nums_shared_by > node_ids.len() {
+            node_ids.len()
+        } else {
+            nums_shared_by
         };
 
-        format!("
-            WITH [{start_nodes_details}] AS startNodesDetails
-            UNWIND startNodesDetails AS nodeDetails
-            MATCH (start)
-            WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
-            WITH COLLECT(DISTINCT start) AS startNodes
-            UNWIND startNodes AS startNode
-            MATCH p=(startNode)-[r{hop_str}]-(common)
-            WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common) AND startNode IN startNodes
-            WITH common, COLLECT(DISTINCT startNode) AS relatedStartNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
-            WHERE {where_clauses}
-            WITH common, relatedStartNodes, relations, sharedBy
-            ORDER BY sharedBy DESC
-            LIMIT {topk}
-            RETURN common, relatedStartNodes, relations",
-            topk = topk,
-            start_nodes_details = start_nodes_details,
-            hop_str = hop_str,
-            where_clauses = where_clauses
-        )
+        let where_clauses = match target_node_types {
+            Some(target_node_types) => {
+                format!(
+                    "sharedBy = {} AND ANY(label IN labels(common) WHERE label IN ['{}'])",
+                    nums_shared_by,
+                    target_node_types.join("', '")
+                )
+            }
+            None => format!("sharedBy = {}", nums_shared_by),
+        };
+
+        if nhops == 1 {
+            format!("
+                WITH [{start_nodes_details}] AS startNodesDetails
+                UNWIND startNodesDetails AS nodeDetails
+                MATCH (start)
+                WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
+                WITH COLLECT(DISTINCT start) AS startNodes
+                UNWIND startNodes AS startNode
+                MATCH p=(startNode)-[r]-(common)
+                WHERE (NOT startNode = common) AND ALL(x IN nodes(p) WHERE x IN startNodes) AND startNode IN startNodes
+                WITH common, COLLECT(DISTINCT startNode) AS relatedNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+                WHERE {where_clauses}
+                WITH common, relatedNodes, relations, sharedBy
+                ORDER BY sharedBy DESC
+                LIMIT {topk}
+                RETURN common, relatedNodes, relations",
+                topk = topk,
+                start_nodes_details = start_nodes_details,
+                where_clauses = where_clauses
+            )
+        } else {
+            format!("
+                WITH [{start_nodes_details}] AS startNodesDetails
+                UNWIND startNodesDetails AS nodeDetails
+                MATCH (start)
+                WHERE start.id = nodeDetails.id AND ANY(label IN labels(start) WHERE label = nodeDetails.label)
+                WITH COLLECT(DISTINCT start) AS startNodes
+                UNWIND startNodes AS startNode
+                MATCH p=(startNode)-[r*1..2]-(common)
+                WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN startNodes OR x = common) AND startNode IN startNodes
+                WITH common, COLLECT(DISTINCT startNode) AS relatedNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT startNode) AS sharedBy
+                WHERE {where_clauses}
+                WITH common, relatedNodes, relations, sharedBy
+                ORDER BY sharedBy DESC
+                LIMIT {topk}
+                RETURN common, relatedNodes, relations",
+                topk = topk,
+                start_nodes_details = start_nodes_details,
+                where_clauses = where_clauses
+            )
+        }
     } else {
         let start_node_id = start_node_id.unwrap();
         let (start_node_label, start_node_id) = split_id(start_node_id)?;
@@ -332,32 +385,81 @@ pub async fn query_shared_nodes(
             .collect::<Vec<String>>()
             .join(", ");
 
-        format!("
-            // 假设 start_node_id 和 start_node_label 代表我们感兴趣的起始节点的ID和标签
-            MATCH (start)
-            WHERE start.id = '{start_node_id}' AND ANY(label IN labels(start) WHERE label = '{start_node_label}')
-            WITH start AS startNode
-            // 这里不再需要收集起始节点，因为我们只有一个起始节点
-            UNWIND [{other_nodes_details}] AS otherNodeDetails
-            MATCH (other)
-            WHERE other.id = otherNodeDetails.id AND ANY(label IN labels(other) WHERE label = otherNodeDetails.label)
-            WITH COLLECT(DISTINCT other) AS otherNodes, startNode
-            UNWIND otherNodes AS otherNode
-            MATCH p=(startNode)-[r{hop_str}]-(common)
-            WHERE NOT startNode = common AND ALL(x IN nodes(p) WHERE x IN otherNodes OR x = common) AND startNode = startNode
-            WITH common, COLLECT(DISTINCT otherNode) AS relatedOtherNodes, COLLECT(DISTINCT r) AS relations, COUNT(DISTINCT otherNode) AS sharedBy
-            WHERE {where_clauses}
-            WITH common, relatedOtherNodes, relations, sharedBy
-            ORDER BY sharedBy DESC
-            LIMIT {topk}
-            RETURN common, relatedOtherNodes, relations",
-            topk = topk,
-            other_nodes_details = other_nodes_details, // 该变量需要提供其他节点的详情，例如ID和标签
-            hop_str = hop_str,
-            where_clauses = where_clauses,
-            start_node_id = start_node_id, // 指定的起始节点ID
-            start_node_label = start_node_label // 指定的起始节点标签
-        )
+        if nhops == 1 {
+            format!("
+                MATCH (start)
+                WHERE start.id = '{start_node_id}' AND ANY(label IN labels(start) WHERE label = '{start_node_label}')
+                WITH start AS startNode
+                UNWIND [{other_nodes_details}] AS otherNodeDetails
+                MATCH (other)
+                WHERE other.id = otherNodeDetails.id AND ANY(label IN labels(other) WHERE label = otherNodeDetails.label)
+                WITH COLLECT(DISTINCT other) AS otherNodes, startNode
+                UNWIND otherNodes AS otherNode
+                MATCH (startNode)-[r]-(sharedNode)
+                WHERE sharedNode = otherNode
+                WITH sharedNode, COLLECT(r) AS relations1, startNode, COLLECT(DISTINCT otherNode) AS relatedNodes
+                RETURN sharedNode AS common, relations1, relatedNodes, startNode",
+                other_nodes_details = other_nodes_details,
+                start_node_id = start_node_id,
+                start_node_label = start_node_label
+            )
+        } else {
+            let where_clauses = match target_node_types {
+                Some(target_node_types) => {
+                    format!(
+                        "sharedBy = {} AND ANY(label IN labels(common) WHERE label IN ['{}'])",
+                        nums_shared_by,
+                        target_node_types.join("', '")
+                    )
+                }
+                None => format!("sharedBy = {}", nums_shared_by),
+            };
+
+            // Example query string:
+            // MATCH (startNode)
+            // WHERE startNode.id = 'ENTREZ:3569' AND ANY(label IN labels(startNode) WHERE label = 'Gene')
+            // WITH startNode
+            // UNWIND [{label: 'Gene', id: 'ENTREZ:3107'}, {label: 'Gene', id: 'ENTREZ:3119'}, {label: 'Gene', id: 'ENTREZ:3569'}] AS otherNodeDetail
+            // MATCH (otherNode)
+            // WHERE otherNode.id = otherNodeDetail.id AND ANY(label IN labels(otherNode) WHERE label = otherNodeDetail.label)
+            // WITH COLLECT(DISTINCT otherNode) AS otherNodes, startNode
+            // MATCH (startNode)-[r1]-(sharedNode)
+            // WHERE NOT (sharedNode IN otherNodes)
+            // WITH sharedNode, COLLECT(DISTINCT r1) AS relations, startNode, otherNodes
+            // MATCH (sharedNode)-[r2]-(otherNode)
+            // WHERE otherNode IN otherNodes AND otherNode <> startNode
+            // WITH sharedNode, relations, startNode, COLLECT(DISTINCT otherNode) AS relatedNodes, COLLECT(DISTINCT r2) AS relations2, COUNT(DISTINCT otherNode) AS sharedBy
+            // WHERE sharedBy = 2 AND ANY(label IN labels(sharedNode) WHERE label IN ['Gene'])
+            // WITH sharedNode AS common, relations AS relations1, relatedNodes, startNode, relations2, sharedBy
+            // ORDER BY sharedBy DESC
+            // LIMIT 3
+            // RETURN common, relations1, relatedNodes, startNode, relations2
+            format!("
+                MATCH (startNode)
+                WHERE startNode.id = '{start_node_id}' AND ANY(label IN labels(startNode) WHERE label = '{start_node_label}')
+                WITH startNode
+                UNWIND [{other_nodes_details}] AS otherNodeDetail
+                MATCH (otherNode)
+                WHERE otherNode.id = otherNodeDetail.id AND ANY(label IN labels(otherNode) WHERE label = otherNodeDetail.label)
+                WITH COLLECT(DISTINCT otherNode) AS otherNodes, startNode
+                MATCH (startNode)-[r1]-(sharedNode)
+                WHERE NOT (sharedNode IN otherNodes)
+                WITH sharedNode, COLLECT(DISTINCT r1) AS relations, startNode, otherNodes
+                MATCH (sharedNode)-[r2]-(otherNode)
+                WHERE otherNode IN otherNodes AND otherNode <> startNode
+                WITH sharedNode AS common, relations, startNode, COLLECT(DISTINCT otherNode) AS relatedNodes, COLLECT(DISTINCT r2) AS relations2, COUNT(DISTINCT otherNode) AS sharedBy
+                WHERE {where_clauses}
+                WITH common, relations AS relations1, relatedNodes, startNode, relations2, sharedBy
+                ORDER BY sharedBy DESC
+                LIMIT {topk}
+                RETURN common, relations1, relatedNodes, startNode, relations2",
+                other_nodes_details = other_nodes_details,
+                where_clauses = where_clauses,
+                start_node_id = start_node_id,
+                start_node_label = start_node_label,
+                topk = topk
+            )
+        }
     };
 
     info!("query_shared_nodes's query_str: {}", query_str);
