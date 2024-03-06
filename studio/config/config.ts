@@ -1,18 +1,21 @@
 // https://umijs.org/config/
 import { defineConfig } from 'umi';
 import path from 'path';
-
 import proxy from './proxy';
 import { routes as defaultRoutes } from './routes';
 
-const isDev = process.env.NODE_ENV === 'development';
-const isStatic = isDev ? true : (process.env.UMI_APP_IS_STATIC ? process.env.UMI_APP_IS_STATIC : false);
+// const isDev = process.env.NODE_ENV === 'development';
+// const isStatic = isDev ? true : (process.env.UMI_APP_IS_STATIC ? process.env.UMI_APP_IS_STATIC : false);
 
 export default defineConfig({
   hash: true,
   history: {
     type: 'hash',
   },
+  metas: [{ name: 'title', content: "Network Medicine Platform" }, { name: 'description', content: "Network Medicine for Disease Mechanism and Treatment Based on AI and knowledge graph." }, { name: 'keywords', content: "Network Medicine, MultiOmics Data, Treatment, AI, Knowledge Graph" }],
+  favicons: [
+    "/assets/gene.png",
+  ],
   publicPath: '/',
   antd: {},
   access: {},
@@ -34,10 +37,6 @@ export default defineConfig({
     // https://github.com/webpack/webpack/discussions/13585
     config.resolve.alias.set('perf_hooks', path.resolve(__dirname, 'perf_hooks.ts'));
     // console.log("config.resolve.alias", config.resolve.alias);
-  },
-  define: {
-    // Whether the frontend is separated from the backend.
-    isStatic: isStatic,
   },
   layout: {
     // https://umijs.org/docs/max/layout-menu

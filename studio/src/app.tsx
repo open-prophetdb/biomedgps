@@ -1,10 +1,9 @@
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { RequestConfig, history, RuntimeConfig } from 'umi';
-import type { Settings as LayoutSettings } from '@ant-design/pro-components';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
-import defaultSettings, { CustomSettings, AppVersion } from '../config/defaultSettings';
+import { CustomSettings, AppVersion } from '../config/defaultSettings';
 
 // 运行时配置
 // @ts-ignore
@@ -124,7 +123,6 @@ export const request: RequestConfig = {
  * */
 // TODO: After releasing the first version, try to improve the customized settings.
 export async function getInitialState(): Promise<{
-  settings?: Partial<LayoutSettings>;
   loading?: boolean;
   collapsed?: boolean;
   customSettings?: CustomSettings;
@@ -141,7 +139,6 @@ export async function getInitialState(): Promise<{
   };
 
   const settings = {
-    settings: { ...defaultSettings, logo: customSettings.websiteLogo } as typeof defaultSettings,
     customSettings: {
       ...customSettings,
       mode: 'Developer',

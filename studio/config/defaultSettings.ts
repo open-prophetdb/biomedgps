@@ -12,7 +12,7 @@ const Settings: LayoutSettings & {
   fixedHeader: false,
   fixSiderbar: true,
   colorWeak: false,
-  title: '',
+  title: 'Network Medicine Platform',
   description: 'Network Medicine for Disease Mechanism and Treatment Based on AI and knowledge graph.',
   keywords: 'Network Medicine, MultiOmics Data, Treatment, AI, Knowledge Graph',
   pwa: false,
