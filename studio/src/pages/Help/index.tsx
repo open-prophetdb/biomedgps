@@ -3,6 +3,7 @@ import { useModel } from 'umi';
 import React, { useEffect } from 'react';
 import { MarkdownViewer } from 'biominer-components';
 import RehypeRaw from 'rehype-raw';
+import RehypeToc from 'rehype-toc';
 
 import './index.less';
 
@@ -20,7 +21,7 @@ const Help: React.FC = () => {
 
   return (
     <Card className="help">
-      <MarkdownViewer markdown={markdown} rehypePlugins={[RehypeRaw]} />
+      <MarkdownViewer markdown={markdown} rehypePlugins={[RehypeRaw, RehypeToc]} />
     </Card>
   );
 };

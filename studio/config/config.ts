@@ -42,6 +42,13 @@ export default defineConfig({
     // https://umijs.org/docs/max/layout-menu
     locale: false,
   },
+  locale: {
+    default: 'en-US',
+    antd: true,
+    title: true,
+    baseNavigator: true,
+    baseSeparator: '-',
+  },
   targets: {
     chrome: 80
   },
@@ -55,7 +62,7 @@ export default defineConfig({
     // https://ant.design/docs/react/customize-theme-variable-cn
     'root-entry-name': 'variable',
   },
-  title: false,
+  title: "Network Medicine Platform",
   ignoreMomentLocale: true,
   // proxy: proxy[REACT_APP_ENV || 'dev'],
   proxy: proxy['dev'],

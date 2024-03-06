@@ -13,4 +13,11 @@ export default defineConfig({
   esbuildMinifyIIFE: true,
   favicons: ['/assets/gene.png'],
   proxy: undefined,
+  locale: {
+    default: 'en-US',
+    antd: true,
+    title: true,
+    baseNavigator: true,
+    baseSeparator: '-',
+  },
 });

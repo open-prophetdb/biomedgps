@@ -1,66 +1,51 @@
-<h2 align="center">Network Medicine Platform</h2>
-<p align="center">A network medicine platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.</p>
+NOTE: Video Tutorial is coming soon!
 
-<p align="center">
-<img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/yjcyxky/biomedgps/release?label=Build Status">
-<img src="https://img.shields.io/github/license/yjcyxky/biomedgps.svg?label=License" alt="License"> 
-<a href="https://github.com/yjcyxky/biomedgps/releases">
-<img alt="Latest Release" src="https://img.shields.io/github/release/yjcyxky/biomedgps.svg?label=Latest%20Release"/>
-</a>
-</p>
+## Scenario 1: Target Discovery for Breast Cancer
 
-## Features
+Company A is at the forefront of breast cancer therapeutic development. Their Target Discovery Department is on a quest to identify novel gene targets that could revolutionize treatment options. The team's mission is critical: to not only pinpoint a promising target gene but also to assess its viability in terms of druggability and market competition.
 
-### <a href="https://drugs.3steps.cn/#/predict-model">Predict Drug/Target</a> Module
+### How the Platform Helps
 
-- [x] Predict known drugs for your queried disease (Drug Repurposing).
-- [x] Predict new indications for your queried drug.
-- [x] Understand the molecular mechanisms of human diseases.
-- [x] Predict similar diseases for your queried disease.
-- [x] Predict similar drugs for your queried drug.
+The network medicine platform offers an integrated solution for Company A's needs. By leveraging advanced algorithms and comprehensive biomedical databases, the platform facilitates:
 
-<p></p>
+#### Identification of Potential Targets
 
-### <a href="https://drugs.3steps.cn/#/knowledge-graph">Explain Your Results</a> Module
+Utilizing cutting-edge network analysis, the platform identifies gene targets implicated in breast cancer, drawing from a vast array of genomic and proteomic data.
 
-- [x] Knowledge graph studio for graph query, visualization and analysis.
-- [x] Graph neural network for drug discovery, disease mechanism, biomarker screening and discovering response to toxicant exposure.
-- [x] Support customized knowledge graph schema and data source.
-- [x] Support customized graph neural network model.
-- [x] Support customized omics datasets.
-- [x] Integrated large language models (such as vicuna, rwkv, chatgpt etc. more details on [chat-publications](https://github.com/yjcyxky/chat-publications)) for answering questions.
+#### Druggability Analysis
 
-<p></p>
+The platform evaluates the identified targets for their druggability, considering factors such as the gene's structure, expression in breast tissue, and the availability of modulators.
 
-## Demo
+#### Market Competition Insight
 
-<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/chatbot.png?raw=true" width="60%" />
-<h3>Demo1: Ask questions with chatbot</h3>
-</div>
+It provides an in-depth analysis of existing and in-development therapies targeting similar pathways, offering insights into patent landscapes, clinical trial stages, and market saturation.
 
-<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/disease-similarities.png?raw=true" width="60%" />
-<h3>Demo2: Find similar diseases with your queried disease</h3>
-</div>
+#### Outcome
 
-<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/drug-targets-genes.png?raw=true" width="60%" />
-<h3>Demo3: Predict drugs and related genes for your queried disease</h3>
-</div>
+Company A leverages these insights to prioritize targets that are not only scientifically promising but also strategically viable, significantly accelerating their path to groundbreaking therapeutic discoveries.
 
-<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/path.png?raw=true" width="60%" />
-<h3>Demo4: Find potential paths between two nodes</h3>
-</div>
+## Scenario 2: Competitor Molecule Analysis for PD-L1 Blockers
 
-<p></p>
+Company B's Drug Discovery Team is on a mission to develop a groundbreaking therapeutic molecule that can effectively block PD-L1, a key protein involved in evading the immune response in various cancers. To ensure their development is competitive and innovative, they need comprehensive insights into existing and emerging PD-L1 inhibitors.
 
-## Ecosystem
+### How the Platform Helps
 
-| Name                                                                              | Language | Description                                                                                                                               |
-| :-------------------------------------------------------------------------------- | :------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| [BioMedGPS Data](https://github.com/yjcyxky/biomedgps-data)                       | Python   | For building the knowledge graph of BioMedGPS and training the graph neural network models.                                               |
-| [Chat Publications](https://github.com/yjcyxky/chat-publications)                 | Python   | Ask questions and get answers from publications.                                                                                          |
-| [BioMedical Knowledgebases](https://github.com/yjcyxky/biomedical-knowledgebases) | Markdown | A collection of biomedical knowledgebases, ontologies, datasets and publications etc.                                                     |
-| [R Omics Utility](https://github.com/yjcyxky/r-omics-utils)                       | R        | Utilities for omics data with R. It will be part of biomedgps system and provide visulization and analysis functions of multi-omics data. |
+The network medicine platform serves as an invaluable tool for Company B by providing:
+
+#### Competitor Molecule Discovery
+
+Through an exhaustive search across global databases, the platform identifies both approved and investigational PD-L1 inhibitors, offering a complete view of the competitive landscape.
+
+#### Detailed Molecule Profiles
+
+For each competitor molecule, the platform provides detailed information, including clinical trial stages, patent statuses, biophysical properties, and reported therapeutic efficacy.
+
+#### Comparative Analysis
+
+It enables Company B to conduct side-by-side comparisons of their molecule against competitors, considering factors like mechanism of action, safety profiles, and clinical benefits.
+
+#### Outcome
+
+Armed with this comprehensive and nuanced understanding of the competitive landscape, Company B can strategically navigate their molecule development, focusing on innovation, differentiation, and addressing unmet needs in the PD-L1 blockade therapeutic area.
+
+## Scenario 3: Drug Repurposing for Symptom Defined Diseases

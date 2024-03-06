@@ -5772,10 +5772,10 @@ bindings@^1.5.0:
   dependencies:
     file-uri-to-path "1.0.0"
 
-biominer-components@0.2.75:
-  version "0.2.75"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.2.75.tgz#51006be0906519df7440983e0e9ff4a9fe3fef57"
-  integrity sha512-ZXBozPajt8BSrBYm0D9QrmA33U4La266WpqBblTxHZ7Ar4edwudBb85tcKDE8xeCs16hoYGTvTbfQkyytUjJHA==
+biominer-components@0.2.76:
+  version "0.2.76"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.2.76.tgz#6c58e0099acdd53cb9a1627186ef1afdb6877cff"
+  integrity sha512-0KkvOuDZoQAFhb9nKCPV5X3XCuOe7AswtqVV/T0PweUzhm0gP6puaiAew/p0pipXSqqexEReEdxxkpZHnb1Rfg==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^3.4.2"
     "@types/openseadragon" "^3.0.3"
