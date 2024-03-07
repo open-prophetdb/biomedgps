@@ -2,9 +2,10 @@
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetRecordsResponse,
-    GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery,
-    Pagination, PaginationQuery, PostResponse, PredictedNodeQuery, SubgraphIdQuery,
+    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
+    GetRecordsResponse, GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse,
+    NodeIdsQuery, Pagination, PaginationQuery, PostResponse, PredictedNodeQuery, PromptList,
+    SubgraphIdQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
@@ -13,7 +14,7 @@ use crate::model::core::{
 use crate::model::graph::Graph;
 use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
-use crate::model::llm::{ChatBot, Context, LlmResponse};
+use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
 use crate::model::util::match_color;
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
@@ -769,7 +770,7 @@ impl BiomedgpsApi {
         path = "/entity2d",
         method = "get",
         tag = "ApiTags::KnowledgeGraph",
-        operation_id = "fetchEntity2d"
+        operation_id = "fetchEntity2D"
     )]
     async fn fetch_entity2d(
         &self,
@@ -1458,6 +1459,34 @@ impl BiomedgpsApi {
                 return PostResponse::bad_request(err);
             }
         }
+    }
+
+    /// Call `/api/v1/llm-prompts` with query params to get prompt templates.
+    #[oai(
+        path = "/llm-prompts",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPrompts"
+    )]
+    async fn get_prompts(&self, _token: CustomSecurityScheme) -> GetPromptResponse {
+        let total = PROMPTS.len() as u64;
+        let page = 1;
+        let page_size = total;
+        let records = PROMPTS
+            .iter()
+            .map(|p| {
+                p.into_iter()
+                    .map(|(k, v)| (String::from(*k), String::from(*v)))
+                    .collect()
+            })
+            .collect();
+
+        GetPromptResponse::ok(PromptList {
+            total,
+            page,
+            page_size,
+            records,
+        })
     }
 }
 

@@ -9,7 +9,7 @@ import { initChat } from '@/components/util';
 // import { KeepAlive } from 'umi';
 import { MessageFilled, MessageOutlined } from '@ant-design/icons';
 import {
-  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2d, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLLM, fetchSharedNodes
+  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts
 } from '@/services/swagger/KnowledgeGraph';
 import { getGeneInfo } from '@/plugins4kg/utils';
 import { getItems4GenePanel } from '@/plugins4kg';
@@ -75,11 +75,14 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
             GetPredictedNodesFn: fetchPredictedNodes,
             GetOneStepLinkedNodesFn: fetchOneStepLinkedNodes,
             GetConnectedNodesFn: fetchEdgesAutoConnectNodes,
-            GetEntity2DFn: fetchEntity2d,
+            GetEntity2DFn: fetchEntity2D,
             GetEntityColorMapFn: fetchEntityColorMap,
             GetNStepsLinkedNodesFn: fetchPaths,
-            AskLlmFn: askLLM,
+            // @ts-ignore, it doesn't matter, maybe we can fix this later.
+            AskLlmFn: askLlm,
             GetSharedNodesFn: fetchSharedNodes,
+            // @ts-ignore, it seems that we don't need to fix this.
+            GetPromptsFn: fetchLlmPrompts,
           }}
           getGeneInfo={getGeneInfo}
           getItems4GenePanel={getItems4GenePanel}

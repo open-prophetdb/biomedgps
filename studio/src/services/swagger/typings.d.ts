@@ -1,4 +1,4 @@
-declare namespace API {
+declare namespace swagger {
   type askLLMParams = {
     prompt_template_id: string;
   };
@@ -6,7 +6,7 @@ declare namespace API {
   type Context = {
     entity?: Entity;
     expanded_relation?: ExpandedRelation;
-    symptoms_with_disease_ctx?: SymptomsWithDiseaseCtx;
+    subgraph_with_disease_ctx?: SubgraphWithDiseaseCtx;
   };
 
   type deleteCuratedKnowledgeParams = {
@@ -130,7 +130,7 @@ declare namespace API {
     model_table_prefix?: string;
   };
 
-  type fetchEntity2dParams = {
+  type fetchEntity2DParams = {
     page?: number;
     page_size?: number;
     query_str?: string;
@@ -173,6 +173,7 @@ declare namespace API {
   type fetchSharedNodesParams = {
     node_ids: string;
     target_node_types?: string;
+    start_node_id?: string;
     topk?: number;
     nhops?: number;
     nums_shared_by?: number;
@@ -266,6 +267,17 @@ declare namespace API {
     label: Label;
     keyshape: NodeKeyShape;
     icon: Icon;
+  };
+
+  type PromptList = {
+    /** data */
+    records: Record<string, any>[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
   };
 
   type putCuratedKnowledgeParams = {
@@ -383,9 +395,8 @@ declare namespace API {
     parent?: string;
   };
 
-  type SymptomsWithDiseaseCtx = {
+  type SubgraphWithDiseaseCtx = {
     disease_name: string;
     subgraph: string;
-    symptoms: string[];
   };
 }

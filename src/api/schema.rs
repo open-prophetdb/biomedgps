@@ -4,10 +4,7 @@ use crate::model::core::{RecordResponse, RelationCount, Statistics};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
-use crate::model::llm::Context;
-use chrono::serde::ts_seconds;
-use chrono::{DateTime, Utc};
-use log::{debug, info, warn};
+use log::warn;
 use poem_openapi::Object;
 use poem_openapi::{payload::Json, ApiResponse, Tags};
 use serde::{Deserialize, Serialize};
@@ -22,6 +19,45 @@ pub enum ApiTags {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
 pub struct ErrorMessage {
     msg: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate, Object)]
+
+pub struct PromptList {
+    /// data
+    pub records: Vec<HashMap<String, String>>,
+    /// total num
+    pub total: u64,
+    /// current page index
+    pub page: u64,
+    /// default 10
+    pub page_size: u64,
+}
+
+#[derive(ApiResponse)]
+pub enum GetPromptResponse {
+    #[oai(status = 200)]
+    Ok(Json<PromptList>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetPromptResponse {
+    pub fn ok(prompts: PromptList) -> Self {
+        Self::Ok(Json(prompts))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
 }
 
 #[derive(ApiResponse)]

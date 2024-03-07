@@ -36,7 +36,8 @@ clean-studio:
 build-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
-	@cd studio && yarn && yarn openapi || true
+	# @cd studio && yarn && yarn openapi || true
+	@cd studio && yarn
 	@cd studio && yarn build:embed && cd ..
 
 build-biomedgps:

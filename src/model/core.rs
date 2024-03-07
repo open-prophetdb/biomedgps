@@ -336,6 +336,7 @@ pub struct Entity {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     #[oai(read_only)]
+    #[oai(skip)]
     pub idx: i64,
 
     #[validate(length(
@@ -1070,6 +1071,7 @@ pub struct Relation {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
     #[oai(read_only)]
+    #[oai(skip)]
     pub id: i64,
 
     #[validate(length(

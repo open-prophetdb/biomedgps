@@ -1,4 +1,7 @@
 {
+  "name": "biomedgps",
+  "version": "0.1.0",
+  "description": "Network Medicine for Disease Mechanism and Treatment Based on AI and knowledge graph.",
   "private": true,
   "author": "Jingcheng Yang <yjcyxky@163.com>",
   "scripts": {
@@ -10,7 +13,8 @@
     "setup": "max setup",
     "start": "npm run dev",
     "start:local-dev": "cross-env UMI_APP_API_PREFIX=http://localhost:3000 max dev",
-    "start:remote-dev": "cross-env UMI_APP_API_PREFIX=https://drugs.3steps.cn UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max dev"
+    "start:remote-dev": "cross-env UMI_APP_API_PREFIX=https://drugs.3steps.cn UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max dev",
+    "openapi": "max openapi"
   },
   "dependencies": {
     "@ant-design/icons": "^5.0.1",
@@ -25,13 +29,11 @@
     "@mlc-ai/web-llm": "0.2.15",
     "@textea/json-viewer": "^2.9.0",
     "@umijs/max": "^4.1.2",
-    "@umijs/max-plugin-openapi": "1.0.7",
-    "@umijs/openapi": "^1.10.1",
     "@umijs/route-utils": "^2.0.0",
     "antd": "5.7.0",
     "antd-schema-form": "^4.5.1",
     "axios": "^1.1.2",
-    "biominer-components": "0.2.80",
+    "biominer-components": "0.2.81",
     "classnames": "^2.3.0",
     "handlebars": "^4.7.7",
     "handsontable": "^12.1.3",
@@ -87,7 +89,8 @@
     "prettier": "^2.8.7",
     "prettier-plugin-organize-imports": "^3.2.2",
     "prettier-plugin-packagejson": "^2.4.3",
-    "typescript": "^5.0.3"
+    "typescript": "^5.0.3",
+    "umi-presets-pro": "^2.0.3"
   },
   "browser": {
     "fs": false,

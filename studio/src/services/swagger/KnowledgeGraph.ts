@@ -5,10 +5,10 @@ import { request } from 'umi';
 /** Call `/api/v1/auto-connect-nodes` with query params to fetch edges which connect the input nodes. GET /api/v1/auto-connect-nodes */
 export async function fetchEdgesAutoConnectNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchEdgesAutoConnectNodesParams,
+  params: swagger.fetchEdgesAutoConnectNodesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/auto-connect-nodes', {
+  return request<swagger.Graph>('/api/v1/auto-connect-nodes', {
     method: 'GET',
     params: {
       ...params,
@@ -20,10 +20,10 @@ export async function fetchEdgesAutoConnectNodes(
 /** Call `/api/v1/curated-graph` with query params to fetch curated graph. GET /api/v1/curated-graph */
 export async function fetchCuratedGraph(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchCuratedGraphParams,
+  params: swagger.fetchCuratedGraphParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/curated-graph', {
+  return request<swagger.Graph>('/api/v1/curated-graph', {
     method: 'GET',
     params: {
       ...params,
@@ -35,10 +35,10 @@ export async function fetchCuratedGraph(
 /** Call `/api/v1/curated-knowledges` with query params to fetch curated knowledges. GET /api/v1/curated-knowledges */
 export async function fetchCuratedKnowledges(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchCuratedKnowledgesParams,
+  params: swagger.fetchCuratedKnowledgesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseKnowledgeCuration>('/api/v1/curated-knowledges', {
+  return request<swagger.RecordResponseKnowledgeCuration>('/api/v1/curated-knowledges', {
     method: 'GET',
     params: {
       ...params,
@@ -49,10 +49,10 @@ export async function fetchCuratedKnowledges(
 
 /** Call `/api/v1/curated-knowledges` with payload to create a curated knowledge. POST /api/v1/curated-knowledges */
 export async function postCuratedKnowledge(
-  body: API.KnowledgeCuration,
+  body: swagger.KnowledgeCuration,
   options?: { [key: string]: any },
 ) {
-  return request<API.KnowledgeCuration>('/api/v1/curated-knowledges', {
+  return request<swagger.KnowledgeCuration>('/api/v1/curated-knowledges', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -65,10 +65,10 @@ export async function postCuratedKnowledge(
 /** Call `/api/v1/curated-knowledges-by-owner` with query params to fetch curated knowledges by owner. GET /api/v1/curated-knowledges-by-owner */
 export async function fetchCuratedKnowledgesByOwner(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchCuratedKnowledgesByOwnerParams,
+  params: swagger.fetchCuratedKnowledgesByOwnerParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseKnowledgeCuration>('/api/v1/curated-knowledges-by-owner', {
+  return request<swagger.RecordResponseKnowledgeCuration>('/api/v1/curated-knowledges-by-owner', {
     method: 'GET',
     params: {
       ...params,
@@ -80,12 +80,12 @@ export async function fetchCuratedKnowledgesByOwner(
 /** Call `/api/v1/curated-knowledges/:id` with payload to create a curated knowledge. PUT /api/v1/curated-knowledges/${param0} */
 export async function putCuratedKnowledge(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.putCuratedKnowledgeParams,
-  body: API.KnowledgeCuration,
+  params: swagger.putCuratedKnowledgeParams,
+  body: swagger.KnowledgeCuration,
   options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params;
-  return request<API.KnowledgeCuration>(`/api/v1/curated-knowledges/${param0}`, {
+  return request<swagger.KnowledgeCuration>(`/api/v1/curated-knowledges/${param0}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ export async function putCuratedKnowledge(
 /** Call `/api/v1/curated-knowledges/:id` with payload to delete a curated knowledge. DELETE /api/v1/curated-knowledges/${param0} */
 export async function deleteCuratedKnowledge(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.deleteCuratedKnowledgeParams,
+  params: swagger.deleteCuratedKnowledgeParams,
   options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params;
@@ -113,10 +113,10 @@ export async function deleteCuratedKnowledge(
 /** Call `/api/v1/entities` with query params to fetch entities. GET /api/v1/entities */
 export async function fetchEntities(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchEntitiesParams,
+  params: swagger.fetchEntitiesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseEntity>('/api/v1/entities', {
+  return request<swagger.RecordResponseEntity>('/api/v1/entities', {
     method: 'GET',
     params: {
       ...params,
@@ -135,19 +135,19 @@ export async function fetchEntityColorMap(options?: { [key: string]: any }) {
 
 /** Call `/api/v1/entity-metadata` with query params to fetch all entity metadata. GET /api/v1/entity-metadata */
 export async function fetchEntityMetadata(options?: { [key: string]: any }) {
-  return request<API.EntityMetadata[]>('/api/v1/entity-metadata', {
+  return request<swagger.EntityMetadata[]>('/api/v1/entity-metadata', {
     method: 'GET',
     ...(options || {}),
   });
 }
 
 /** Call `/api/v1/entity2d` with query params to fetch entity2d. GET /api/v1/entity2d */
-export async function fetchEntity2d(
+export async function fetchEntity2D(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchEntity2dParams,
+  params: swagger.fetchEntity2DParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseEntity2D>('/api/v1/entity2d', {
+  return request<swagger.RecordResponseEntity2D>('/api/v1/entity2d', {
     method: 'GET',
     params: {
       ...params,
@@ -157,13 +157,13 @@ export async function fetchEntity2d(
 }
 
 /** Call `/api/v1/llm` with query params to get answer from LLM. POST /api/v1/llm */
-export async function askLLM(
+export async function askLlm(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.askLLMParams,
-  body: API.Context,
+  params: swagger.askLLMParams,
+  body: swagger.Context,
   options?: { [key: string]: any },
 ) {
-  return request<API.LlmResponse>('/api/v1/llm', {
+  return request<swagger.LlmResponse>('/api/v1/llm', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -176,13 +176,21 @@ export async function askLLM(
   });
 }
 
+/** Call `/api/v1/llm-prompts` with query params to get prompt templates. GET /api/v1/llm-prompts */
+export async function fetchPrompts(options?: { [key: string]: any }) {
+  return request<swagger.PromptList>('/api/v1/llm-prompts', {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/nodes` with query params to fetch nodes. GET /api/v1/nodes */
 export async function fetchNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchNodesParams,
+  params: swagger.fetchNodesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/nodes', {
+  return request<swagger.Graph>('/api/v1/nodes', {
     method: 'GET',
     params: {
       ...params,
@@ -194,10 +202,10 @@ export async function fetchNodes(
 /** Call `/api/v1/one-step-linked-nodes` with query params to fetch linked nodes with one step. GET /api/v1/one-step-linked-nodes */
 export async function fetchOneStepLinkedNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchOneStepLinkedNodesParams,
+  params: swagger.fetchOneStepLinkedNodesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/one-step-linked-nodes', {
+  return request<swagger.Graph>('/api/v1/one-step-linked-nodes', {
     method: 'GET',
     params: {
       ...params,
@@ -209,10 +217,10 @@ export async function fetchOneStepLinkedNodes(
 /** Call `/api/v1/paths` with query params to fetch paths. GET /api/v1/paths */
 export async function fetchPaths(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchPathsParams,
+  params: swagger.fetchPathsParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/paths', {
+  return request<swagger.Graph>('/api/v1/paths', {
     method: 'GET',
     params: {
       ...params,
@@ -224,10 +232,10 @@ export async function fetchPaths(
 /** Call `/api/v1/predicted-nodes` with query params to fetch predicted nodes. GET /api/v1/predicted-nodes */
 export async function fetchPredictedNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchPredictedNodesParams,
+  params: swagger.fetchPredictedNodesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/predicted-nodes', {
+  return request<swagger.Graph>('/api/v1/predicted-nodes', {
     method: 'GET',
     params: {
       ...params,
@@ -239,10 +247,10 @@ export async function fetchPredictedNodes(
 /** Call `/api/v1/relation-counts` with query params to fetch relation counts. GET /api/v1/relation-counts */
 export async function fetchRelationCounts(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchRelationCountsParams,
+  params: swagger.fetchRelationCountsParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RelationCount[]>('/api/v1/relation-counts', {
+  return request<swagger.RelationCount[]>('/api/v1/relation-counts', {
     method: 'GET',
     params: {
       ...params,
@@ -253,7 +261,7 @@ export async function fetchRelationCounts(
 
 /** Call `/api/v1/relation-metadata` with query params to fetch all relation metadata. GET /api/v1/relation-metadata */
 export async function fetchRelationMetadata(options?: { [key: string]: any }) {
-  return request<API.RelationMetadata[]>('/api/v1/relation-metadata', {
+  return request<swagger.RelationMetadata[]>('/api/v1/relation-metadata', {
     method: 'GET',
     ...(options || {}),
   });
@@ -262,10 +270,10 @@ export async function fetchRelationMetadata(options?: { [key: string]: any }) {
 /** Call `/api/v1/relations` with query params to fetch relations. GET /api/v1/relations */
 export async function fetchRelations(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchRelationsParams,
+  params: swagger.fetchRelationsParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseRelation>('/api/v1/relations', {
+  return request<swagger.RecordResponseRelation>('/api/v1/relations', {
     method: 'GET',
     params: {
       ...params,
@@ -277,10 +285,10 @@ export async function fetchRelations(
 /** Call `/api/v1/shared-nodes` with query params to fetch shared nodes. GET /api/v1/shared-nodes */
 export async function fetchSharedNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchSharedNodesParams,
+  params: swagger.fetchSharedNodesParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Graph>('/api/v1/shared-nodes', {
+  return request<swagger.Graph>('/api/v1/shared-nodes', {
     method: 'GET',
     params: {
       ...params,
@@ -291,7 +299,7 @@ export async function fetchSharedNodes(
 
 /** Call `/api/v1/statistics` with query params to fetch all entity & relation metadata. GET /api/v1/statistics */
 export async function fetchStatistics(options?: { [key: string]: any }) {
-  return request<API.Statistics>('/api/v1/statistics', {
+  return request<swagger.Statistics>('/api/v1/statistics', {
     method: 'GET',
     ...(options || {}),
   });
@@ -300,10 +308,10 @@ export async function fetchStatistics(options?: { [key: string]: any }) {
 /** Call `/api/v1/subgraphs` with query params to fetch subgraphs. GET /api/v1/subgraphs */
 export async function fetchSubgraphs(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.fetchSubgraphsParams,
+  params: swagger.fetchSubgraphsParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.RecordResponseSubgraph>('/api/v1/subgraphs', {
+  return request<swagger.RecordResponseSubgraph>('/api/v1/subgraphs', {
     method: 'GET',
     params: {
       ...params,
@@ -313,8 +321,8 @@ export async function fetchSubgraphs(
 }
 
 /** Call `/api/v1/subgraphs` with payload to create a subgraph. POST /api/v1/subgraphs */
-export async function postSubgraph(body: API.Subgraph, options?: { [key: string]: any }) {
-  return request<API.Subgraph>('/api/v1/subgraphs', {
+export async function postSubgraph(body: swagger.Subgraph, options?: { [key: string]: any }) {
+  return request<swagger.Subgraph>('/api/v1/subgraphs', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -327,12 +335,12 @@ export async function postSubgraph(body: API.Subgraph, options?: { [key: string]
 /** Call `/api/v1/subgraphs/:id` with payload to update a subgraph. PUT /api/v1/subgraphs/${param0} */
 export async function putSubgraph(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.putSubgraphParams,
-  body: API.Subgraph,
+  params: swagger.putSubgraphParams,
+  body: swagger.Subgraph,
   options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params;
-  return request<API.Subgraph>(`/api/v1/subgraphs/${param0}`, {
+  return request<swagger.Subgraph>(`/api/v1/subgraphs/${param0}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -346,7 +354,7 @@ export async function putSubgraph(
 /** Call `/api/v1/subgraphs/:id` with payload to create subgraph. DELETE /api/v1/subgraphs/${param0} */
 export async function deleteSubgraph(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.deleteSubgraphParams,
+  params: swagger.deleteSubgraphParams,
   options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params;
