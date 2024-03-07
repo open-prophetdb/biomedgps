@@ -24,12 +24,12 @@ pub struct LlmResponse {
     pub created_at: DateTime<Utc>,
 }
 
-/// The context is used to store the context for the LLM. The context can be an entity, an expanded relation, or a symptoms with disease context.
+/// The context is used to store the context for the LLM. The context can be an entity, an expanded relation, or treatments with disease context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Context {
     pub entity: Option<Entity>,
     pub expanded_relation: Option<ExpandedRelation>,
-    pub symptoms_with_disease_ctx: Option<SymptomsWithDiseaseCtx>,
+    pub subgraph_with_disease_ctx: Option<SubgraphWithDiseaseCtx>,
 }
 
 impl Context {
@@ -58,10 +58,10 @@ impl Context {
                 response: answer.message.to_owned(),
                 created_at: answer.created_at,
             })
-        } else if self.symptoms_with_disease_ctx.is_some() {
-            let symptoms_with_disease_ctx = self.symptoms_with_disease_ctx.unwrap();
+        } else if self.subgraph_with_disease_ctx.is_some() {
+            let subgraph_with_disease_ctx = self.subgraph_with_disease_ctx.unwrap();
             let mut llm_msg =
-                LlmMessage::new(&prompt_template_id, symptoms_with_disease_ctx, None).unwrap();
+                LlmMessage::new(&prompt_template_id, subgraph_with_disease_ctx, None).unwrap();
             let answer = match llm_msg.answer(&chatbot, pool).await {
                 Ok(answer) => answer,
                 Err(e) => {
@@ -133,15 +133,15 @@ impl LlmContext for ExpandedRelation {
     }
 }
 
-// The SymptomsWithDiseaseCtx is used to store the context for the symptoms with disease.
+// The SubgraphWithDiseaseCtx is used to store the context for the treatments/mechanisms with disease.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
-pub struct SymptomsWithDiseaseCtx {
+pub struct SubgraphWithDiseaseCtx {
     pub disease_name: String,
     pub subgraph: String,
     pub symptoms: Vec<String>,
 }
 
-impl LlmContext for SymptomsWithDiseaseCtx {
+impl LlmContext for SubgraphWithDiseaseCtx {
     fn get_context(&self) -> Self {
         self.clone()
     }
@@ -150,7 +150,6 @@ impl LlmContext for SymptomsWithDiseaseCtx {
         let mut prompt = prompt_template.to_string();
         prompt = prompt.replace("{{disease_name}}", &self.disease_name);
         prompt = prompt.replace("{{subgraph}}", &self.subgraph);
-        prompt = prompt.replace("{{symptoms}}", &self.symptoms.join(", "));
         prompt
     }
 }
@@ -169,12 +168,15 @@ lazy_static! {
         m.insert("custom_question", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\n{{custom_question}}");
 
         // You need to prepare two fields: 1) subgraph: a json string; 2) disease_name: a string.
-        m.insert("subgraph_symptoms_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\n\nSubgraph Overview: I have compiled a Knowledge Subgraph dedicated to exploring the complex landscape surrounding {{disease_name}}, incorporating elements such as related symptoms, co-occurring diseases, therapeutic medications, and underlying genes/pathways. This Subgraph aims to elucidate:\n\nDisease-Symptom Associations: The linkages between symptoms of {{disease_name}} and their correlation with various diseases.\nMedication and Genetic/Pathway Connections: How medications align with and influence the genes or pathways associated with these diseases.\nMechanisms of Action: The specific pathways through which medications exert their therapeutic effects on these diseases.\nSymptom Detailing for {{disease_name}}: Specific symptoms related to {{disease_name}} include: {{symptoms}}.\nResearch Questions:\n\nIn light of the above, my queries are as follows:\n\nCritical Knowledge Identification: Within the context of {{disease_name}}, this Knowledge Subgraph houses an extensive array of entities and relationships fundamental to unraveling the disease's mechanisms and scrutinizing relevant treatment drugs. Leveraging your expertise, concentrate on the graph's relations pivotal to understanding {{disease_name}}'s mechanisms and its associated treatments. Identify and emphasize essential knowledge aspects that significantly aid in decoding the disease's pathology and therapeutic measures. This entails pinpointing vital biological pathways, gene-disease correlations, drug-target engagements, and any novel research insights that could reveal innovative therapeutic approaches. Your analysis is expected to prioritize data with a direct bearing on treatment efficacy and enhance our molecular-level understanding of the disease.\n\nEmerging Therapies: Are there any novel studies or predictive analyses indicating unrecognized medications that might benefit {{disease_name}} symptoms or the disease itself?\n\nSymptom-Disease Correlation: Which diseases are directly linked to {{disease_name}} symptoms, and what are the common treatments for these diseases?\n\nAction Mechanisms of Medications: How do these medications influence specific genes or pathways?\n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{disease_name}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.\nThis requirement is non-negotiable, ensuring that all information provided is backed by credible and accessible scientific evidence. Leveraging PubMed as a source is essential for maintaining the accuracy and reliability of the insights shared in your analysis.");
+        m.insert("subgraph_treatment_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\n\nSubgraph Overview: I have compiled a Knowledge Subgraph dedicated to exploring the complex landscape surrounding {{disease_name}}, incorporating elements such as related symptoms, co-occurring diseases, therapeutic medications, and underlying genes/pathways. This Subgraph aims to elucidate:\n\nDisease-Symptom Associations: The linkages between symptoms of {{disease_name}} and their correlation with various diseases.\nMedication and Genetic/Pathway Connections: How medications align with and influence the genes or pathways associated with these diseases.\nMechanisms of Action: The specific pathways through which medications exert their therapeutic effects on these diseases.\nSymptom Detailing for {{disease_name}}: Specific symptoms related to {{disease_name}}.\nResearch Questions:\n\nIn light of the above, my queries are as follows:\n\nCritical Knowledge Identification: Within the context of {{disease_name}}, this Knowledge Subgraph houses an extensive array of entities and relationships fundamental to unraveling the disease's mechanisms and scrutinizing relevant treatment drugs. Leveraging your expertise, concentrate on the graph's relations pivotal to understanding {{disease_name}}'s mechanisms and its associated treatments. Identify and emphasize essential knowledge aspects that significantly aid in decoding the disease's pathology and therapeutic measures. This entails pinpointing vital biological pathways, gene-disease correlations, drug-target engagements, and any novel research insights that could reveal innovative therapeutic approaches. Your analysis is expected to prioritize data with a direct bearing on treatment efficacy and enhance our molecular-level understanding of the disease.\n\nEmerging Therapies: Are there any novel studies or predictive analyses indicating unrecognized medications that might benefit {{disease_name}} symptoms or the disease itself?\n\nSymptom-Disease Correlation: Which diseases are directly linked to {{disease_name}} symptoms, and what are the common treatments for these diseases?\n\nAction Mechanisms of Medications: How do these medications influence specific genes or pathways?\n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{disease_name}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.\nThis requirement is non-negotiable, ensuring that all information provided is backed by credible and accessible scientific evidence. Leveraging PubMed as a source is essential for maintaining the accuracy and reliability of the insights shared in your analysis.");
+
+        m.insert("subgraph_mechanism_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ disease_name }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and paths within this Subgraph that are most relevant to {{ disease_name }}. To achieve this, I need your assistance to: 1. Understand the structure and meaning of this Subgraph. Please explain what the nodes and edges represent, and how they are connected to {{ disease_name }}. 2. Identify and explain the key nodes that are most relevant to {{ disease_name }}. Please base your explanation on the nodes and their attributes and their known roles in the disease, explaining which nodes are critical and why these nodes are critical. 3. Determine and describe the main paths connecting these key nodes. Please discuss how these paths might be involved in the onset, progression, or treatment of the disease, considering the type and strength of interactions between nodes. 4. Provide a report summarizing your findings and understanding, including a list of key nodes and paths, along with a rationale for how they are related to {{ disease_name }}. Note that, given the complexity and multifactorial nature of diseases, explanations may need to integrate multiple attributes of nodes and their interactions. \n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{disease_name}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.\nThis requirement is non-negotiable, ensuring that all information provided is backed by credible and accessible scientific evidence. Leveraging PubMed as a source is essential for maintaining the accuracy and reliability of the insights shared in your analysis.");
 
         m
     };
 }
 
+// The following codes do not need to be modified when you add a new LLM context.
 pub async fn fetch_by_session_uuid(
     session_uuid: &str,
     pool: &sqlx::PgPool,
