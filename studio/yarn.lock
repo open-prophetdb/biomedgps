@@ -5366,17 +5366,17 @@ bindings@^1.5.0:
   dependencies:
     file-uri-to-path "1.0.0"
 
-biominer-components@0.2.82:
-  version "0.2.82"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.2.82.tgz#0f74d15fc776c6cb990815c3195df33b72f151e3"
-  integrity sha512-aZOwJVnH/fRPYt/xpOOFPCTebgWWGZB2Nak98uoL8h8F+W5un8zJc55SuOCcR+PSXAA0lpA7nv4pbYV3new0hg==
+biominer-components@0.2.83:
+  version "0.2.83"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.2.83.tgz#ac394847153927c76246156847825cfb92e5fd93"
+  integrity sha512-a5nDCvA3ILulicDU3eTPY+elBr43lkWLdVZk4i4aOwsf/eMtZ/9J3BAEd4SgkX+DMwzB6dZyJYr3S3FXiYn23w==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^3.4.2"
     "@types/openseadragon" "^3.0.3"
     ag-grid-community "^31.0.1"
     ag-grid-enterprise "^31.0.1"
     ag-grid-react "^31.0.1"
-    gtex-d3 thehyve/gtex-viz#7c822b0
+    gtex-d3 yjcyxky/gtex-viz#7c822b0
     lodash "^4.17.21"
     moment "^2.29.4"
     openseadragon "^3.1.0"
@@ -9768,9 +9768,9 @@ grid-index@^1.1.0:
   resolved "https://registry.yarnpkg.com/grid-index/-/grid-index-1.1.0.tgz#97f8221edec1026c8377b86446a7c71e79522ea7"
   integrity sha512-HZRwumpOGUrHyxO5bqKZL0B0GlUpwtCAzZ42sgxUPniu33R1LSFH5yrIcBCHjkctCAh3mtWKcKd9J4vDDdeVHA==
 
-"gtex-d3@github:thehyve/gtex-viz#7c822b0":
+"gtex-d3@github:yjcyxky/gtex-viz#7c822b0":
   version "0.0.1"
-  resolved "https://codeload.github.com/thehyve/gtex-viz/tar.gz/7c822b0305fd4e1b80c2180432d9057f1bc049c1"
+  resolved "https://codeload.github.com/yjcyxky/gtex-viz/tar.gz/7c822b0305fd4e1b80c2180432d9057f1bc049c1"
   dependencies:
     d3 "^5.0.0"
     file-saver "^2.0.1"
