@@ -1,3 +1,4 @@
+import { Empty } from "antd";
 import ExpressionAtlas from "./ExpressionAtlas";
 import GeneInfo from "./GeneInfo";
 import GTexViewer from "./GTexViewer";
@@ -11,7 +12,7 @@ import type { GeneInfo as GeneInfoType } from "./utils";
 export {
   ExpressionAtlas,
   GeneInfo,
-  GTexViewer,
+  // GTexViewer,
   MolStarViewer,
   MutationViewer,
   SangerCosmic,
@@ -32,12 +33,14 @@ export const getItems4GenePanel = (geneInfo: GeneInfoType, hiddenItems: string[]
     {
       label: "Gene",
       key: "gene",
-      children: <GTexViewer officialGeneSymbol={ensemblId} type="gene" />
+      // children: <GTexViewer officialGeneSymbol={ensemblId} type="gene" />
+      children: <Empty />
     },
     {
       label: "Transcript",
       key: "transcript",
-      children: <GTexViewer officialGeneSymbol={ensemblId} type="transcript" />
+      // children: <GTexViewer officialGeneSymbol={ensemblId} type="transcript" />
+      children: <Empty />
     },
     {
       label: "Expression Atlas",

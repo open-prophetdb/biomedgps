@@ -5,16 +5,16 @@ import { history } from 'umi';
 // import { createFromIconfontCN } from '@ant-design/icons';
 import { useAuth0 } from "@auth0/auth0-react";
 import { GraphTable } from 'biominer-components';
-import { makeDataSources, pushGraphDataToLocalStorage } from 'biominer-components/dist/esm/components/KnowledgeGraph/utils';
-import { APIs, GraphData, COMPOSED_ENTITY_DELIMITER, Entity } from 'biominer-components/dist/esm/components/typings';
+import { makeDataSources, pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
+import { APIs, GraphData, COMPOSED_ENTITY_DELIMITER, Entity } from 'biominer-components/dist/typings';
 import { fetchEntities, fetchPredictedNodes } from '@/services/swagger/KnowledgeGraph';
-import { EdgeAttribute } from 'biominer-components/dist/esm/components/EdgeTable/index.t';
-import { NodeAttribute } from 'biominer-components/dist/esm/components/NodeTable/index.t';
-import { makeQueryEntityStr } from 'biominer-components/dist/esm/components/utils';
+import { EdgeAttribute } from 'biominer-components/dist/EdgeTable/index.t';
+import { NodeAttribute } from 'biominer-components/dist/NodeTable/index.t';
+import { makeQueryEntityStr } from 'biominer-components/dist/utils';
 import { sortBy } from 'lodash';
 import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
-import { makeRelationTypes } from 'biominer-components/dist/esm/components/utils';
-import type { OptionType, RelationStat } from 'biominer-components/dist/esm/components/typings';
+import { makeRelationTypes } from 'biominer-components/dist/utils';
+import type { OptionType, RelationStat } from 'biominer-components/dist/typings';
 
 import './index.less';
 

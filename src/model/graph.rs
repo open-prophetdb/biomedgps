@@ -130,10 +130,18 @@ pub struct Label {
 }
 
 impl Label {
+    pub fn format_name(name: &str) -> String {
+        if name.len() > 20 {
+            format!("{}...", &name[0..20])
+        } else {
+            name.to_string()
+        }
+    }
+
     /// Use the node name as the label value.
     pub fn new(name: &str) -> Self {
         Label {
-            value: name.to_string(), // It will be shown at the bottom of the node
+            value: Self::format_name(name),
             fill: "#000".to_string(),
             font_size: 12,
             offset: 0,
