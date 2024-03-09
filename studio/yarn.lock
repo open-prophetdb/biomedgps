@@ -5375,10 +5375,10 @@ bindings@^1.5.0:
   dependencies:
     file-uri-to-path "1.0.0"
 
-biominer-components@0.3.6:
-  version "0.3.6"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.6.tgz#84743106ff8c6a9182394b6d6cef457cf9121232"
-  integrity sha512-ORvQ4QPzA70psw7+7m83LEFVzuMNMOQSP6/lMyLTn8Bdpyy0D03EVQQPXHroG830SFJudQfW6MAa9+2SWQYHwQ==
+biominer-components@0.3.7:
+  version "0.3.7"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.7.tgz#99500932c8be034d266078701229b4185fa4c18e"
+  integrity sha512-TFwnQnEPs78sEbRY5r89iJUQspDVEYzbvIKGy92WlKVy+AES/ZQAmc8Wrc7ZUvv38R/4ad/U35U1ehEpc6FU8g==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^4.2.2"
     ag-grid-community "^31.0.1"
@@ -5393,7 +5393,7 @@ biominer-components@0.3.6:
     react-chart-editor "^0.46.1"
     react-full-screen "^1.1.1"
     react-highlight-words "^0.20.0"
-    react-markdown "^9.0.1"
+    react-markdown "8.0.7"
     react-moveable "^0.56.0"
     react-plotly.js "^2.6.0"
     react-textarea-autosize "^8.5.3"
@@ -15897,7 +15897,7 @@ react-lifecycles-compat@^3.0.4:
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
   integrity sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA==
 
-react-markdown@^8.0.3:
+react-markdown@8.0.7:
   version "8.0.7"
   resolved "https://registry.yarnpkg.com/react-markdown/-/react-markdown-8.0.7.tgz#c8dbd1b9ba5f1c5e7e5f2a44de465a3caafdf89b"
   integrity sha512-bvWbzG4MtOU62XqBx3Xx+zB2raaFFsq4mYiAzfjXJMEz2sixgeAfraA3tvzULF02ZdOMUOKTBFFaZJDDrq+BJQ==
