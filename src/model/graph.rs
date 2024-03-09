@@ -13,8 +13,7 @@ use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
 };
-use crate::model::util::match_color;
-use crate::model::util::ValidationError;
+use crate::model::util::{match_color, title_case, ValidationError};
 use crate::query_builder::sql_builder::ComposeQuery;
 use lazy_static::lazy_static;
 use log::{debug, error};
@@ -131,8 +130,8 @@ pub struct Label {
 
 impl Label {
     pub fn format_name(name: &str) -> String {
-        if name.len() > 20 {
-            format!("{}...", &name[0..20])
+        if name.len() > 15 {
+            format!("{}...", title_case(&name[0..15]))
         } else {
             name.to_string()
         }
@@ -205,11 +204,11 @@ pub struct NodeData {
     #[serde(deserialize_with = "convert_null_to_empty_string")]
     #[oai(skip_serializing_if_is_none)]
     pub pmids: Option<String>,
-    
+
     #[serde(deserialize_with = "convert_null_to_empty_string")]
     #[oai(skip_serializing_if_is_none)]
     pub taxid: Option<String>,
-    
+
     #[serde(deserialize_with = "convert_null_to_empty_string")]
     #[oai(skip_serializing_if_is_none)]
     pub synonyms: Option<String>,

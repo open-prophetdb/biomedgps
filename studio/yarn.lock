@@ -5375,10 +5375,10 @@ bindings@^1.5.0:
   dependencies:
     file-uri-to-path "1.0.0"
 
-biominer-components@0.3.1:
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.1.tgz#2e77420859c90c0a55cb7ebd2e2b278779521b43"
-  integrity sha512-mPj2tDf1cLuKy1NugoUuEfEnWyGgprDCWaV6+/mQKAKrFRT/8nZ3WxM8G/hU8A6k8IEogohMdCa77SeAz1X6Xw==
+biominer-components@0.3.6:
+  version "0.3.6"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.6.tgz#84743106ff8c6a9182394b6d6cef457cf9121232"
+  integrity sha512-ORvQ4QPzA70psw7+7m83LEFVzuMNMOQSP6/lMyLTn8Bdpyy0D03EVQQPXHroG830SFJudQfW6MAa9+2SWQYHwQ==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^4.2.2"
     ag-grid-community "^31.0.1"

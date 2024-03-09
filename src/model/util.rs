@@ -90,6 +90,23 @@ pub fn match_color(entity_type: &str) -> String {
     DEFAULT_COLOR.to_string()
 }
 
+pub fn title_case(s: &str) -> String {
+    s.split_whitespace()
+        .map(|word| {
+            word.char_indices()
+                .map(|(i, c)| {
+                    if i == 0 {
+                        c.to_uppercase().collect::<String>()
+                    } else {
+                        c.to_lowercase().collect::<String>()
+                    }
+                })
+                .collect::<String>()
+        })
+        .collect::<Vec<String>>() // 将单词收集成Vec<String>
+        .join(" ")
+}
+
 pub fn read_annotation_file(filepath: &PathBuf) -> Result<HashMap<String, String>, Box<dyn Error>> {
     let delimiter = get_delimiter(filepath).unwrap();
 
