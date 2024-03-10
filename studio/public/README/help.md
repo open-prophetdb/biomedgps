@@ -1,3 +1,41 @@
+## Common Use Cases
+
+### Step 1: Register and Login
+
+To access the network medicine platform, you need to register and create an account or use google, microsoft, or github to login. You can click the "Sign In" button on the top right corner of the page to start the process.
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step1-sign-in.png?raw=true" width="60%" />
+</div>
+
+### Step 2: Predict Interactions
+
+Once you are logged in, you can start predicting interactions between genes, drugs, symptoms, and diseases. You can use the first tab "Predict Drug/Target" on the top of the page to enter the prediction page. You can pick up a module according to your interest, such as Disease module, Drug module, Gene module, and Symptom module. Each module has a set of parameters that you can set to predict interactions. For example, at the Disease module, you can set the "Prediction Type" to "Similar Diseases", keep the "Relation Type for Prediction" as default, and search a disease name, such as "breast cancer", and set the "Top K" to 10. Then click the "Apply Parameters" button to start the prediction. The result will be shown in the table left to the parameters. After you get the result, you can pick up some rows you are interested in and click the "Explain" button to load these rows to a knowledge graph to explain your prediction.
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step2-predict-page.png?raw=true" width="60%" />
+</div>
+
+### Step 3: Explain Your Prediction
+
+There are several operations you can do on the knowledge graph. You can right-click on a node, right-click on a edge, right-click on a canvas to do different operations for the nodes, edges, and graph respectively. If you would like to know more common operations, you can click the button with a question mark on the top of the page to see the help document. This button is on the right side of the "Upload / Query" button.
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain.png?raw=true" width="60%" />
+</div>
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-right-click-node.png?raw=true" width="60%" />
+</div>
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-right-click-edge.png?raw=true" width="60%" />
+</div>
+
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
+<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-common-operations.png?raw=true" width="60%" />
+</div>
+
 NOTE: Video Tutorial is coming soon!
 
 ## Scenario 1: Target Discovery for Breast Cancer
