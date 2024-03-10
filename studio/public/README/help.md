@@ -21,19 +21,19 @@ Once you are logged in, you can start predicting interactions between genes, dru
 There are several operations you can do on the knowledge graph. You can right-click on a node, right-click on a edge, right-click on a canvas to do different operations for the nodes, edges, and graph respectively. If you would like to know more common operations, you can click the button with a question mark on the top of the page to see the help document. This button is on the right side of the "Upload / Query" button.
 
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain.png?raw=true" width="60%" />
+<img src="https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain.png?raw=true" width="60%" />
 </div>
 
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-right-click-node.png?raw=true" width="60%" />
+<img src="https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain-right-click-node.png?raw=true" width="60%" />
 </div>
 
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-right-click-edge.png?raw=true" width="60%" />
+<img src="https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain-right-click-edge.png?raw=true" width="60%" />
 </div>
 
 <div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
-<img src="https://github.com/yjcyxky/biomedgps/blob/master/studio/public/README/images/step3-explain-common-operations.png?raw=true" width="60%" />
+<img src="https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain-common-operations.png?raw=true" width="60%" />
 </div>
 
 NOTE: Video Tutorial is coming soon!
