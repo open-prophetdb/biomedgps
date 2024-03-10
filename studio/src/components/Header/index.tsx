@@ -66,6 +66,11 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       icon: <UserOutlined />,
     },
     {
+      label: 'v0.3.1',
+      key: 'version',
+      icon: <FieldTimeOutlined />
+    },
+    {
       label: 'About',
       key: 'about',
       icon: <InfoCircleOutlined />,
@@ -89,6 +94,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       history.push('/help')
     } else if (item.key === 'changelog') {
       history.push('/changelog')
+    } else if (item.key === 'version') {
+      window.open('https://github.com/open-prophetdb/biomedgps/releases', '_blank');
     }
   };
 
