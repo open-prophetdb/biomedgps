@@ -13,7 +13,29 @@ use poem_openapi::{Enum, Object};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::sync::Mutex;
 use validator::Validate;
+
+lazy_static! {
+    pub static ref UUID_REGEX: Regex =
+        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
+
+    pub static ref PROMPTS: Mutex<Vec<HashMap<&'static str, &'static str>>> = Mutex::new(vec![]);
+    pub static ref PROMPT_TEMPLATE: Mutex<HashMap<&'static str, &'static str>> = Mutex::new(HashMap::new());
+    // "explain_custom_question": "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\n{{custom_question}}"
+}
+
+// Initialize the prompt templates
+pub fn init_prompt_templates() {
+    // Register the prompt templates for the entity
+    Entity::register_prompt_template();
+
+    // Register the prompt templates for the expanded relation
+    ExpandedRelation::register_prompt_template();
+
+    // Register the prompt templates for the subgraph with disease context
+    SubgraphWithCtx::register_prompt_template();
+}
 
 #[derive(Debug, Deserialize, Serialize, Object, sqlx::FromRow)]
 pub struct LlmResponse {
@@ -29,7 +51,7 @@ pub struct LlmResponse {
 pub struct Context {
     pub entity: Option<Entity>,
     pub expanded_relation: Option<ExpandedRelation>,
-    pub subgraph_with_disease_ctx: Option<SubgraphWithDiseaseCtx>,
+    pub subgraph_with_ctx: Option<SubgraphWithCtx>,
 }
 
 impl Context {
@@ -58,10 +80,10 @@ impl Context {
                 response: answer.message.to_owned(),
                 created_at: answer.created_at,
             })
-        } else if self.subgraph_with_disease_ctx.is_some() {
-            let subgraph_with_disease_ctx = self.subgraph_with_disease_ctx.unwrap();
+        } else if self.subgraph_with_ctx.is_some() {
+            let subgraph_with_ctx = self.subgraph_with_ctx.unwrap();
             let mut llm_msg =
-                LlmMessage::new(&prompt_template_id, subgraph_with_disease_ctx, None).unwrap();
+                LlmMessage::new(&prompt_template_id, subgraph_with_ctx, None).unwrap();
             let answer = match llm_msg.answer(&chatbot, pool).await {
                 Ok(answer) => answer,
                 Err(e) => {
@@ -90,7 +112,8 @@ impl Context {
 /// A trait for LLM context. Each LLM context might can render several prompt templates. So we separate the context and prompt template. But this means the users need to provide the right pair of context and prompt template.
 pub trait LlmContext {
     fn get_context(&self) -> Self;
-    fn render_prompt(&self, prompt_template: &str) -> String;
+    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error>;
+    fn register_prompt_template();
 }
 
 impl LlmContext for Entity {
@@ -98,12 +121,31 @@ impl LlmContext for Entity {
         self.clone()
     }
 
-    fn render_prompt(&self, prompt_template: &str) -> String {
+    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
         let mut prompt = prompt_template.to_string();
         prompt = prompt.replace("{{entity_name}}", &self.name);
         prompt = prompt.replace("{{entity_id}}", &self.id);
         prompt = prompt.replace("{{entity_type}}", &self.label);
-        prompt
+        Ok(prompt)
+    }
+
+    fn register_prompt_template() {
+        let mut prompt_templates = PROMPT_TEMPLATE.lock().unwrap();
+        prompt_templates.insert("explain_node_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. \n\nWhat's the {{entity_name}} which id is {{entity_id}}?");
+
+        let mut prompts = PROMPTS.lock().unwrap();
+
+        let mut m1 = HashMap::new();
+        m1.insert("key", "explain_node_summary");
+        m1.insert("label", "Node Summary");
+        m1.insert("type", "node");
+
+        // Does it exist?
+        if prompts.contains(&m1) {
+            return;
+        } else {
+            prompts.push(m1);
+        }
     }
 }
 
@@ -120,7 +162,7 @@ impl LlmContext for ExpandedRelation {
         self.clone()
     }
 
-    fn render_prompt(&self, prompt_template: &str) -> String {
+    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
         let mut prompt = prompt_template.to_string();
         prompt = prompt.replace("{{source_name}}", &self.source.name);
         prompt = prompt.replace("{{source_id}}", &self.source.id);
@@ -129,109 +171,156 @@ impl LlmContext for ExpandedRelation {
         prompt = prompt.replace("{{target_name}}", &self.target.name);
         prompt = prompt.replace("{{target_id}}", &self.target.id);
         prompt = prompt.replace("{{target_type}}", &self.target.label);
-        prompt
-    }
-}
-
-// The SubgraphWithDiseaseCtx is used to store the context for the treatments/mechanisms with disease.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
-pub struct SubgraphWithDiseaseCtx {
-    pub disease_name: String,
-    pub subgraph: String
-}
-
-impl LlmContext for SubgraphWithDiseaseCtx {
-    fn get_context(&self) -> Self {
-        self.clone()
+        Ok(prompt)
     }
 
-    fn render_prompt(&self, prompt_template: &str) -> String {
-        let mut prompt = prompt_template.to_string();
-        prompt = prompt.replace("{{disease_name}}", &self.disease_name);
-        prompt = prompt.replace("{{subgraph}}", &self.subgraph);
-        prompt
-    }
-}
+    fn register_prompt_template() {
+        let mut prompt_templates = PROMPT_TEMPLATE.lock().unwrap();
+        prompt_templates.insert("explain_edge_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. What's the {{source_name}}[{{source_id}}, {{source_type}}] -> {{relation_type}} -> {{target_name}}[{{target_id}}, {{target_type}}? Do you know more about the relationship between {{source_name}} and {{target_name}}? If you know, please tell me more about the relationship between {{source_name}} and {{target_name}}.");
 
-lazy_static! {
-    pub static ref UUID_REGEX: Regex =
-        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap();
-
-    pub static ref PROMPTS: Vec<HashMap<&'static str, &'static str>> = {
-        let mut m = vec![];
-
-        let mut m1 = HashMap::new();
-        m1.insert("key", "explain_node_summary");
-        m1.insert("label", "Node Summary");
-        m1.insert("type", "node");
+        let mut prompts = PROMPTS.lock().unwrap();
 
         let mut m2 = HashMap::new();
         m2.insert("key", "explain_edge_summary");
         m2.insert("label", "Edge Summary");
         m2.insert("type", "edge");
 
+        // Does it exist?
+        if prompts.contains(&m2) {
+            return;
+        } else {
+            prompts.push(m2);
+        }
+    }
+}
+
+// The SubgraphWithCtx is used to store the context and a related subgraph for explaining.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
+pub struct SubgraphWithCtx {
+    pub context_str: String,
+    pub subgraph: String,
+}
+
+impl LlmContext for SubgraphWithCtx {
+    fn get_context(&self) -> Self {
+        self.clone()
+    }
+
+    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
+        let ctx_str_regex = Regex::new(r"(.*)#(.*)#(.*)").unwrap();
+        let err_msg = "Invalid context_str, it should be a combination of a node1, a relation type, and a node2, such as `Ibuprofen#treats#Headache` when you use the prompt template `explain_path_with_attention_subgraph`".to_string();
+        if prompt_template_category == "explain_path_with_attention_subgraph" {
+            let caps = match ctx_str_regex.captures(&self.context_str) {
+                Some(caps) => caps,
+                None => return Err(anyhow::anyhow!(err_msg)),
+            };
+            let node1 = match caps.get(1) {
+                Some(node1) => node1.as_str(),
+                None => return Err(anyhow::anyhow!(err_msg)),
+            };
+            let relation_type = match caps.get(2) {
+                Some(relation_type) => relation_type.as_str(),
+                None => return Err(anyhow::anyhow!(err_msg)),
+            };
+            let node2 = match caps.get(3) {
+                Some(node2) => node2.as_str(),
+                None => return Err(anyhow::anyhow!(err_msg)),
+            };
+
+            let mut prompt = prompt_template.to_string();
+            prompt = prompt.replace("{{subgraph}}", &self.subgraph);
+            prompt = prompt.replace("{{node1}}", node1);
+            prompt = prompt.replace("{{relation_type}}", relation_type);
+            prompt = prompt.replace("{{node2}}", node2);
+            return Ok(prompt);
+        } else {
+            let mut prompt = prompt_template.to_string();
+            prompt = prompt.replace("{{context_str}}", &self.context_str);
+            prompt = prompt.replace("{{subgraph}}", &self.subgraph);
+            return Ok(prompt);
+        }
+    }
+
+    fn register_prompt_template() {
+        let mut prompts = PROMPTS.lock().unwrap();
+        let mut prompt_templates = PROMPT_TEMPLATE.lock().unwrap();
+
+        let mut m1 = HashMap::new();
+        m1.insert("key", "explain_subgraph_treatment_with_disease_ctx");
+        m1.insert("label", "Treatment within Disease Context");
+        m1.insert("type", "subgraph");
+
+        // Does it exist?
+        if prompts.contains(&m1) {
+            return;
+        } else {
+            prompts.push(m1);
+        };
+        // You need to prepare two fields: 1) subgraph: a json string; 2) context_str: a string, it need to be a disease name, such as "ME/CFS".
+        prompt_templates.insert("explain_subgraph_treatment_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\n\nSubgraph Overview: I have compiled a Knowledge Subgraph dedicated to exploring the complex landscape surrounding {{context_str}}, incorporating elements such as related symptoms, co-occurring diseases, therapeutic medications, and underlying genes/pathways. This Subgraph aims to elucidate:\n\nDisease-Symptom Associations: The linkages between symptoms of {{context_str}} and their correlation with various diseases.\nMedication and Genetic/Pathway Connections: How medications align with and influence the genes or pathways associated with these diseases.\nMechanisms of Action: The specific pathways through which medications exert their therapeutic effects on these diseases.\nSymptom Detailing for {{context_str}}: Specific symptoms related to {{context_str}}.\nResearch Questions:\n\nIn light of the above, my queries are as follows:\n\nCritical Knowledge Identification: Within the context of {{context_str}}, this Knowledge Subgraph houses an extensive array of entities and relationships fundamental to unraveling the disease's mechanisms and scrutinizing relevant treatment drugs. Leveraging your expertise, concentrate on the graph's relations pivotal to understanding {{context_str}}'s mechanisms and its associated treatments. Identify and emphasize essential knowledge aspects that significantly aid in decoding the disease's pathology and therapeutic measures. This entails pinpointing vital biological pathways, gene-disease correlations, drug-target engagements, and any novel research insights that could reveal innovative therapeutic approaches. Your analysis is expected to prioritize data with a direct bearing on treatment efficacy and enhance our molecular-level understanding of the disease.\n\nEmerging Therapies: Are there any novel studies or predictive analyses indicating unrecognized medications that might benefit {{context_str}} symptoms or the disease itself?\n\nSymptom-Disease Correlation: Which diseases are directly linked to {{context_str}} symptoms, and what are the common treatments for these diseases?\n\nAction Mechanisms of Medications: How do these medications influence specific genes or pathways?\n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{context_str}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.\nThis requirement is non-negotiable, ensuring that all information provided is backed by credible and accessible scientific evidence. Leveraging PubMed as a source is essential for maintaining the accuracy and reliability of the insights shared in your analysis.");
+
+        let mut m2 = HashMap::new();
+        m2.insert("key", "explain_subgraph_mechanism_with_disease_ctx");
+        m2.insert("label", "Mechanism within Disease Context");
+        m2.insert("type", "subgraph");
+
+        // Does it exist?
+        if prompts.contains(&m2) {
+            return;
+        } else {
+            prompts.push(m2);
+        };
+
+        // You need to prepare two fields: 1) subgraph: a json string; 2) context_str: a string, it need to be a disease name, such as "ME/CFS".
+        prompt_templates.insert("explain_subgraph_mechanism_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ context_str }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and paths within this Subgraph that are most relevant to {{ context_str }}. To achieve this, I need your assistance to: 1. Identify and explain the key nodes that are most relevant to {{ context_str }}. Please base your explanation on the nodes and their attributes and their known roles in the disease, explaining which nodes are critical and why these nodes are critical. 2. Determine and describe the main paths connecting these key nodes. Please discuss how these paths might be involved in the onset, progression, or treatment of the disease, considering the type and strength of interactions between nodes. 3. Provide a report summarizing your findings and understanding, including a list of key nodes and paths, along with a rationale for how they are related to {{ context_str }}. Note that, given the complexity and multifactorial nature of diseases, explanations may need to integrate multiple attributes of nodes and their interactions. \n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{context_str}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.");
+
         let mut m3 = HashMap::new();
-        m3.insert("key", "explain_custom_question");
-        m3.insert("label", "Custom Question");
-        m3.insert("type", "custom");
+        m3.insert("key", "explain_subgraph_importance_with_disease_ctx");
+        m3.insert("label", "Node/Edge Importance within Disease Context");
+        m3.insert("type", "subgraph");
 
-        let mut m4 = HashMap::new();
-        m4.insert("key", "explain_subgraph_treatment_with_disease_ctx");
-        m4.insert("label", "Treatment within Disease Context");
-        m4.insert("type", "subgraph");
-
-        let mut m5 = HashMap::new();
-        m5.insert("key", "explain_subgraph_mechanism_with_disease_ctx");
-        m5.insert("label", "Mechanism within Disease Context");
-        m5.insert("type", "subgraph");
-
-        let mut m6 = HashMap::new();
-        m6.insert("key", "explain_subgraph_importance_with_disease_ctx");
-        m6.insert("label", "Node/Edge Importance within Disease Context");
-        m6.insert("type", "subgraph");
-
-        let mut m7 = HashMap::new();
-        m7.insert("key", "explain_path_within_subgraph");
-        m7.insert("label", "Path within Subgraph");
-        m7.insert("type", "path");
-
-        m.push(m1);
-        m.push(m2);
-        m.push(m3);
-        m.push(m4);
-        m.push(m5);
-        m.push(m6);
-
-        m
-    };
-
-
-    // Only for predicted edge
-    pub static ref PROMPT_TEMPLATE: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
-
-        m.insert("explain_node_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. \n\nWhat's the {{entity_name}} which id is {{entity_id}}?");
-
-        m.insert("explain_edge_summary", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. What's the {{source_name}}[{{source_id}}, {{source_type}}] -> {{relation_type}} -> {{target_name}}[{{target_id}}, {{target_type}}? Do you know more about the relationship between {{source_name}} and {{target_name}}? If you know, please tell me more about the relationship between {{source_name}} and {{target_name}}.");
-
-        m.insert("explain_custom_question", "You need to execute the following instructions I send you: find the related information for the question, summarize the information you found and output a summary no more than 500 words, give me the sources of information. Notice: Please just return me the sentence 'I don't know what you say, it seems not to be a right question related with specific topic', if the question I send you is not related with medical concepts.\n\n{{custom_question}}");
-
-        // You need to prepare two fields: 1) subgraph: a json string; 2) disease_name: a string.
-        m.insert("explain_subgraph_treatment_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\n\nSubgraph Overview: I have compiled a Knowledge Subgraph dedicated to exploring the complex landscape surrounding {{disease_name}}, incorporating elements such as related symptoms, co-occurring diseases, therapeutic medications, and underlying genes/pathways. This Subgraph aims to elucidate:\n\nDisease-Symptom Associations: The linkages between symptoms of {{disease_name}} and their correlation with various diseases.\nMedication and Genetic/Pathway Connections: How medications align with and influence the genes or pathways associated with these diseases.\nMechanisms of Action: The specific pathways through which medications exert their therapeutic effects on these diseases.\nSymptom Detailing for {{disease_name}}: Specific symptoms related to {{disease_name}}.\nResearch Questions:\n\nIn light of the above, my queries are as follows:\n\nCritical Knowledge Identification: Within the context of {{disease_name}}, this Knowledge Subgraph houses an extensive array of entities and relationships fundamental to unraveling the disease's mechanisms and scrutinizing relevant treatment drugs. Leveraging your expertise, concentrate on the graph's relations pivotal to understanding {{disease_name}}'s mechanisms and its associated treatments. Identify and emphasize essential knowledge aspects that significantly aid in decoding the disease's pathology and therapeutic measures. This entails pinpointing vital biological pathways, gene-disease correlations, drug-target engagements, and any novel research insights that could reveal innovative therapeutic approaches. Your analysis is expected to prioritize data with a direct bearing on treatment efficacy and enhance our molecular-level understanding of the disease.\n\nEmerging Therapies: Are there any novel studies or predictive analyses indicating unrecognized medications that might benefit {{disease_name}} symptoms or the disease itself?\n\nSymptom-Disease Correlation: Which diseases are directly linked to {{disease_name}} symptoms, and what are the common treatments for these diseases?\n\nAction Mechanisms of Medications: How do these medications influence specific genes or pathways?\n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{disease_name}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.\nThis requirement is non-negotiable, ensuring that all information provided is backed by credible and accessible scientific evidence. Leveraging PubMed as a source is essential for maintaining the accuracy and reliability of the insights shared in your analysis.");
-
-        m.insert("explain_subgraph_mechanism_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ disease_name }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and paths within this Subgraph that are most relevant to {{ disease_name }}. To achieve this, I need your assistance to: 1. Identify and explain the key nodes that are most relevant to {{ disease_name }}. Please base your explanation on the nodes and their attributes and their known roles in the disease, explaining which nodes are critical and why these nodes are critical. 2. Determine and describe the main paths connecting these key nodes. Please discuss how these paths might be involved in the onset, progression, or treatment of the disease, considering the type and strength of interactions between nodes. 3. Provide a report summarizing your findings and understanding, including a list of key nodes and paths, along with a rationale for how they are related to {{ disease_name }}. Note that, given the complexity and multifactorial nature of diseases, explanations may need to integrate multiple attributes of nodes and their interactions. \n\nGuidance for Response:\n\nPlease address the aforementioned inquiries based on the Knowledge Subgraph and your expertise. For each of the questions related to the Knowledge Subgraph and its implications for {{disease_name}}, it is imperative that you provide supporting literature. This literature must exclusively come from PubMed, which is a critical repository for reliable medical research findings. Your responses should not only incorporate insights derived from these studies but also include citations formatted according to standard academic practices. Specifically, citations should detail the authors, title, journal name, year of publication, and the PubMed ID (PMID) to facilitate easy verification and further reading.\n\nFor example, a proper citation format would be: Doe J, Smith A, Jones B. Title of the Article. Journal Name. Year;Volume(Issue):Page numbers. PMID: XXXXXXX.");
-
+        // Does it exist?
+        if prompts.contains(&m3) {
+            return;
+        } else {
+            prompts.push(m3);
+        };
         // JSON version
-        // m.insert("explain_subgraph_importance_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ disease_name }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and paths within this Subgraph that are most relevant to {{ disease_name }}. To achieve this, please label these nodes and paths as critical, important, moderate, or less important based on your knowledges and the subgraph, and provide a rationale for your assessment. After labeling the nodes and paths, please output your findings as an array, the format is like```{your_output}```.  The array contains a set of objects, each object have as least three columns: id (node or edge), importance, reason.");
+        // You need to prepare two fields: 1) subgraph: a json string; 2) context_str: a string, it need to be a disease name, such as "ME/CFS".
+        // m.insert("explain_subgraph_importance_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ context_str }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and paths within this Subgraph that are most relevant to {{ context_str }}. To achieve this, please label these nodes and paths as critical, important, moderate, or less important based on your knowledges and the subgraph, and provide a rationale for your assessment. After labeling the nodes and paths, please output your findings as an array, the format is like```{your_output}```.  The array contains a set of objects, each object have as least three columns: id (node or edge), importance, reason.");
 
         // Table version
-        m.insert("explain_subgraph_importance_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ disease_name }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and edges within this Subgraph that are most relevant to {{ disease_name }}. To achieve this, please label these nodes listed in the subgraph as Critical, Important, Moderate, or Less Important based on your knowledges on {{ disease_name }} and the subgraph, and provide a rationale for your assessment. After labeling the nodes, please output your results as a table (not a file). The table contains a set of rows, each row have as least six columns: #, ID (node id), Name (node name), Importance, Reliability, Reason. Please note: 1. the subgraph might be incomplete, so you need to use your knowledges to think these nodes step by step, and then assess the importance of the nodes; 2. you need to consider the importance of the node types for specific diseases, for example, symptom might be important for a symptom-defined disease, but it might be less important for a genetic disease; 3. you need to consider the reliability of the relation, for example, if the relation is mentioned more frequent in your knowledgebase, then we can treat it more reliable; 4. the final table you output should ordered by importance and reliability, and the importance should be ordered by Critical, Important, Moderate, and Less Important; 5. you need to tell me why you think the node is important / less important, reliable / less reliable, and the reason should be based on the subgraph and your knowledges (recommendation).");
+        prompt_templates.insert("explain_subgraph_importance_with_disease_ctx", "Knowledge Subgraph: {{subgraph}}\n\nKnowledge Subgraph Analysis Request:\nI have a set of Subgraph data that includes a collection of genes/proteins and their connections to a specific disease, {{ context_str }}. This Subgraph consists of nodes (representing genes/proteins) and edges (representing interactions or relationships between the genes/proteins). Each node has associated attributes, such as name, description, or known disease associations. Edges may also have attributes, like the type or strength of interaction. My goal is to identify key nodes and edges within this Subgraph that are most relevant to {{ context_str }}. To achieve this, please label these nodes listed in the subgraph as Critical, Important, Moderate, or Less Important based on your knowledges on {{ context_str }} and the subgraph, and provide a rationale for your assessment. After labeling the nodes, please output your results as a table (not a file). The table contains a set of rows, each row have as least six columns: #, ID (node id), Name (node name), Importance, Reliability, Reason. Please note: 1. the subgraph might be incomplete, so you need to use your knowledges to think these nodes step by step, and then assess the importance of the nodes; 2. you need to consider the importance of the node types for specific diseases, for example, symptom might be important for a symptom-defined disease, but it might be less important for a genetic disease; 3. you need to consider the reliability of the relation, for example, if the relation is mentioned more frequent in your knowledgebase, then we can treat it more reliable; 4. the final table you output should ordered by importance and reliability, and the importance should be ordered by Critical, Important, Moderate, and Less Important; 5. you need to tell me why you think the node is important / less important, reliable / less reliable, and the reason should be based on the subgraph and your knowledges (recommendation).");
 
-        // Actually, in this case, the disease_name is a path name.
-        m.insert("explain_path_within_subgraph", "Knowledge Subgraph: {{subgraph}}\n\nMy goal is to explain the path {{ disease_name }} within the subgraph. Please provide a detailed explanation of the path.");
+        let mut m4 = HashMap::new();
+        m4.insert("key", "explain_path_within_subgraph");
+        m4.insert("label", "Path within Subgraph");
+        m4.insert("type", "path");
 
-        m
-    };
+        // Does it exist?
+        if prompts.contains(&m4) {
+            return;
+        } else {
+            prompts.push(m4);
+        };
+        // Actually, in this case, the context_str is a path name, such as "ME/CFS-[treated_by]->Ibuprofen-[treats]->Headache".
+        prompt_templates.insert("explain_path_within_subgraph", "Knowledge Subgraph: {{subgraph}}\n\nMy goal is to explain the path {{ context_str }} within the subgraph. Please provide a detailed explanation of the path.");
+
+        let mut m5 = HashMap::new();
+        m5.insert("key", "explain_path_with_attention_subgraph");
+        m5.insert("label", "Path with Attention Subgraph");
+        m5.insert("type", "edge");
+
+        // Does it exist?
+        if prompts.contains(&m5) {
+            return;
+        } else {
+            prompts.push(m5);
+        };
+
+        // In this case, the context_str is a combination of a node1, a relation type, and a node2, such as "Ibuprofen-[treats]->Headache". So we split the context_str into three parts: node1, relation_type, and node2 for rendering the prompt.
+        prompt_templates.insert("explain_path_with_attention_subgraph", "Knowledge Subgraph: {{subgraph}}\n\nGiven a Subgraph extracted from a Knowledge Graph, the Subgraph is centered around two main nodes, {{node1}} and {{node2}}, and it is structured to provide context for the existence of a specific relationship {{relation_type}} between them. The Subgraph includes the following elements: 1. Direct Relationship: Information on whether there is a direct connection of type {{relation_type}} between {{node1}} and {{node2}}. 2. {{node1}}'s Top Connections: A list of the top 10 connections for node {{node1}}, including the type of relationship and the connected nodes, ranked by score indicating the strength and relevance of each connection. 3. {{node2}}'s Top Connections: A list of the top 10 connections for node {{node2}}, similar to {{node1}}'s connections, providing insights into {{node2}}'s most significant relationships in the Knowledge Graph. 4. Relevant Attributes of Nodes: Any relevant attributes or properties of {{node1}}, {{node2}}, and their top connected nodes that could influence the presence of relationship {{relation_type}}.\n\nAdditional Context: Any other nodes or relationships within the Subgraph that provide further context or clues as to why relationship {{relation_type}} between {{node1}} and {{node2}} might be justified or logical. Based on the details of this Subgraph, please analyze and explain the potential reasons and the rationality behind the existence of relationship {{relation_type}} between node {{node1}} and node {{node2}}. Consider the direct and indirect connections, the significance of the relationships based on scores, and any attributes or contextual information provided.");
+    }
 }
 
 // The following codes do not need to be modified when you add a new LLM context.
@@ -305,12 +394,13 @@ where
         context: T,
         session_uuid: Option<String>,
     ) -> Result<Self, anyhow::Error> {
-        let prompt_template = match PROMPT_TEMPLATE.get(prompt_template_category) {
+        let templates = PROMPT_TEMPLATE.lock().unwrap();
+        let prompt_template = match templates.get(prompt_template_category) {
             Some(prompt_template) => prompt_template.to_string(),
             None => return Err(anyhow::anyhow!("Invalid prompt template category")),
         };
 
-        let prompt = context.render_prompt(prompt_template.as_str());
+        let prompt = context.render_prompt(prompt_template_category, prompt_template.as_str())?;
         let session_uuid = match session_uuid {
             Some(session_uuid) => session_uuid,
             None => {
@@ -321,7 +411,7 @@ where
         };
         let message = "".to_string();
 
-        let prompt_template_category = if PROMPT_TEMPLATE.contains_key(prompt_template_category) {
+        let prompt_template_category = if templates.contains_key(prompt_template_category) {
             prompt_template_category.to_string()
         } else {
             return Err(anyhow::anyhow!("Invalid prompt template category"));
@@ -428,7 +518,7 @@ impl ChatBot {
         let model = if model_name == "GPT4" {
             // GPT4 or GPT4_1106_PREVIEW
             // https://platform.openai.com/account/limits
-            // 
+            //
             GPT4_1106_PREVIEW.to_string()
         } else {
             GPT3_5_TURBO.to_string()
@@ -455,7 +545,7 @@ impl ChatBot {
                 content: prompt,
                 name: self.name.clone(),
                 function_call: self.function_call.clone(),
-            }]
+            }],
         );
 
         let req = req.temperature(0.5);

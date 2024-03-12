@@ -210,6 +210,7 @@ impl BiomedgpsApi {
                 page,
                 page_size,
                 Some(order_by_clause.as_str()),
+                None,
             )
             .await
             {
@@ -521,6 +522,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("id ASC"),
+            None
         )
         .await
         {
@@ -705,6 +707,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("score ASC"),
+            None
         )
         .await
         {
@@ -824,6 +827,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("embedding_id ASC"),
+            None
         )
         .await
         {
@@ -849,11 +853,12 @@ impl BiomedgpsApi {
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         query_str: Query<Option<String>>,
-        _token: CustomSecurityScheme,
+        token: CustomSecurityScheme,
     ) -> GetRecordsResponse<Subgraph> {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let token = token.0;
 
         match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
             Ok(_) => {}
@@ -894,6 +899,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("created_time DESC"),
+            Some(&token.username),
         )
         .await
         {
@@ -1469,10 +1475,11 @@ impl BiomedgpsApi {
         operation_id = "fetchPrompts"
     )]
     async fn get_prompts(&self, _token: CustomSecurityScheme) -> GetPromptResponse {
-        let total = PROMPTS.len() as u64;
+        let prompt_lst = PROMPTS.lock().unwrap();
+        let total = prompt_lst.len() as u64;
         let page = 1;
         let page_size = total;
-        let records = PROMPTS
+        let records = prompt_lst
             .iter()
             .map(|p| {
                 p.into_iter()

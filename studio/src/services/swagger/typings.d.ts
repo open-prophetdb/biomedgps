@@ -6,7 +6,7 @@ declare namespace swagger {
   type Context = {
     entity?: Entity;
     expanded_relation?: ExpandedRelation;
-    subgraph_with_disease_ctx?: SubgraphWithDiseaseCtx;
+    subgraph_with_ctx?: SubgraphWithCtx;
   };
 
   type deleteCuratedKnowledgeParams = {
@@ -395,8 +395,8 @@ declare namespace swagger {
     parent?: string;
   };
 
-  type SubgraphWithDiseaseCtx = {
-    disease_name: string;
+  type SubgraphWithCtx = {
+    context_str: string;
     subgraph: string;
   };
 }

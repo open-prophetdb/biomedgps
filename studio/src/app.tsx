@@ -52,7 +52,10 @@ const getUsername = (): string | undefined => {
   const accessToken = getJwtAccessToken();
   if (accessToken) {
     const payload = accessToken.split('.')[1];
-    const payloadJson = JSON.parse(atob(payload));
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = 4 - (base64.length % 4);
+    const paddedBase64 = padLength < 4 ? base64 + "=".repeat(padLength) : base64;
+    const payloadJson = JSON.parse(atob(paddedBase64));
     return payloadJson['username'];
   } else {
     return undefined;

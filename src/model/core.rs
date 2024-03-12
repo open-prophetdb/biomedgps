@@ -14,6 +14,7 @@ use log::{debug, info};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sqlx::query;
 use std::{error::Error, option::Option, path::PathBuf};
 use validator::Validate;
 
@@ -271,6 +272,7 @@ impl<
         page: Option<u64>,
         page_size: Option<u64>,
         order_by: Option<&str>,
+        owner: Option<&str>,
     ) -> Result<RecordResponse<S>, anyhow::Error> {
         let mut query_str = match query {
             Some(ComposeQuery::QueryItem(item)) => item.format(),
@@ -306,6 +308,14 @@ impl<
 
             format!("LIMIT {} OFFSET {}", limit, offset)
         };
+
+        let which_owner = if owner.is_some() {
+            format!("AND owner = '{}'", owner.unwrap())
+        } else {
+            "".to_string()
+        };
+
+        let query_str = format!("{} {}", query_str, which_owner);
 
         let sql_str = format!(
             "SELECT * FROM {} WHERE {} {} {}",

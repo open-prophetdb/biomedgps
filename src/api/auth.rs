@@ -11,6 +11,7 @@ use serde_json::Value;
 use std::sync::RwLock;
 
 pub const USERNAME_PLACEHOLDER: &str = "ANONYMOUS-USER-PLACEHOLDER";
+pub const EMAIL_PLACEHOLDER: &str = "anonymous@example.com";
 
 lazy_static! {
     static ref PUBLIC_KEYS: RwLock<Vec<String>> = RwLock::new(vec![]);
@@ -19,14 +20,17 @@ lazy_static! {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
+    pub email: String,
     pub organizations: Vec<i32>,
     pub projects: Vec<i32>,
 }
 
 impl User {
-    fn new(username: String) -> Self {
+    fn new(username: &str, email: &str) -> Self {
         Self {
-            username,
+            username: username.to_string(),
+            email: email.to_string(),
+            // Be compatible with the old version, the token might not contain the organizations field.
             organizations: vec![-1],
             projects: vec![-1],
         }
@@ -182,16 +186,16 @@ pub struct CustomSecurityScheme(pub User);
 
 async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
     // Get jwt_secret_key from environment variable
-    let default_user = Some(User::new(USERNAME_PLACEHOLDER.to_string()));
+    let default_user = Some(User::new(USERNAME_PLACEHOLDER, EMAIL_PLACEHOLDER));
 
     let jwt_secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key) => key,
-        Err(err) => "".to_string()
+        Err(err) => "".to_string(),
     };
 
     let jwt_client_id = match std::env::var("JWT_CLIENT_ID") {
         Ok(client_id) => client_id,
-        Err(err) => "".to_string()
+        Err(err) => "".to_string(),
     };
 
     let token_str = bearer.token;
@@ -261,14 +265,11 @@ async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
                         }
                     };
 
+                    let email = &claims.email;
+
                     debug!("Claims: {:?}, username: {}", claims, username);
 
-                    return Some(User {
-                        username,
-                        // Be compatible with the old version, the token might not contain the organizations field.
-                        organizations: vec![-1],
-                        projects: vec![-1],
-                    });
+                    return Some(User::new(&username, email));
                 }
                 Err(err) => {
                     error!("Error: {}", err);
@@ -312,7 +313,9 @@ mod tests {
         let kid = detect_kid(token).unwrap();
 
         let jwks = get_jwks_from_cache(&kid).unwrap();
-        let validated_claims = validate_token_with_rs256(client_id, token, &jwks, &kid).await.unwrap();
+        let validated_claims = validate_token_with_rs256(client_id, token, &jwks, &kid)
+            .await
+            .unwrap();
         assert_eq!(validated_claims.name, "Craig Yang");
     }
 }

@@ -7,6 +7,7 @@ use biomedgps::api::auth::fetch_and_store_jwks;
 use biomedgps::api::route::BiomedgpsApi;
 use biomedgps::model::core::EntityMetadata;
 use biomedgps::model::kge::init_kge_models;
+use biomedgps::model::llm::init_prompt_templates;
 use biomedgps::model::util::update_existing_colors;
 use biomedgps::{check_db_version, connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
@@ -286,6 +287,17 @@ async fn main() -> Result<(), std::io::Error> {
         }
     } else {
         neo4j_url.unwrap()
+    };
+
+    // Initialize the prompt templates.
+    match std::env::var("OPENAI_API_KEY") {
+        Ok(openai_api_key) => {
+            init_prompt_templates();
+        },
+        Err(e) => {
+            let err = format!("Failed to get OPENAI_API_KEY: {}, so we will skip initializing the prompt templates.", e);
+            warn!("{}", err);
+        }
     };
 
     let graph_pool = connect_graph_db(&_neo4j_url).await;

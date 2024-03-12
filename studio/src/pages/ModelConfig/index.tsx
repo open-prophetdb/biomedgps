@@ -7,18 +7,59 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { GraphTable } from 'biominer-components';
 import { makeDataSources, pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import { APIs, GraphData, COMPOSED_ENTITY_DELIMITER, Entity } from 'biominer-components/dist/typings';
-import { fetchEntities, fetchPredictedNodes } from '@/services/swagger/KnowledgeGraph';
+import { fetchEntities, fetchPredictedNodes, fetchOneStepLinkedNodes } from '@/services/swagger/KnowledgeGraph';
 import { EdgeAttribute } from 'biominer-components/dist/EdgeTable/index.t';
 import { NodeAttribute } from 'biominer-components/dist/NodeTable/index.t';
 import { makeQueryEntityStr } from 'biominer-components/dist/utils';
 import { sortBy } from 'lodash';
 import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
-import type { OptionType, RelationStat } from 'biominer-components/dist/typings';
+import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 
 import './index.less';
 
 const { Header, Sider } = Layout;
+
+const makeQueryStr = (entity_type: string, entity_id: string): string => {
+  const source_query: ComposeQueryItem = {
+    operator: 'and',
+    items: [
+      {
+        field: 'source_type',
+        operator: '=',
+        value: entity_type,
+      },
+      {
+        field: 'source_id',
+        operator: '=',
+        value: entity_id,
+      },
+    ],
+  };
+
+  const target_query: ComposeQueryItem = {
+    operator: 'and',
+    items: [
+      {
+        field: 'target_type',
+        operator: '=',
+        value: entity_type,
+      },
+      {
+        field: 'target_id',
+        operator: '=',
+        value: entity_id,
+      },
+    ],
+  };
+
+  let query: ComposeQueryItem = {
+    operator: 'or',
+    items: [source_query, target_query],
+  };
+
+  return JSON.stringify(query);
+}
 
 // const IconFont = createFromIconfontCN({
 //   scriptUrl: '//at.alicdn.com/t/c/font_3865804_no8ogbfj0q.js',
@@ -778,7 +819,7 @@ const ModelConfig: React.FC = (props) => {
             setGraphData(data);
           }).catch((error) => {
             console.log('ModelConfig - onConfirm - handler - Error: ', error);
-            message.warn("Cannot find any result for the given parameters.", 5)
+            message.warning("Cannot find any result for the given parameters.", 5)
             setParams({});
             setGraphData(error);
           }).finally(() => {
@@ -838,13 +879,63 @@ const ModelConfig: React.FC = (props) => {
             </Empty> :
             <GraphTable edgeDataSources={edgeDataSources} nodeDataSources={nodeDataSources} key={JSON.stringify(params)}
               emptyMessage='Please setup related parameters in the left side and generate some predicted result first.'
+              onExplainRow={(row: EdgeAttribute) => {
+                setLoading(true);
+                const source_id = row.source_id;
+                const source_type = row.source_type;
+                const target_id = row.target_id;
+                const target_type = row.target_type;
+                const relation_type = row.reltype;
+
+                const first_fn = fetchOneStepLinkedNodes({
+                  query_str: makeQueryStr(source_type, source_id),
+                  page_size: 40
+                })
+
+                const second_fn = fetchOneStepLinkedNodes({
+                  query_str: makeQueryStr(target_type, target_id),
+                  page_size: 40
+                })
+
+                Promise.all([first_fn, second_fn]).then((responses) => {
+                  const source_nodes = responses[0];
+                  const target_nodes = responses[1];
+
+                  let d = {
+                    nodes: source_nodes.nodes.concat(target_nodes.nodes) as GraphNode[],
+                    edges: source_nodes.edges.concat(target_nodes.edges) as GraphEdge[]
+                  }
+
+                  const edges = edgeDataSources
+                    .filter((edge) => row.relid === edge.relid)
+                    .map((edge) => edge.metadata);
+
+                  d = {
+                    nodes: d.nodes,
+                    edges: d.edges.concat(edges as GraphEdge[])
+                  }
+
+                  console.log('ExplainRow: ', row, d, source_nodes, target_nodes, edges);
+                  setLoading(false);
+                  if (d && d.nodes && d.nodes.length > 0) {
+                    pushGraphDataToLocalStorage(d);
+                    history.push('/knowledge-graph');
+                  } else {
+                    message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
+                  }
+                }).catch((error) => {
+                  setLoading(false);
+                  console.log('ExplainRow Error: ', error);
+                  message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
+                });
+              }}
               onLoadGraph={(graph) => {
                 console.log('onLoadGraph: ', graph);
                 if (graph && graph.nodes && graph.nodes.length > 0) {
                   pushGraphDataToLocalStorage(graph);
                   history.push('/knowledge-graph');
                 } else {
-                  message.warn("You need to generate some predicted result and pick up the interested rows first.", 5)
+                  message.warning("You need to generate some predicted result and pick up the interested rows first.", 5)
                 }
               }}
               edgeStat={relationStat}

@@ -1878,6 +1878,7 @@ impl Graph {
             page,
             page_size,
             order_by,
+            None
         )
         .await
         {
