@@ -3,7 +3,7 @@ extern crate log;
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
 use biomedgps::model::{
-    init_db::{create_score_table, kg_score_table2graphdb},
+    init_db::{create_score_table, get_kg_score_table_name, kg_score_table2graphdb},
     util::read_annotation_file,
 };
 use biomedgps::{
@@ -11,6 +11,8 @@ use biomedgps::{
     run_migrations,
 };
 use log::*;
+use regex::Regex;
+use sqlx::Row;
 use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -32,14 +34,16 @@ struct Opt {
 enum SubCommands {
     #[structopt(name = "initdb")]
     InitDB(InitDbArguments),
-    #[structopt(name = "inittable")]
-    InitTable(InitTableArguments),
+    #[structopt(name = "cachetable")]
+    CacheTable(CacheTableArguments),
     #[structopt(name = "importdb")]
     ImportDB(ImportDBArguments),
     #[structopt(name = "importgraph")]
     ImportGraph(ImportGraphArguments),
     #[structopt(name = "importkge")]
     ImportKGE(ImportKGEArguments),
+    #[structopt(name = "cleandb")]
+    CleanDB(CleanDBArguments),
 }
 
 /// Init database.
@@ -49,6 +53,19 @@ pub struct InitDbArguments {
     /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
+}
+
+/// Clean database
+#[derive(StructOpt, PartialEq, Debug)]
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - cleandb", author="Jingcheng Yang <yjcyxky@163.com>")]
+pub struct CleanDBArguments {
+    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb or neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable DATABASE_URL or NEO4J_URL.
+    #[structopt(name = "database_url", short = "d", long = "database-url")]
+    database_url: Option<String>,
+
+    /// Which table to clean. e.g. entity, relation, entity_metadata, relation_metadata, knowledge_curation, subgraph, entity2d, compound-disease-symptom, knowledge-score, embedding, graph etc.
+    #[structopt(name = "table", short = "t", long = "table")]
+    table: String,
 }
 
 /// Import data files into database.
@@ -108,13 +125,17 @@ pub struct ImportDBArguments {
     show_all_errors: bool,
 }
 
-/// Init tables for performance. You must run this command after the importdb command.
+/// Cache tables for performance. You must run this command after the importdb command.
 #[derive(StructOpt, PartialEq, Debug)]
-#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - inittable", author="Jingcheng Yang <yjcyxky@163.com>")]
-pub struct InitTableArguments {
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - cachetable", author="Jingcheng Yang <yjcyxky@163.com>")]
+pub struct CacheTableArguments {
     /// [Required] Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
+
+    /// [Optional] Database host, such as postgres-ml:5432. Only needed when you run your application in a docker container and the database is in another container.
+    #[structopt(name = "db_host", short = "D", long = "db-host")]
+    db_host: Option<String>,
 
     /// [Optional] Database url, such as neo4j://<username>:<password>@localhost:7687, if not set, use the value of environment variable NEO4J_URL.
     #[structopt(name = "neo4j_url", short = "n", long = "neo4j-url")]
@@ -136,6 +157,15 @@ pub struct InitTableArguments {
         default_value = DEFAULT_MODEL_NAME
     )]
     table_prefix: String,
+
+    /// [Optional] The batch size for caching table.
+    #[structopt(
+        name = "batch_size",
+        short = "b",
+        long = "batch-size",
+        default_value = "10000"
+    )]
+    batch_size: usize,
 }
 
 /// Import data files into a graph database.
@@ -290,7 +320,7 @@ async fn main() {
                 Err(e) => error!("Init database failed: {}", e),
             }
         }
-        SubCommands::InitTable(arguments) => {
+        SubCommands::CacheTable(arguments) => {
             let database_url = arguments.database_url;
 
             let database_url = if database_url.is_none() {
@@ -390,9 +420,43 @@ async fn main() {
                         error!("{}", "NEO4J_URL is not set, skip to import kg score table to graph database.");
                         std::process::exit(0);
                     } else {
+                        let table_prefix = &arguments.table_prefix;
+                        let table_name = get_kg_score_table_name(table_prefix);
+                        let total = match sqlx::query(&format!(
+                            "SELECT count(*) FROM {}",
+                            table_name
+                        ))
+                        .fetch_one(&pool)
+                        .await
+                        {
+                            Ok(row) => row.get::<i64, _>("count"),
+                            Err(e) => {
+                                error!(
+                                    "Failed to get the total number of the records in the score table: {}",
+                                    e
+                                );
+                                std::process::exit(1);
+                            }
+                        };
+                        // Use the regex to replace the database host and port.
+                        let re = Regex::new(r"(.*//.*?@)[^/]*(/.*)").unwrap();
+                        let database_url = if arguments.db_host.is_none() {
+                            database_url
+                        } else {
+                            let caps = re.captures(&database_url).unwrap();
+                            let db_host = arguments.db_host.unwrap();
+                            format!("{}{}{}", &caps[1], db_host, &caps[2])
+                        };
                         let graph = Arc::new(connect_graph_db(&neo4j_url).await);
-                        match kg_score_table2graphdb(&pool, &graph, Some(&arguments.table_prefix))
-                            .await
+                        match kg_score_table2graphdb(
+                            &database_url,
+                            &graph,
+                            Some(table_prefix),
+                            total as usize,
+                            arguments.batch_size,
+                            false,
+                        )
+                        .await
                         {
                             Ok(_) => {
                                 info!("Import kg score table to graph database successfully.")
@@ -571,6 +635,9 @@ async fn main() {
                 &annotation_file,
             )
             .await
+        }
+        SubCommands::CleanDB(arguments) => {
+            info!("To be implemented.")
         }
     }
 }

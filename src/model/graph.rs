@@ -518,6 +518,10 @@ pub struct Edge {
 }
 
 impl Edge {
+    pub fn format_id(source_id: &str, relation_type: &str, target_id: &str) -> String {
+        format!("{}-{}-{}", source_id, relation_type, target_id)
+    }
+
     /// Create a new edge.
     pub fn new(
         relation_type: &str,
@@ -527,7 +531,7 @@ impl Edge {
         target_type: &str,
         distance: Option<f64>,
     ) -> Self {
-        let relid = format!("{}-{}-{}", source_id, relation_type, target_id);
+        let relid = Edge::format_id(source_id, relation_type, target_id);
 
         Edge {
             relid: relid.clone(),
@@ -554,10 +558,7 @@ impl Edge {
     /// Create a new edge from an EdgeData struct.
     pub fn from_edge_data(edge: &EdgeData) -> Self {
         Edge {
-            relid: format!(
-                "{}-{}-{}",
-                edge.source_id, edge.relation_type, edge.target_id
-            ),
+            relid: Edge::format_id(&edge.source_id, &edge.relation_type, &edge.target_id),
             source: Node::format_id(&edge.source_type, &edge.source_id),
             category: "edge".to_string(),
             target: Node::format_id(&edge.target_type, &edge.target_id),
@@ -569,10 +570,7 @@ impl Edge {
 
     /// It will convert the [`Relation`](struct.Relation.html) struct to the [`Edge`](struct.Edge.html) struct.
     pub fn from_relation(relation: &Relation) -> Self {
-        let relid = format!(
-            "{}-{}-{}",
-            relation.source_id, relation.relation_type, relation.target_id
-        );
+        let relid = Edge::format_id(&relation.source_id, &relation.relation_type, &relation.target_id);
         Edge {
             relid: relid.clone(),
             source: Node::format_id(&relation.source_type, &relation.source_id),
@@ -585,10 +583,12 @@ impl Edge {
     }
 
     pub fn from_curated_knowledge(knowledge: &KnowledgeCuration) -> Self {
-        let relid = format!(
-            "{}-{}-{}",
-            knowledge.source_id, knowledge.relation_type, knowledge.target_id
+        let relid = Edge::format_id(
+            &knowledge.source_id,
+            &knowledge.relation_type,
+            &knowledge.target_id,
         );
+
         Edge {
             relid: relid.clone(),
             source: Node::format_id(&knowledge.source_type, &knowledge.source_id),

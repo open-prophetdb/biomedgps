@@ -1,14 +1,13 @@
 //! SQL initialization strings for creating tables.
 
-use crate::model::core::Relation;
 use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
 };
 use crate::model::util::ValidationError;
-use futures::stream::{FuturesUnordered, StreamExt};
-use log::{debug, error, info};
-use neo4rs::{query, Graph};
+use anyhow::anyhow;
+use log::{debug, error, info, warn};
+use neo4rs::{query, Graph, Node as NeoNode};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -528,87 +527,160 @@ fn get_score_attr_name(table_prefix: &str) -> String {
     format!("{}_score", table_prefix)
 }
 
+/// Convert the score table of the triple entity to the graph database.
+///
+/// # Arguments
+/// * `jdbc_url` - The JDBC URL of the database.
+/// * `graphdb` - The graph database.
+/// * `table_prefix` - Optional prefix for the table name. If not provided, the default model name will be used.
+/// * `total` - The total number of the records in the score table.
+/// * `batch_size` - The batch size for the iteration.
+/// * `only_score` - If true, only the score will be set for the relation, otherwise the resource, dataset, pmids and key_sentence will also be set. If you want to update all the attributes, you need to set it to false. Otherwise, we assume that you have an idx attribute for the relation.
 pub async fn kg_score_table2graphdb(
-    pool: &PgPool,
+    database_url: &str,
     graphdb: &Arc<Graph>,
     table_prefix: Option<&str>,
-) -> Result<(), ValidationError> {
+    total: usize,
+    batch_size: usize,
+    only_score: bool,
+) -> Result<(), anyhow::Error> {
+    let jdbc_url = database_url.replace("postgres://", "jdbc:postgresql://");
     let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
     let score_table_name = get_kg_score_table_name(table_prefix);
-
     let score_attr_name = get_score_attr_name(table_prefix);
+    info!("jdbc_url: {}", jdbc_url);
 
-    let query_str = format!(
-        r#"
-            SELECT
-                id,
-                source_id,
-                source_type,
-                target_id,
-                target_type,
-                relation_type,
-                formatted_relation_type,
-                key_sentence,
-                resource,
-                dataset,
-                pmids,
-                score
-            FROM {score_table};
-        "#,
-        score_table = score_table_name,
-    );
+    info!("Need to convert {} records to the graph database", total);
+    let batch = total as usize / batch_size;
 
-    let rows = match sqlx::query_as::<_, Relation>(&query_str)
-        .fetch_all(pool)
-        .await
-    {
-        Ok(rows) => rows,
-        Err(e) => {
-            error!("Failed to get the rows from the score table: {}", e);
-            return Err(ValidationError::new(
-                &format!("Failed to get the rows from the score table: {}", e),
-                vec![],
-            ));
-        }
-    };
-
-    for row in rows {
-        let query_str = format!(
-            r#"
-                CALL apoc.periodic.iterate(
-                    "MATCH (source:{source_type} {{idx: '{source_node_id}'}})
-                     MATCH (target:{target_type} {{idx: '{target_node_id}'}})
-                     MATCH (source)-[r:`{relation_type}`]->(target)
-                     RETURN r",
-                    "SET r.{score_attr_name} = {score}",
-                    {{batchSize:1000, parallel: true, iterateList: true, retries: 3}}
-                );
-            "#,
-            source_type = row.source_type,
-            source_node_id = format!("{}::{}", row.source_type, row.source_id),
-            target_type = row.target_type,
-            target_node_id = format!("{}::{}", row.target_type, row.target_id),
-            relation_type = row.relation_type,
-            score_attr_name = score_attr_name,
-            score = row.score.unwrap_or(0.0),
+    for i in 0..batch {
+        info!(
+            "Run the batch: {}/{}, each batch has {} records",
+            i, batch, batch_size
         );
+        let offset = i * batch_size;
+        // https://github.com/pgjdbc/pgjdbc
+        let query_str = if !only_score {
+            format!(
+                r#"
+                    CALL apoc.periodic.iterate(
+                        'CALL apoc.load.jdbc(
+                            "{jdbc_url}",
+                            "SELECT id, source_id, source_type, target_id, target_type, relation_type, 
+                                    formatted_relation_type, key_sentence, resource, dataset, pmids, score, 
+                                    COALESCE(source_type, \'\') || \'::\' || COALESCE(source_id, \'\') AS source_node_id, 
+                                    COALESCE(target_type, \'\') || \'::\' || COALESCE(target_id, \'\') AS target_node_id,
+                                    COALESCE(source_id, \'\') || \'-\' || COALESCE(relation_type, \'\') || \'-\' || COALESCE(target_id, \'\') AS idx
+                             FROM {score_table} LIMIT {limit} OFFSET {offset}") YIELD row RETURN row',
+                        'WITH row
+                         CALL apoc.merge.node([row.source_type], {{ idx: row.source_node_id }}) YIELD node as source
+                         CALL apoc.merge.node([row.target_type], {{ idx: row.target_node_id }}) YIELD node as target
+                         CALL apoc.merge.relationship(source, row.relation_type, {{}}, {{}}, target, {{}}) YIELD rel
+                         SET rel.{score_attr_name} = row.score,
+                             rel.idx = row.idx,
+                             rel.resource = row.resource,
+                             rel.dataset = row.dataset,
+                             rel.pmids = row.pmids,
+                             rel.key_sentence = row.key_sentence',
+                        {{batchSize: {batch_size}, parallel: true, iterateList: true, retries: 0}}
+                    )
+                    YIELD batches, total, errorMessages, failedOperations
+                    RETURN batches, total, errorMessages, failedOperations
+                "#,
+                limit = batch_size * 5,
+                offset = offset,
+                jdbc_url = jdbc_url,
+                score_table = score_table_name,
+                score_attr_name = score_attr_name,
+                batch_size = batch_size,
+            )
+        } else {
+            format!(
+                r#"
+                    CALL apoc.periodic.iterate(
+                        'CALL apoc.load.jdbc(
+                            "{jdbc_url}",
+                            "SELECT id, source_id, source_type, target_id, target_type, relation_type, formatted_relation_type, 
+                                    key_sentence, resource, dataset, pmids, score, 
+                                    COALESCE(source_id, \'\') || \'-\' || COALESCE(relation_type, \'\') || \'-\' || COALESCE(target_id, \'\') AS idx 
+                            FROM {score_table} LIMIT {limit} OFFSET {offset}")
+                         YIELD row RETURN row',
+                        'WITH row
+                         MATCH ()-[r]->() WHERE r.idx = row.idx 
+                         SET r.{score_attr_name} = row.score
+                        {{batchSize: {batch_size}, parallel: true, iterateList: true, retries: 0}}
+                    )
+                    YIELD batches, total, errorMessages, failedOperations
+                    RETURN batches, total, errorMessages, failedOperations
+                "#,
+                limit = batch_size * 5,
+                offset = offset,
+                jdbc_url = jdbc_url,
+                score_table = score_table_name,
+                score_attr_name = score_attr_name,
+                batch_size = batch_size,
+            )
+        };
+
+        info!("query_str: {}", query_str);
+
+        let err_msg = "if you encounter a connection error and you are using the docker container, please try to set the --db-host to the hostname:port of your database docker container.";
 
         match graphdb.execute(query(&query_str)).await {
-            Ok(_) => {
-                debug!(
-                    "The score is set successfully for the relation: {}",
-                    row.relation_type
+            Ok(mut result) => {
+                // Extract the batches, total and errorMessages from the result
+                while let Some(row) = result.next().await? {
+                    info!("row: {:?}", row);
+                    let batches = match row.get("batches") {
+                        Some(b) => b,
+                        None => 0,
+                    };
+                    let total = match row.get("total") {
+                        Some(t) => t,
+                        None => 0,
+                    };
+                    let failed_operations = match row.get::<i64>("failedOperations") {
+                        Some(f) => f,
+                        None => continue,
+                    };
+                    let msg = match row.get::<NeoNode>("errorMessages") {
+                        Some(e) => e,
+                        None => continue,
+                    };
+
+                    if batches == 0 && total == 0 {
+                        warn!("The score table is empty.");
+                        return Ok(());
+                    }
+
+                    if failed_operations > 0 {
+                        error!(
+                            "The score table is not empty, but the number of failed operations is {} out of {}. The error message: {:?}",
+                            failed_operations, total, msg
+                        );
+
+                        return Err(
+                            anyhow!(
+                                "The score table is not empty, but the number of failed operations is {} out of {}. The error message: {:?}",
+                                failed_operations, total, msg
+                            )
+                        );
+                    }
+                }
+                info!(
+                    "The score table {} is converted to the graph database successfully",
+                    score_table_name
                 );
             }
             Err(e) => {
-                error!("Failed to set the score for the relation: {}", e);
-                return Err(ValidationError::new(
-                    &format!("Failed to set the score for the relation: {}", e),
-                    vec![],
-                ));
+                error!(
+                    "Failed to set the score for the relation: {}, {}",
+                    e, err_msg
+                );
+                return Err(anyhow::Error::new(e));
             }
         }
-    };
+    }
 
     info!("The score table is converted to the graph database successfully");
 

@@ -30,10 +30,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::vec;
 
 use crate::model::core::{
-    CheckData, Entity, Entity2D, KnowledgeCuration, Relation, RelationMetadata,
-    Subgraph,
+    CheckData, Entity, Entity2D, KnowledgeCuration, Relation, RelationMetadata, Subgraph,
 };
-use crate::model::graph::Node;
+use crate::model::graph::{Edge, Node};
 use crate::model::kge::{EntityEmbedding, LegacyRelationEmbedding, RelationEmbedding};
 use crate::model::util::{
     drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
@@ -269,15 +268,15 @@ pub async fn prepare_relation_queries(
         let query_string = if check_exist {
             format!(
                 "MATCH (e1:{} {{idx: $source_idx}})
-                MATCH (e2:{} {{idx: $target_idx}})
-                MERGE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset}}]->(e2)",
+                 MATCH (e2:{} {{idx: $target_idx}})
+                 MERGE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset, idx: $relation_idx}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         } else {
             format!(
                 "MATCH (e1:{} {{idx: $source_idx}})
-                MATCH (e2:{} {{idx: $target_idx}})
-                CREATE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset}}]->(e2)",
+                 MATCH (e2:{} {{idx: $target_idx}})
+                 CREATE (e1)-[r:`{}` {{resource: $resource, key_sentence: $key_sentence, pmids: $pmids, dataset: $dataset, idx: $relation_idx}}]->(e2)",
                 record.source_type, record.target_type, label
             )
         };
@@ -294,7 +293,11 @@ pub async fn prepare_relation_queries(
             .param("pmids", pmids)
             .param("resource", record.resource)
             .param("key_sentence", key_sentence)
-            .param("dataset", dataset);
+            .param("dataset", dataset)
+            .param(
+                "relation_idx",
+                Edge::format_id(&record.source_id, &label, &record.target_id),
+            );
 
         queries.push(query);
     }

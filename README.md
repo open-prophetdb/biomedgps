@@ -64,37 +64,48 @@ docker-compose up -d
 
 `Step 3`: Init Database, Check and Import Data
 
+- Init database
+
 ```bash
-# Init database
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli initdb
 
-# Check and import data, -t is the table name, -f is the data file path, -D is the delete flag
-# Import entity data
+## Check and import data, -t is the table name, -f is the data file path, -D is the delete flag
+## Import entity data
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity.tsv -t entity -D
 
-# Import relation data
+## Import relation data
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/relation.tsv -t relation -D --dataset drkg
 
-# Generate metadata for entity
+## Generate metadata for entity
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity.tsv -t entity_metadata -D
 
-# Generate metadata for relation
+## Generate metadata for relation
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/relation_types.tsv -t relation_metadata -D
 
-# Import entity2d data
+## Import entity2d data
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity2d.tsv -t entity2d -D
 
-# Import entity embeddings
+## Import entity embeddings
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/entity_embeddings.tsv -t entity_embedding -D
 
-# Import relation embeddings
+## Import relation embeddings
 export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && biomedgps-cli importdb -f /data/relation_embeddings.tsv -t relation_embedding -D
+```
 
-# Import entity data to graph database
+- Init Graph Database
+
+```bash
+## Import entity data to graph database
 export NEO4J_URL=neo4j://neo4j:password@localhost:7687 && biomedgps-cli importgraph -f /data/entities.tsv -t entity -b 1000
 
-# Import relation data to graph database
+## Import relation data to graph database
 export NEO4J_URL=neo4j://neo4j:password@localhost:7687 && biomedgps-cli importgraph -f /data/relations.tsv -t relation -b 1000
+```
+
+- Make several cache tables for performance
+
+```bash
+export DATABASE_URL=postgres://postgres:password@localhost:5432/test_biomedgps && export NEO4J_URL=neo4j://neo4j:password@localhost:7687 && biomedgps-cli cachetable --table knowledge-score -T biomedgps
 ```
 
 `Step 4`: Launch the platform, see more details on usage [here](#usage).
