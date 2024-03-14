@@ -278,6 +278,10 @@ const ModelConfig: React.FC = (props) => {
     form.resetFields();
     setParams({});
     setGraphData({ nodes: [], edges: [] });
+    cleanTable()
+  }
+
+  const cleanTable = () => {
     setEdgeDataSources([]);
     setNodeDataSources([]);
   }
@@ -803,6 +807,8 @@ const ModelConfig: React.FC = (props) => {
 
   // Placeholder function for submitting the form
   const handleSubmit = () => {
+    // We need to clean the table before we submit the form, otherwise, the table will show the previous result.
+    cleanTable();
     setLoading(true);
     form
       .validateFields()

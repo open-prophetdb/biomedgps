@@ -14,11 +14,12 @@ use crate::model::kge::{
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
 };
 use crate::model::util::{match_color, title_case, ValidationError};
-use crate::query_builder::sql_builder::ComposeQuery;
+use crate::query_builder::sql_builder::{ComposeQuery, ComposeQueryItem, QueryItem, Value};
 use lazy_static::lazy_static;
 use log::{debug, error};
 use neo4rs::{Node as NeoNode, Relation as NeoRelation};
 use poem_openapi::Object;
+use polars::lazy::dsl::Operator;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -1871,10 +1872,27 @@ impl Graph {
             "biomedgps_relation".to_string()
         };
 
+        let score_condition = QueryItem::new("score".to_string(), Value::Null, "is not".to_string());
+        let query = match query {
+            Some(ComposeQuery::QueryItem(item)) => {
+                let mut query = ComposeQueryItem::new("and");
+                query.add_item(ComposeQuery::QueryItem(item.clone()));
+                query.add_item(ComposeQuery::QueryItem(score_condition));
+                Some(ComposeQuery::ComposeQueryItem(query))
+            }
+            Some(ComposeQuery::ComposeQueryItem(item)) => {
+                let mut query = ComposeQueryItem::new("and");
+                query.add_item(ComposeQuery::ComposeQueryItem(item.clone()));
+                query.add_item(ComposeQuery::QueryItem(score_condition));
+                Some(ComposeQuery::ComposeQueryItem(query))
+            }
+            None => Some(ComposeQuery::QueryItem(score_condition)),
+        };
+
         match RecordResponse::<Relation>::get_records(
             pool,
             table_name.as_str(),
-            query,
+            &query,
             page,
             page_size,
             order_by,

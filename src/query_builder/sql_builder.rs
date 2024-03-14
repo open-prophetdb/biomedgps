@@ -27,7 +27,7 @@ pub struct QueryItem {
 impl QueryItem {
     pub fn new(field: String, value: Value, operator: String) -> Self {
         let allowed_operators = vec![
-            "=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">=",
+            "=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">=", "is", "is not"
         ];
         if !allowed_operators.contains(&operator.as_str()) {
             panic!("Invalid operator: {}", operator);
@@ -56,7 +56,7 @@ impl QueryItem {
                 }
             }
             Value::Null => {
-                if !vec!["=", "!="].contains(&operator.as_str()) {
+                if !vec!["is", "is not"].contains(&operator.as_str()) {
                     panic!("Invalid operator: {}", operator);
                 }
             }
