@@ -65,3 +65,7 @@ changelog:
 	@printf "Generate changelog...\n"
 	@python build/build_changelog.py --repo ../biominer-components --output-file ./studio/public/README/changelog.md --repo-name 'BioMedGPS UI'
 	@python build/build_changelog.py --repo . --output-file ./studio/public/README/changelog.md --repo-name BioMedGPS
+
+deploy: build-studio
+	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
+	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@drugs.3steps.cn:/data/biomedgps/bin
