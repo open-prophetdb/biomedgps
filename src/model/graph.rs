@@ -1171,13 +1171,14 @@ impl Graph {
             ));
         }
 
-        let reverse = if source_type == r_target_type {
+        // We might get a same type relation, like "STRING::BINDING::Gene:Gene", so we need to check if the source type is the same as the target type and the source type is the same as the relation source type
+        let reverse = if source_type == r_target_type && source_type != r_source_type {
             true
         } else {
             false
         };
 
-        let target_type = if source_type == r_target_type {
+        let target_type = if source_type == r_target_type && source_type != r_source_type {
             r_source_type
         } else {
             r_target_type

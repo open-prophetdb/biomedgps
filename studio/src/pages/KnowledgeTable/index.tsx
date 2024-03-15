@@ -303,6 +303,9 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'score',
             align: 'center',
             key: 'score',
+            render: (text) => {
+                return <span>{text.toFixed(3)}</span>;
+            },
             sorter: (a, b) => a.score - b.score,
         }
     ];
