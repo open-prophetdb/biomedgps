@@ -4,6 +4,13 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 
 export const routes = [
   {
+    path: '/knowledge-table',
+    name: 'ME/CFS & LongCOVID',
+    icon: 'table',
+    component: './KnowledgeTable',
+    category: 'knowledge-graph'
+  },
+  {
     path: '/predict-model',
     name: 'Predict Drug/Target',
     icon: 'history',
@@ -61,7 +68,8 @@ export const routes = [
   },
   {
     path: '/',
-    redirect: '/predict-model',
+    // redirect: '/predict-model',
+    redirect: '/knowledge-table',
   },
   {
     component: './404',
