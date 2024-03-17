@@ -1,5 +1,5 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined } from '@ant-design/icons';
-import { Space, Menu, Button, message } from 'antd';
+import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
 import { useAuth0 } from "@auth0/auth0-react";
@@ -59,7 +59,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
     }
   }, [props.username, user]);
 
-  const items: MenuProps['items'] = [
+  const directItems: MenuProps['items'] = [
     {
       label: username,
       key: 'user',
@@ -70,15 +70,18 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       key: 'version',
       icon: <FieldTimeOutlined />
     },
-    {
-      label: 'About',
-      key: 'about',
-      icon: <InfoCircleOutlined />,
-    },
+  ]
+
+  const items: MenuProps['items'] = [
     {
       label: 'Help',
       key: 'help',
       icon: <QuestionCircleOutlined />,
+    },
+    {
+      label: 'About Us',
+      key: 'about',
+      icon: <InfoCircleOutlined />,
     },
     {
       label: 'ChangeLog',
@@ -113,7 +116,10 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
 
   return (
     <Space className={`${styles.right} ${styles.light} right-content`}>
-      <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={items} />
+      <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
+      <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
+        <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
+      </Dropdown>
       <Button type={isAuthenticated ? 'default' : 'primary'} danger={isAuthenticated}
         onClick={() => isAuthenticated ? logoutWithRedirect() : loginWithRedirect()}>
         Sign {isAuthenticated ? 'Out' : 'In'}

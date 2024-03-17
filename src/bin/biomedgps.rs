@@ -65,6 +65,10 @@ struct Opt {
     #[structopt(name = "database-url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
+    /// Pool size for database connection.
+    #[structopt(name = "pool-size", short = "s", long = "pool-size")]
+    pool_size: Option<u32>,
+
     /// Graph Database url, such as neo4j:://user:pass@host:port. We will always use the default database.
     /// You can also set it with env var: NEO4J_URL.
     #[structopt(name = "neo4j-url", short = "g", long = "neo4j-url")]
@@ -239,7 +243,8 @@ async fn main() -> Result<(), std::io::Error> {
         database_url.unwrap()
     };
 
-    let pool = connect_db(&database_url, 10).await;
+    let pool_size = args.pool_size.unwrap_or(10);
+    let pool = connect_db(&database_url, pool_size).await;
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
 

@@ -56,7 +56,6 @@ declare namespace swagger {
   };
 
   type Entity = {
-    idx: number;
     id: string;
     name: string;
     label: string;
@@ -158,6 +157,16 @@ declare namespace swagger {
     query_str?: string;
     topk?: number;
     model_name?: string;
+  };
+
+  type fetchPublicationParams = {
+    id: string;
+  };
+
+  type fetchPublicationsParams = {
+    query_str: string;
+    page?: number;
+    page_size?: number;
   };
 
   type fetchRelationCountsParams = {
@@ -280,6 +289,36 @@ declare namespace swagger {
     page_size: number;
   };
 
+  type Publication = {
+    authors: string[];
+    citation_count?: number;
+    summary: string;
+    journal: string;
+    title: string;
+    year?: number;
+    doc_id: string;
+  };
+
+  type PublicationDetail = {
+    authors: string[];
+    citation_count?: number;
+    summary: string;
+    journal: string;
+    title: string;
+    year?: number;
+    doc_id: string;
+    article_abstract?: string;
+    doi?: string;
+    provider_url?: string;
+  };
+
+  type PublicationRecords = {
+    records: Publication[];
+    total: number;
+    page: number;
+    page_size: number;
+  };
+
   type putCuratedKnowledgeParams = {
     id: number;
   };
@@ -344,7 +383,6 @@ declare namespace swagger {
   };
 
   type Relation = {
-    id: number;
     relation_type: string;
     formatted_relation_type?: string;
     source_id: string;

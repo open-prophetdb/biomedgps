@@ -9,7 +9,7 @@ import { initChat } from '@/components/util';
 // import { KeepAlive } from 'umi';
 import { MessageFilled, MessageOutlined } from '@ant-design/icons';
 import {
-  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts
+  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts, fetchPublication, fetchPublications
 } from '@/services/swagger/KnowledgeGraph';
 import { getGeneInfo } from '@/plugins4kg/utils';
 import { getItems4GenePanel } from '@/plugins4kg';
@@ -65,7 +65,9 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
         <KnowledgeGraph
           apis={{
             GetStatisticsFn: fetchStatistics,
+            // @ts-ignore, it doesn't matter, maybe we can fix this later.
             GetEntitiesFn: fetchEntities,
+            // @ts-ignore, it doesn't matter, maybe we can fix this later.
             GetRelationsFn: fetchRelations,
             GetRelationCountsFn: fetchRelationCounts,
             GetGraphHistoryFn: fetchSubgraphs,
@@ -83,6 +85,18 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
             GetSharedNodesFn: fetchSharedNodes,
             // @ts-ignore, it seems that we don't need to fix this.
             GetPromptsFn: fetchLlmPrompts,
+            GetPublicationFn: (id: string) => {
+              return fetchPublication({
+                id: id
+              })
+            },
+            GetPublicationsFn: (queryStr: string, page?: number, pageSize?: number) => {
+              return fetchPublications({
+                query_str: queryStr,
+                page: page,
+                page_size: pageSize
+              })
+            },
           }}
           getGeneInfo={getGeneInfo}
           getItems4GenePanel={getItems4GenePanel}

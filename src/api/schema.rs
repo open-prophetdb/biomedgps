@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
 
+use super::req::{PublicationDetail, PublicationRecords};
+
 #[derive(Tags)]
 pub enum ApiTags {
     KnowledgeGraph,
@@ -200,6 +202,58 @@ impl<
 {
     pub fn ok(vec_t: Vec<T>) -> Self {
         Self::Ok(Json(vec_t))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetPublicationDetailResponse {
+    #[oai(status = 200)]
+    Ok(Json<PublicationDetail>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetPublicationDetailResponse {
+    pub fn ok(publication_detail: PublicationDetail) -> Self {
+        Self::Ok(Json(publication_detail))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetPublicationsResponse {
+    #[oai(status = 200)]
+    Ok(Json<PublicationRecords>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetPublicationsResponse {
+    pub fn ok(publication_records: PublicationRecords) -> Self {
+        Self::Ok(Json(publication_records))
     }
 
     pub fn bad_request(msg: String) -> Self {

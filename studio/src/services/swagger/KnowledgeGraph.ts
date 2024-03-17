@@ -244,6 +244,35 @@ export async function fetchPredictedNodes(
   });
 }
 
+/** Call `/api/v1/publications` with query params to fetch publications. GET /api/v1/publications */
+export async function fetchPublications(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchPublicationsParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.PublicationRecords>('/api/v1/publications', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/publications/:id` to fetch a publication. GET /api/v1/publications/${param0} */
+export async function fetchPublication(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchPublicationParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.PublicationDetail>(`/api/v1/publications/${param0}`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/relation-counts` with query params to fetch relation counts. GET /api/v1/relation-counts */
 export async function fetchRelationCounts(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

@@ -1,11 +1,12 @@
 //! This module defines the routes of the API.
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
+use crate::api::req::Publication;
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
-    GetRecordsResponse, GetRelationCountResponse, GetStatisticsResponse, GetWholeTableResponse,
-    NodeIdsQuery, Pagination, PaginationQuery, PostResponse, PredictedNodeQuery, PromptList,
-    SubgraphIdQuery,
+    GetPublicationsResponse, GetRecordsResponse, GetRelationCountResponse, GetStatisticsResponse,
+    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
+    PredictedNodeQuery, PromptList, SubgraphIdQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
@@ -24,10 +25,58 @@ use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::sync::Arc;
 use validator::Validate;
 
+use super::schema::GetPublicationDetailResponse;
+
 pub struct BiomedgpsApi;
 
 #[OpenApi(prefix_path = "/api/v1")]
 impl BiomedgpsApi {
+    /// Call `/api/v1/publications/:id` to fetch a publication.
+    #[oai(
+        path = "/publications/:id",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPublication"
+    )]
+    async fn fetch_publication(&self, id: Path<String>) -> GetPublicationDetailResponse {
+        let id = id.0;
+        match Publication::fetch_publication(&id).await {
+            Ok(publication) => GetPublicationDetailResponse::ok(publication),
+            Err(e) => {
+                let err = format!("Failed to fetch publication: {}", e);
+                warn!("{}", err);
+                return GetPublicationDetailResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/publications` with query params to fetch publications.
+    #[oai(
+        path = "/publications",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPublications"
+    )]
+    async fn fetch_publications(
+        &self,
+        query_str: Query<String>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+    ) -> GetPublicationsResponse {
+        let query_str = query_str.0;
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match Publication::fetch_publications(&query_str, page, page_size).await {
+            Ok(records) => GetPublicationsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch publications: {}", e);
+                warn!("{}", err);
+                return GetPublicationsResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/statistics` with query params to fetch all entity & relation metadata.
     #[oai(
         path = "/statistics",
@@ -522,7 +571,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("id ASC"),
-            None
+            None,
         )
         .await
         {
@@ -707,7 +756,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("score ASC"),
-            None
+            None,
         )
         .await
         {
@@ -827,7 +876,7 @@ impl BiomedgpsApi {
             page,
             page_size,
             Some("embedding_id ASC"),
-            None
+            None,
         )
         .await
         {
