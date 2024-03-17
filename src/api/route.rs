@@ -67,6 +67,16 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
 
+        info!("Fetch publications with query: {}", query_str);
+        let pairs = query_str.split("#").collect::<Vec<&str>>();
+        let query_str = if pairs.len() != 2 {
+            let err = format!("Invalid query string: {}", query_str);
+            warn!("{}", err);
+            return GetPublicationsResponse::bad_request(err);
+        } else {
+            format!("what's the relation between {} and {}?", pairs[0], pairs[1])
+        };
+
         match Publication::fetch_publications(&query_str, page, page_size).await {
             Ok(records) => GetPublicationsResponse::ok(records),
             Err(e) => {

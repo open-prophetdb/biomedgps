@@ -3,9 +3,6 @@ use poem_openapi::{types::ToJSON, Object};
 use reqwest;
 use serde::{Deserialize, Serialize};
 
-const CONSENSUS_API: &str = "https://consensus.app/api/paper_search/";
-const CONSENSUS_DETAIL_API: &str = "https://consensus.app/api/papers/details/";
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
 pub struct PublicationRecords {
     pub records: Vec<Publication>,
@@ -43,14 +40,21 @@ impl Publication {
     pub async fn fetch_publication(
         id: &str,
     ) -> Result<PublicationDetail, anyhow::Error> {
-        let api_token = match std::env::var("CONSENSUS_API_TOKEN") {
+        let api_token = match std::env::var("GUIDESCOPER_API_TOKEN") {
             Ok(token) => token,
             Err(_) => {
-                return Err(anyhow::anyhow!("CONSENSUS_API_TOKEN not found"));
+                return Err(anyhow::anyhow!("GUIDESCOPER_API_TOKEN not found"));
             }
         };
 
-        let url = format!("{}{}", CONSENSUS_DETAIL_API, id);
+        let detail_api = match std::env::var("GUIDESCOPER_DETAIL_API") {
+            Ok(token) => token,
+            Err(_) => {
+                return Err(anyhow::anyhow!("GUIDESCOPER_DETAIL_API not found"));
+            }
+        };
+
+        let url = format!("{}{}", detail_api, id);
         let cookie = format!("_session={}", api_token);
         let client = reqwest::Client::new();
         let res = client.get(&url).header("Cookie", cookie).send().await?;
@@ -96,10 +100,17 @@ impl Publication {
         page: Option<u64>,
         page_size: Option<u64>,
     ) -> Result<PublicationRecords, anyhow::Error> {
-        let api_token = match std::env::var("CONSENSUS_API_TOKEN") {
+        let api_token = match std::env::var("GUIDESCOPER_API_TOKEN") {
             Ok(token) => token,
             Err(_) => {
-                return Err(anyhow::anyhow!("CONSENSUS_API_TOKEN not found"));
+                return Err(anyhow::anyhow!("GUIDESCOPER_API_TOKEN not found"));
+            }
+        };
+
+        let guidescoper_api = match std::env::var("GUIDESCOPER_API") {
+            Ok(token) => token,
+            Err(_) => {
+                return Err(anyhow::anyhow!("GUIDESCOPER_API not found"));
             }
         };
 
@@ -111,7 +122,7 @@ impl Publication {
         let mut records = Vec::new();
         let url = format!(
             "{}?query={}&page={}&size={}",
-            CONSENSUS_API, query_str, page, page_size
+            guidescoper_api, query_str, page, page_size
         );
         let cookie = format!("_session={}", api_token);
         let client = reqwest::Client::new();
