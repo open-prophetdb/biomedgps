@@ -5,8 +5,7 @@ import { getJwtAccessToken } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
-// @ts-ignore
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 import styles from './index.less';
 import './extra.less'
@@ -32,12 +31,14 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         //   const decodedToken = jwtDecode(tokenClaims.__raw);
         // }
         const token = getJwtAccessToken();
-        const decodedToken: any = jwtDecode(token);
-        const currentTime = Date.now() / 1000;
+        if (token) {
+          const decodedToken: any = jwtDecode(token);
+          const currentTime = Date.now() / 1000;
 
-        if (decodedToken.exp < currentTime + 5 * 60) {
-          const newAccessToken = await getAccessTokenSilently();
-          document.cookie = `jwt_access_token=${newAccessToken};max-age=86400;path=/`;
+          if (decodedToken.exp < currentTime + 5 * 60) {
+            const newAccessToken = await getAccessTokenSilently();
+            document.cookie = `jwt_access_token=${newAccessToken};max-age=86400;path=/`;
+          }
         }
       } catch (error) {
         console.error('Error refreshing access token:', error);
