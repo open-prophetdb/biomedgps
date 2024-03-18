@@ -1,6 +1,27 @@
 import * as webllm from "@mlc-ai/web-llm";
 import { message } from "antd";
 
+export const getJwtAccessToken = (): string | null => {
+    let jwtToken = null;
+    // Check if the cookie exists
+    if (document.cookie && document.cookie.includes("jwt_access_token=")) {
+        // Retrieve the cookie value
+        // @ts-ignore
+        jwtToken = document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("jwt_access_token="))
+            .split("=")[1];
+    }
+
+    if (jwtToken) {
+        console.log("JWT access token found in the cookie.");
+        return jwtToken;
+    } else {
+        console.log("JWT access token not found in the cookie.");
+        return null;
+    }
+}
+
 export const initChat = async () => {
     // const chat = new webllm.ChatWorkerClient(new Worker(
     //   new URL('./assets/web-llm.worker.js', import.meta.url),
@@ -57,6 +78,7 @@ export const initChat = async () => {
     await chat.reload("Mistral-7B-Instruct-v0.2-q4f16_1", undefined, appConfig);
     console.log("Chat AI is loaded.");
 
+    // @ts-ignore
     window.chat = chat;
 
     return chat;

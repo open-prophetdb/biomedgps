@@ -4,6 +4,7 @@ import { RequestConfig, history, RuntimeConfig } from 'umi';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
+import { getJwtAccessToken } from '@/components/util';
 
 // 运行时配置
 // @ts-ignore
@@ -26,27 +27,6 @@ const CLIENT_ID = process.env.UMI_APP_AUTH0_CLIENT_ID ? process.env.UMI_APP_AUTH
 const AUTH0_DOMAIN = process.env.UMI_APP_AUTH0_DOMAIN ? process.env.UMI_APP_AUTH0_DOMAIN : '<your-domain>';
 
 console.log('apiPrefix', process.env, apiPrefix);
-
-const getJwtAccessToken = (): string | null => {
-  let jwtToken = null;
-  // Check if the cookie exists
-  if (document.cookie && document.cookie.includes("jwt_access_token=")) {
-    // Retrieve the cookie value
-    // @ts-ignore
-    jwtToken = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("jwt_access_token="))
-      .split("=")[1];
-  }
-
-  if (jwtToken) {
-    console.log("JWT access token found in the cookie.");
-    return jwtToken;
-  } else {
-    console.log("JWT access token not found in the cookie.");
-    return null;
-  }
-}
 
 const getUsername = (): string | undefined => {
   const accessToken = getJwtAccessToken();

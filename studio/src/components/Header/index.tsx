@@ -1,9 +1,13 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { history } from 'umi';
+import { getJwtAccessToken } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
+import { history } from 'umi';
+// @ts-ignore
+import jwtDecode from "jwt-decode";
+
 import styles from './index.less';
 import './extra.less'
 
@@ -14,9 +18,36 @@ export interface GlobalHeaderRightProps {
 }
 
 const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
-  const { loginWithRedirect, isAuthenticated, logout, user, getIdTokenClaims } = useAuth0();
+  const { loginWithRedirect, isAuthenticated, logout, user, getIdTokenClaims, getAccessTokenSilently } = useAuth0();
   const [current, setCurrent] = useState('user');
   const [username, setUsername] = useState(props.username || user?.name || user?.email || user?.nickname || 'Anonymous');
+
+  useEffect(() => {
+    const checkTokenValidity = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        // const tokenClaims = await getIdTokenClaims();
+        // if (tokenClaims) {
+        //   const decodedToken = jwtDecode(tokenClaims.__raw);
+        // }
+        const token = getJwtAccessToken();
+        const decodedToken: any = jwtDecode(token);
+        const currentTime = Date.now() / 1000;
+
+        if (decodedToken.exp < currentTime + 5 * 60) {
+          const newAccessToken = await getAccessTokenSilently();
+          document.cookie = `jwt_access_token=${newAccessToken};max-age=86400;path=/`;
+        }
+      } catch (error) {
+        console.error('Error refreshing access token:', error);
+      }
+    };
+
+    const intervalId = setInterval(checkTokenValidity, 5 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, getIdTokenClaims, getAccessTokenSilently]);
 
   useEffect(() => {
     // If the user is not authenticated, redirect to the login page.
