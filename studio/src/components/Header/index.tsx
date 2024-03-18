@@ -5,8 +5,7 @@ import { getJwtAccessToken } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
-// @ts-ignore
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 import styles from './index.less';
 import './extra.less'
