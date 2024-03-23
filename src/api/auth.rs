@@ -154,12 +154,40 @@ fn validate_token_with_hs256(token: &str, secret_key: &str) -> Result<User, Stri
 }
 
 fn detect_algrithom(token: &str) -> Result<Algorithm, ErrorKind> {
+    if !token.contains('.') {
+        return Err(ErrorKind::InvalidToken);
+    }
     let parts: Vec<&str> = token.split('.').collect();
     let header = parts[0];
-    let header_json = base64::decode(header).unwrap();
-    let header_json_str = String::from_utf8(header_json).unwrap();
-    let header_json_value: Value = serde_json::from_str(&header_json_str).unwrap();
-    let alg = header_json_value["alg"].as_str().unwrap();
+    let header_json = match base64::decode(header) {
+        Ok(header_json) => header_json,
+        Err(e) => {
+            error!("Error: {}", e);
+            return Err(ErrorKind::InvalidToken);
+        }
+    };
+    let header_json_str = match String::from_utf8(header_json) {
+        Ok(header_json_str) => header_json_str,
+        Err(e) => {
+            error!("Error: {}", e);
+            return Err(ErrorKind::InvalidToken);
+        }
+    };
+    let header_json_value: Value = match serde_json::from_str(&header_json_str) {
+        Ok(header_json_value) => header_json_value,
+        Err(e) => {
+            error!("Error: {}", e);
+            return Err(ErrorKind::InvalidToken);
+        }
+    };
+    let alg = match header_json_value["alg"].as_str() {
+        Some(alg) => alg,
+        None => {
+            error!("Error: invalid alg.");
+            return Err(ErrorKind::InvalidToken);
+        }
+    };
+
     match alg {
         "HS256" => Ok(Algorithm::HS256),
         "RS256" => Ok(Algorithm::RS256),
@@ -168,6 +196,10 @@ fn detect_algrithom(token: &str) -> Result<Algorithm, ErrorKind> {
 }
 
 fn detect_kid(token_str: &str) -> Option<String> {
+    if !token_str.contains('.') {
+        return None;
+    }
+
     let parts: Vec<&str> = token_str.split('.').collect();
     let header = parts[0];
     let header_json = base64::decode(header).unwrap();

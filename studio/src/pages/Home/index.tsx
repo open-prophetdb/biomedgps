@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Spin, Tag, Select, Empty, Popover } from 'antd';
+import { Row, Col, Spin, Tag, Select, Empty, Popover, message } from 'antd';
 import { history } from 'umi';
 import CookieConsent, { Cookies } from 'react-cookie-consent';
 import { BookOutlined, ToolOutlined, createFromIconfontCN } from '@ant-design/icons';
@@ -152,9 +152,10 @@ export const fetchNodes = async (
                 callback(options);
             })
             .catch((error) => {
-                if (error.status === 401) {
-                    console.log('Unauthorized');
-                    history.push('/not-authorized');
+                if (error.response.status === 401) {
+                    message.warning("Please login to see the search results.")
+                } else {
+                    message.warning("Your network is not stable, please try again later. If the problem persists, please contact the administrator.")
                 }
                 console.log('requestNodes Error: ', error);
                 callback([]);
@@ -208,27 +209,27 @@ const HomePage: React.FC = () => {
             key: 'disease',
             icon: 'biomedgps-disease',
             title: 'Disease',
-            stat: '10000',
+            stat: '30,662',
         },
         {
             key: 'gene',
             icon: 'biomedgps-gene',
             title: 'Gene',
-            stat: '10000',
+            stat: '105,382',
             description: '',
         },
         {
             key: 'compound',
             icon: 'biomedgps-drug',
             title: 'Compound',
-            stat: '4000',
+            stat: '267,789',
             description: '',
         },
         {
             key: 'knowledges',
             icon: 'biomedgps-knowledge',
             title: 'Knowledges',
-            stat: '5,843,000',
+            stat: '5,810,160',
             description: '',
         },
     ];
@@ -286,6 +287,11 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
+                    <h4 style={{ textAlign: 'center' }}>Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.<br /> If you want to predict new knowledges, please go to the <a onClick={
+                        () => {
+                            history.push('/predict-model');
+                        }
+                    }>Predict Drug/Target</a> page.</h4>
                     <Select
                         showSearch
                         allowClear
@@ -337,6 +343,7 @@ const HomePage: React.FC = () => {
                             ))}
                     </Select>
                     <span className="desc">
+                        Examples: {' '}
                         <a onClick={() => {
                             onSearch('Disease::MONDO:0005404', 'ME/CFS')
                         }}>
@@ -360,7 +367,7 @@ const HomePage: React.FC = () => {
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
-                    <Col className="data-stat" sm={24} md={11} xs={11} xxl={11}>
+                    <Col className="data-stat" sm={24} md={12} xs={12} xxl={12}>
                         <p className="desc" style={{ textAlign: 'justify' }}>
                             A platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.
                             <br />
@@ -374,8 +381,8 @@ const HomePage: React.FC = () => {
                             More resources about the platform can be found in the <a href="https://drugs.3steps.cn/#/about">About</a> page.
                         </p>
                     </Col>
-                    <Col sm={1} md={1} xs={1} xxl={1}></Col>
-                    <Col className="image-container" sm={24} md={12} xs={12} xxl={12}>
+                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
+                    <Col className="image-container" sm={24} md={11} xs={11} xxl={11}>
                         <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
                             {images.map((item: ImageItem) => {
                                 return (

@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
-import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
+import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchPublication, fetchPublications } from '@/services/swagger/KnowledgeGraph';
 import type { ComposeQueryItem, QueryItem, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
+import type { EdgeInfo } from 'biominer-components/dist/EdgeInfoPanel/index.t';
 import { guessLink } from 'biominer-components/dist/utils';
-import { sortBy, filter, uniqBy } from 'lodash';
+import { EdgeInfoPanel } from 'biominer-components';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
+import { sortBy, filter, uniqBy } from 'lodash';
 
 import './index.less';
 
@@ -68,6 +70,8 @@ const KnowledgeTable: React.FC = (props) => {
     const queriedNodeName = new URLSearchParams(search).get('nodeName') || undefined;
     const [nodeId, setNodeId] = useState<string | undefined>(undefined);
     const [nodeName, setNodeName] = useState<string | undefined>(undefined);
+    const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
+    const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -289,6 +293,34 @@ const KnowledgeTable: React.FC = (props) => {
                 return <span>{text.toFixed(3)}</span>;
             },
             sorter: (a, b) => a.score - b.score,
+        },
+        {
+            title: 'Action',
+            key: 'operation',
+            fixed: 'right',
+            align: 'center',
+            width: 120,
+            render: (text, record) => (
+                <Space size="middle">
+                    <Popover
+                        content={
+                            <>
+                                <p>Show the top N publications and related information about this knowledge.</p>
+                            </>
+                        }
+                        title="Note"
+                    >
+                        <Button type="primary" onClick={() => {
+                            setEdgeInfo({
+                                startNode: record.source_node,
+                                endNode: record.target_node,
+                                edge: record as GraphEdge
+                            });
+                            setDrawerVisible(true);
+                        }}>Publications</Button>
+                    </Popover>
+                </Space>
+            ),
         }
     ];
 
@@ -333,7 +365,9 @@ const KnowledgeTable: React.FC = (props) => {
                     const sourceName = response.nodes.find((node) => node.data.id === item.source_id)?.data.name;
                     const targetName = response.nodes.find((node) => node.data.id === item.target_id)?.data.name;
                     newItem.source_name = sourceName;
+                    newItem.source_node = response.nodes.find((node) => node.data.id === item.source_id);
                     newItem.target_name = targetName;
+                    newItem.target_node = response.nodes.find((node) => node.data.id === item.target_id);
 
                     return newItem;
                 })
@@ -402,7 +436,7 @@ const KnowledgeTable: React.FC = (props) => {
                 size="small"
                 columns={columns}
                 loading={loading}
-                scroll={{ x: 1000, y: 'calc(100vh - 140px)' }}
+                scroll={{ x: 1000, y: 'calc(100vh - 165px)' }}
                 dataSource={tableData || []}
                 rowSelection={{
                     selectedRowKeys,
@@ -433,6 +467,37 @@ const KnowledgeTable: React.FC = (props) => {
                     setPageSize(pagination.pageSize || 10);
                 }}
             ></Table>
+            <Drawer
+                width={'80%'}
+                className='knowledge-drawer'
+                height={'100%'}
+                title={`Knowledge Information - ${edgeInfo?.startNode?.data.name} - ${edgeInfo?.edge?.relation_type} - ${edgeInfo?.endNode?.data.name}`}
+                rootStyle={{ position: 'absolute' }}
+                closable={true}
+                mask={true}
+                placement={'right'}
+                onClose={() => {
+                    setDrawerVisible(false);
+                }
+                }
+                open={drawerVisible}
+            >
+                {edgeInfo ?
+                    <EdgeInfoPanel edgeInfo={edgeInfo}
+                        fetchPublication={(id: string) => {
+                            return fetchPublication({
+                                id: id
+                            })
+                        }}
+                        fetchPublications={(queryStr: string, page?: number, pageSize?: number) => {
+                            return fetchPublications({
+                                query_str: queryStr,
+                                page: page,
+                                page_size: pageSize
+                            })
+                        }} />
+                    : <Empty description="No publication data for this knowledge." />}
+            </Drawer>
         </Row>
     );
 };
