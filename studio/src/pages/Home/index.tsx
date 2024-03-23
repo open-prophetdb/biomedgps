@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Spin, Tag, Select, Empty } from 'antd';
+import { Row, Col, Spin, Tag, Select, Empty, Popover } from 'antd';
 import { history } from 'umi';
 import CookieConsent, { Cookies } from 'react-cookie-consent';
 import { BookOutlined, ToolOutlined, createFromIconfontCN } from '@ant-design/icons';
@@ -13,8 +13,43 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import './index.less';
 
 const IconFont = createFromIconfontCN({
-    scriptUrl: '//at.alicdn.com/t/c/font_3865804_e60ulb5mre7.js',
+    scriptUrl: '//at.alicdn.com/t/c/font_4435889_2sgb9f98fdw.js',
 });
+
+const EntityCard = (metadata: Entity | undefined) => {
+    if (!metadata) {
+        return <div>No metadata found!</div>;
+    } else {
+        return (
+            <div style={{ overflowWrap: 'break-word', width: '500px' }}>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>Synonyms: </span>
+                    {metadata.synonyms || 'No synonyms found!'}
+                </p>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>Xrefs: </span>
+                    {metadata.xrefs || 'No xrefs found!'}
+                </p>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>Description: </span>
+                    {metadata.description || 'No description found!'}
+                </p>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>ID: </span>
+                    {metadata.id}
+                </p>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>Name: </span>
+                    {metadata.name}
+                </p>
+                <p style={{ marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 'bold' }}>Label: </span>
+                    {metadata.label}
+                </p>
+            </div>
+        );
+    }
+};
 
 export function makeQueryEntityStr(params: Partial<Entity>, order?: string[]): string {
     let query: ComposeQueryItem = {} as ComposeQueryItem;
@@ -91,10 +126,10 @@ export const fetchNodes = async (
     // If the value is a number, then maybe it is an id or xref but not for name or synonyms.
     if (value && !isNaN(Number(value))) {
         queryMap = { id: value, xrefs: value };
-        order = ['id', 'xrefs', 'label'];
+        order = ['label', 'id', 'xrefs'];
     } else {
         queryMap = { name: value, synonyms: value, xrefs: value, id: value };
-        order = ['name', 'synonyms', 'label', 'xrefs', 'id'];
+        order = ['label', 'name', 'synonyms', 'xrefs', 'id'];
     }
 
     const fetchData = () => {
@@ -109,7 +144,7 @@ export const fetchNodes = async (
                 const options: OptionType[] = records.map((item: Entity, index: number) => ({
                     order: index,
                     value: `${item['label']}::${item['id']}`,
-                    label: `${item['label']} | ${item['id']} | ${item['name']}`,
+                    label: <span><Tag>item['label']</Tag> {`${item['id']} | ${item['name']}`}</span>,
                     description: item['description'],
                     metadata: item,
                 }));
@@ -171,36 +206,48 @@ const HomePage: React.FC = () => {
     const stats: StatItem[] = [
         {
             key: 'disease',
-            icon: 'icon-yeast',
+            icon: 'biomedgps-disease',
             title: 'Disease',
             stat: '10000',
         },
         {
             key: 'gene',
-            icon: 'icon-book',
+            icon: 'biomedgps-gene',
             title: 'Gene',
             stat: '10000',
             description: '',
         },
         {
             key: 'compound',
-            icon: 'icon-tool',
+            icon: 'biomedgps-drug',
             title: 'Compound',
             stat: '4000',
             description: '',
         },
         {
             key: 'knowledges',
-            icon: 'icon-dna',
+            icon: 'biomedgps-knowledge',
             title: 'Knowledges',
             stat: '5,843,000',
             description: '',
         },
     ];
 
-    const onSearch = (value: string | string[]) => {
+    const onSearch = (value: string, name?: string) => {
         console.log('Search:', value);
-        history.push('/knowledge-table', { nodeId: value })
+
+        if (value && name) {
+            history.push(`/knowledge-table?nodeId=${value}&nodeName=${name}`);
+            return;
+        }
+
+        const filtered = filter(nodeOptions, (item) => item.value === value);
+        if (filtered.length === 0 || !filtered[0]?.metadata) {
+            history.push(`/knowledge-table?nodeId=${value}`);
+        } else {
+            const metadata = filtered[0].metadata;
+            history.push(`/knowledge-table?nodeId=${value}&nodeName=${metadata.name}`);
+        }
     };
 
     const images: ImageItem[] = [
@@ -250,9 +297,10 @@ const HomePage: React.FC = () => {
                         defaultActiveFirstOption={false}
                         placeholder="Enter a gene/protein, disease, drug or symptom name to start..."
                         onSearch={(value) => fetchNodes(value, setNodeOptions)}
-                        options={nodeOptions}
                         filterOption={false}
-                        onSelect={(value, options) => fetchNodes(value, setNodeOptions)}
+                        onSelect={(value, options) => {
+                            onSearch(value);
+                        }}
                         notFoundContent={
                             <Empty
                                 description={
@@ -264,25 +312,48 @@ const HomePage: React.FC = () => {
                                 }
                             />
                         }
-                    ></Select>
+                    >
+                        {nodeOptions &&
+                            nodeOptions.map((option: any) => (
+                                <Select.Option key={option.label} value={option.value} disabled={option.disabled}>
+                                    {option.metadata ? (
+                                        <Popover
+                                            placement="rightBottom"
+                                            title={option.label}
+                                            content={EntityCard(option.metadata)}
+                                            trigger="hover"
+                                            getPopupContainer={(triggeredNode: any) => document.body}
+                                            overlayClassName="entity-id-popover"
+                                            autoAdjustOverflow={false}
+                                            destroyTooltipOnHide={true}
+                                            zIndex={1500}
+                                        >
+                                            {option.label}
+                                        </Popover>
+                                    ) : (
+                                        option.label
+                                    )}
+                                </Select.Option>
+                            ))}
+                    </Select>
                     <span className="desc">
                         <a onClick={() => {
-                            onSearch('Disease::MONDO:0005404')
+                            onSearch('Disease::MONDO:0005404', 'ME/CFS')
                         }}>
                             <Tag color='#108ee9'>ME/CFS</Tag>
                         </a>
                         <a onClick={() => {
-                            onSearch('Disease::MONDO:0100233')
+                            onSearch('Disease::MONDO:0100233', 'LongCOVID')
                         }}>
                             <Tag color='#108ee9'>LongCOVID</Tag>
                         </a>
                         <a onClick={() => {
-                            onSearch('Compound::DrugBank:DB00028')
+                            onSearch('Compound::DrugBank:DB00028', 'Human immunoglobulin G')
                         }}>
                             <Tag color='#108ee9'>Human immunoglobulin G</Tag>
                         </a>
                         <a onClick={() => {
-                            onSearch('Symptom::MESH:D005221')
+                            onSearch('Symptom::MESH:D005221', 'Fatigue')
                         }}>
                             <Tag color='#108ee9'>Fatigue</Tag>
                         </a>

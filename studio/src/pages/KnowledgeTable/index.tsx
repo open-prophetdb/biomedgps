@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button, Empty } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
@@ -64,7 +65,9 @@ const KnowledgeTable: React.FC = (props) => {
     const search = useLocation().search;
     // Such as Disease::MONDO:0005404
     const queriedNodeId = new URLSearchParams(search).get('nodeId') || undefined;
+    const queriedNodeName = new URLSearchParams(search).get('nodeName') || undefined;
     const [nodeId, setNodeId] = useState<string | undefined>(undefined);
+    const [nodeName, setNodeName] = useState<string | undefined>(undefined);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -85,6 +88,10 @@ const KnowledgeTable: React.FC = (props) => {
     useEffect(() => {
         if (queriedNodeId) {
             setNodeId(queriedNodeId);
+        }
+
+        if (queriedNodeName) {
+            setNodeName(queriedNodeName);
         }
     }, [])
 
@@ -344,23 +351,50 @@ const KnowledgeTable: React.FC = (props) => {
     };
 
     return (total === 0) ? (
-        <Empty description="No Knowledges for Your Query" style={{
-            height: '100%',
-            flexDirection: 'column',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-        }} />
+        <>
+            <Empty description={
+                <>
+                    <p>No Knowledges for Your Query {nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''}</p>
+                    <Button type="primary" onClick={() => history.push('/')}>
+                        Go Back to Home Page
+                    </Button>
+                </>
+            }
+                style={{
+                    height: '100%',
+                    flexDirection: 'column',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }} />
+        </>
     ) : (
         <Row className="knowledge-table-container">
             <div className='button-container'>
-                <Button type="primary" danger size="small" disabled={selectedRowKeys.length === 0}
-                    onClick={() => explainGraph(selectedRowKeys as string[])}>
-                    Explain
-                </Button>
                 <span>
-                    Selected {selectedRowKeys.length} items [You can select several items by clicking on the checkboxes and explain them together]
+                    Selected {selectedRowKeys.length} items
+                    <Tooltip title="You can select several items by clicking on the checkboxes and explain them together.">
+                        <Button type="link" style={{ marginLeft: '5px', padding: '4px 0' }}>
+                            <QuestionCircleOutlined />Help
+                        </Button>
+                    </Tooltip>
                 </span>
+                <Button size="large" onClick={() => {
+                    history.push('/')
+                }}>
+                    Back to Home
+                </Button>
+                <Button type="primary" danger size="large"
+                    // disabled={selectedRowKeys.length === 0}
+                    onClick={() => {
+                        if (selectedRowKeys.length === 0) {
+                            message.warning('Please select at least one row to explain.', 5);
+                            return;
+                        }
+                        explainGraph(selectedRowKeys as string[]);
+                    }}>
+                    Explain [{nodeName ? nodeName : nodeId}]
+                </Button>
             </div>
             <Table
                 className={'graph-table'}
@@ -389,7 +423,7 @@ const KnowledgeTable: React.FC = (props) => {
                     current: page,
                     pageSize: pageSize,
                     total: total || 0,
-                    position: ['topRight'],
+                    position: ['topLeft'],
                     showTotal: (total) => {
                         return `Total ${total} items`;
                     },
