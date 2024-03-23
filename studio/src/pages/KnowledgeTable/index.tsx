@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Empty } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
+import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
 import type { ComposeQueryItem, QueryItem, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import { guessLink } from 'biominer-components/dist/utils';
@@ -18,80 +19,53 @@ export type GraphTableData = {
     pageSize: number;
 };
 
-const makeQueryStr = (): string => {
-    const fsource_query: ComposeQueryItem = {
+const makeQueryStr = (entityType: string, entityId: string): string => {
+    const source_query: ComposeQueryItem = {
         operator: 'and',
         items: [
             {
                 field: 'source_type',
                 operator: '=',
-                value: "Disease",
+                value: entityType
             },
             {
                 field: 'source_id',
                 operator: '=',
-                value: "MONDO:0005404",
+                value: entityId
             },
         ],
     };
 
-    const ssource_query: ComposeQueryItem = {
-        operator: 'and',
-        items: [
-            {
-                field: 'source_type',
-                operator: '=',
-                value: "Disease",
-            },
-            {
-                field: 'source_id',
-                operator: '=',
-                value: "MONDO:0100233",
-            },
-        ],
-    };
-
-    const ftarget_query: ComposeQueryItem = {
+    const target_query: ComposeQueryItem = {
         operator: 'and',
         items: [
             {
                 field: 'target_type',
                 operator: '=',
-                value: "Disease",
+                value: entityType
             },
             {
                 field: 'target_id',
                 operator: '=',
-                value: "MONDO:0005404",
-            },
-        ],
-    };
-
-    const starget_query: ComposeQueryItem = {
-        operator: 'and',
-        items: [
-            {
-                field: 'target_type',
-                operator: '=',
-                value: "Disease",
-            },
-            {
-                field: 'target_id',
-                operator: '=',
-                value: "MONDO:0100233",
+                value: entityId
             },
         ],
     };
 
     let query: ComposeQueryItem = {
         operator: 'or',
-        items: [fsource_query, ftarget_query, ssource_query, starget_query],
+        items: [source_query, target_query],
     };
 
     return JSON.stringify(query);
 }
 
 const KnowledgeTable: React.FC = (props) => {
+    const search = useLocation().search;
+    // Such as Disease::MONDO:0005404
+    const queriedNodeId = new URLSearchParams(search).get('nodeId') || undefined;
+    const [nodeId, setNodeId] = useState<string | undefined>(undefined);
+
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
     const [tableData, setTableData] = useState<any[]>([] as any[]);
@@ -109,16 +83,10 @@ const KnowledgeTable: React.FC = (props) => {
     }, [isAuthenticated])
 
     useEffect(() => {
-        fetchRelationCounts({ query_str: makeQueryStr() })
-            .then((response) => {
-                const n = response.map((item) => item.ncount).reduce((a, b) => a + b, 0);
-                setTotal(n);
-            })
-            .catch((error) => {
-                console.log('Get relation counts error: ', error);
-                setTotal(0);
-            });
-    }, []);
+        if (queriedNodeId) {
+            setNodeId(queriedNodeId);
+        }
+    }, [])
 
     const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
         console.log('selectedRowKeys changed: ', newSelectedRowKeys);
@@ -146,19 +114,26 @@ const KnowledgeTable: React.FC = (props) => {
         history.push('/knowledge-graph');
     }
 
-    const getKnowledgesData = (page: number, pageSize: number): Promise<GraphData> => {
+    const getKnowledgesData = (nodeId: string, page: number, pageSize: number): Promise<GraphData> => {
         return new Promise((resolve, reject) => {
-            fetchOneStepLinkedNodes({
-                query_str: makeQueryStr(),
-                page_size: pageSize,
-                page: page
-            })
-                .then((response) => {
-                    resolve(response);
+            let pairs = nodeId.split('::');
+            const entityType = pairs[0];
+            const entityId = pairs[1];
+            if (entityType && entityId) {
+                fetchOneStepLinkedNodes({
+                    query_str: makeQueryStr(entityType, entityId),
+                    page_size: pageSize,
+                    page: page
                 })
-                .catch((error) => {
-                    reject(error);
-                });
+                    .then((response) => {
+                        resolve(response);
+                    })
+                    .catch((error) => {
+                        reject(error);
+                    });
+            } else {
+                resolve({ nodes: [], edges: [] });
+            }
         })
     };
 
@@ -312,7 +287,30 @@ const KnowledgeTable: React.FC = (props) => {
 
     useEffect(() => {
         setLoading(true);
-        getKnowledgesData(page, pageSize)
+        if (!nodeId) {
+            setLoading(false);
+            return;
+        }
+
+        let pairs = nodeId.split('::');
+        const entityType = pairs[0];
+        const entityId = pairs[1];
+        if (entityType && entityId) {
+            fetchRelationCounts({ query_str: makeQueryStr(entityType, entityId) })
+                .then((response) => {
+                    const n = response.map((item) => item.ncount).reduce((a, b) => a + b, 0);
+                    setTotal(n);
+                })
+                .catch((error) => {
+                    console.log('Get relation counts error: ', error);
+                    setTotal(0);
+                });
+        } else {
+            // Reset the component
+            setTotal(0);
+        }
+
+        getKnowledgesData(nodeId, page, pageSize)
             .then((response) => {
                 setGraphData(response);
                 setLoading(false);
@@ -339,13 +337,21 @@ const KnowledgeTable: React.FC = (props) => {
                 setGraphData({} as GraphData);
                 setLoading(false);
             });
-    }, [page, pageSize, refreshKey]);
+    }, [nodeId, page, pageSize, refreshKey]);
 
     const getRowKey = (record: GraphEdge) => {
         return record.relid || `${JSON.stringify(record)}`;
     };
 
-    return (
+    return (total === 0) ? (
+        <Empty description="No Knowledges for Your Query" style={{
+            height: '100%',
+            flexDirection: 'column',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        }} />
+    ) : (
         <Row className="knowledge-table-container">
             <div className='button-container'>
                 <Button type="primary" danger size="small" disabled={selectedRowKeys.length === 0}

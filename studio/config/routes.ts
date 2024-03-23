@@ -4,9 +4,16 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 
 export const routes = [
   {
+    path: '/',
+    name: 'Home',
+    icon: 'home',
+    component: './Home',
+  },
+  {
     path: '/knowledge-table',
     name: 'ME/CFS & LongCOVID',
     icon: 'table',
+    hideInMenu: true,
     component: './KnowledgeTable',
     category: 'knowledge-graph'
   },
@@ -65,11 +72,6 @@ export const routes = [
     hideInMenu: true,
     path: '/not-authorized',
     component: './NotAuthorized',
-  },
-  {
-    path: '/',
-    // redirect: '/predict-model',
-    redirect: '/knowledge-table',
   },
   {
     path: '/*',
