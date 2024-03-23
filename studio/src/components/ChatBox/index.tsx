@@ -1,7 +1,7 @@
 import { ReactChatPlugin } from 'biominer-components';
 import { filter, set } from 'lodash';
 import * as webllm from "@mlc-ai/web-llm";
-import { initChat } from '@/components/util';
+import { initChat } from '@/components/webllm';
 import { useEffect, useState } from 'react';
 import { message as AntdMessage } from 'antd';
 import rehypeRaw from 'rehype-raw';
@@ -51,7 +51,9 @@ const ChatBoxWrapper: React.FC<ChatBoxProps> = (props) => {
 
   useEffect(() => {
     const initChatBox = async () => {
+      // @ts-ignore
       if (window.chat) {
+        // @ts-ignore
         setChat(window.chat);
       } else {
         const chat = await initChat();

@@ -1,4 +1,5 @@
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { message as AndMessage } from 'antd';
 
 const getIdentity = async () => {
   let visitorId = localStorage.getItem('rapex-visitor-id')

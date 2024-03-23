@@ -2,6 +2,7 @@
 import { defineConfig } from 'umi';
 import path from 'path';
 import proxy from './proxy';
+import CompressionPlugin from 'compression-webpack-plugin';
 import { routes as defaultRoutes } from './routes';
 
 // const isDev = process.env.NODE_ENV === 'development';
@@ -24,7 +25,7 @@ export default defineConfig({
   request: {},
   npmClient: 'yarn',
   dva: {},
-  chainWebpack: (config: any) => {
+  chainWebpack: (config: any, { env }) => {
     config.merge({
       resolve: {
         fallback: {
@@ -36,6 +37,16 @@ export default defineConfig({
     // https://github.com/webpack/webpack/discussions/13585
     config.resolve.alias.set('perf_hooks', path.resolve(__dirname, 'perf_hooks.ts'));
     // console.log("config.resolve.alias", config.resolve.alias);
+
+    if (env === 'production') {
+      config.plugin('compression-webpack-plugin').use(
+        new CompressionPlugin({
+          test: /.js$|.html$|.css$/,
+          threshold: 10240,
+          deleteOriginalAssets: false,
+        }),
+      );
+    }
   },
   layout: {
     // https://umijs.org/docs/max/layout-menu

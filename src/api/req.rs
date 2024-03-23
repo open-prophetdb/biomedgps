@@ -1,5 +1,5 @@
 use anyhow;
-use poem_openapi::{types::ToJSON, Object};
+use poem_openapi::Object;
 use reqwest;
 use serde::{Deserialize, Serialize};
 
@@ -37,9 +37,7 @@ pub struct PublicationDetail {
 }
 
 impl Publication {
-    pub async fn fetch_publication(
-        id: &str,
-    ) -> Result<PublicationDetail, anyhow::Error> {
+    pub async fn fetch_publication(id: &str) -> Result<PublicationDetail, anyhow::Error> {
         let api_token = match std::env::var("GUIDESCOPER_API_TOKEN") {
             Ok(token) => token,
             Err(_) => {

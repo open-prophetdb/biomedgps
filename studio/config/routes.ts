@@ -72,6 +72,7 @@ export const routes = [
     redirect: '/knowledge-table',
   },
   {
+    path: '/*',
     component: './404',
   },
 ];
