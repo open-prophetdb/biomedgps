@@ -49,33 +49,70 @@ export const getBiologyBackground = (proteinInfo: UniProtEntry): React.ReactNode
     }
 }
 
+export const fetchAlphafoldData = async (uniprotId: string): Promise<{
+    id: string;
+    chain: string;
+}> => {
+    const response = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotId}`);
+    const data = await response.json();
+
+    return data.map((entry: any) => {
+        return {
+            id: entry.entryId,
+            chain: `${entry.uniprotStart}-${entry.uniprotEnd}`
+        }
+    });
+}
+
 export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }) => {
     const [currentPdbId, setCurrentPdbId] = useState<string>('');
     const [pdbData, setPdbData] = useState<any[]>([]);
 
     useEffect(() => {
-        const pdbInfo = proteinInfo.uniProtKBCrossReferences.filter((ref) => ref.database === 'PDB');
+        const pdbInfo = proteinInfo.uniProtKBCrossReferences.filter(
+            (ref) => ref.database === 'PDB'
+        );
         const pdbData = pdbInfo.map((ref) => {
             return {
                 key: ref.id,
                 id: ref.id,
-                category: 'PDB',
+                category: ref.database,
                 method: ref.properties.find((prop) => prop.key === 'Method')?.value,
                 resolution: ref.properties.find((prop) => prop.key === 'Resolution')?.value,
                 chain: ref.properties.find((prop) => prop.key === 'Chains')?.value,
             };
         });
-
         setPdbData(pdbData);
+
+        const alphafoldData = proteinInfo.uniProtKBCrossReferences.filter(
+            (ref) => ref.database === 'AlphaFoldDB'
+        );
+        Promise.all(alphafoldData.map((ref) => fetchAlphafoldData(ref.id))).then((data) => {
+            const alphafoldPdbData = data.flat().map((entry: any) => {
+                return {
+                    key: entry.id,
+                    id: entry.id,
+                    category: 'AlphaFoldDB',
+                    method: 'Predicted',
+                    resolution: 'Unknown',
+                    chain: entry.chain,
+                };
+            });
+
+            setPdbData([...pdbData, ...alphafoldPdbData]);
+        }).catch((err) => {
+            console.error(err);
+        });
+
         setCurrentPdbId(pdbData[0]?.id);
     }, [proteinInfo]);
-
 
     return (
         pdbData.length === 0 ? <Empty description="No PDB found" /> :
             <Row className="pdb-info">
-                <MolStarViewer pdbId={currentPdbId} dimensions={['80%', '500px']}
-                    className="molstar-viewer" useInterface showControls showAxes />
+                <MolStarViewer pdbId={currentPdbId} dimensions={['80%', '600px']}
+                    className="molstar-viewer" useInterface showControls showAxes
+                />
                 <Table dataSource={pdbData} columns={[
                     {
                         title: 'Database',
@@ -155,7 +192,9 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                 {
                     key: 'ncbi-gene-id',
                     label: 'NCBI Gene ID',
-                    children: geneInfo.entrezgene,
+                    children: <a href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneInfo.entrezgene}`} target="_blank">
+                        {geneInfo.entrezgene}
+                    </a>,
                 },
                 {
                     key: 'alias',
@@ -166,6 +205,13 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                     key: 'location',
                     label: 'Chromosome Location',
                     children: geneInfo.map_location ? geneInfo.map_location : 'Unknown',
+                },
+                {
+                    key: 'uniport-id',
+                    label: 'UniProt ID',
+                    children: uniprotId ? <a href={`https://www.uniprot.org/uniprot/${uniprotId}`} target="_blank">
+                        {uniprotId}
+                    </a> : 'Unknown',
                 }
             ];
 

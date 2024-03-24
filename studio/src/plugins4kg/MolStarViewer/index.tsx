@@ -34,6 +34,12 @@ const MolstarViewer: React.FC<MolstarViewerProps> = (props) => {
             isExpanded: false,
             controlsDisplay: "reactive",
             showControls,
+            regionState: {
+              left: 'collapsed',
+              right: 'hidden',
+              top: 'full',
+              bottom: 'hidden'
+            }
           }
         };
 
@@ -111,6 +117,13 @@ const MolstarViewer: React.FC<MolstarViewerProps> = (props) => {
     }
   }, [showAxes])
 
+  const formatPdbUrl = (pdbId: string) => {
+    if (pdbId.startsWith('AF-')) {
+      return `https://alphafold.ebi.ac.uk/files/${pdbId}-model_v4.cif`;
+    } else {
+      return `https://files.rcsb.org/view/${pdbId}.cif`;
+    }
+  }
 
   const loadStructure = async (pdbId: string, url: string, file: any, plugin: any) => {
     if (plugin) {
@@ -122,7 +135,7 @@ const MolstarViewer: React.FC<MolstarViewerProps> = (props) => {
         const traj = await plugin.builders.structure.parseTrajectory(data, file.type);
         await plugin.builders.structure.hierarchy.applyPreset(traj, "default");
       } else {
-        const structureUrl = url ? url : pdbId ? `https://files.rcsb.org/view/${pdbId}.cif` : null;
+        const structureUrl = url ? url : pdbId ? formatPdbUrl(pdbId) : null;
         if (!structureUrl) return;
         const data = await plugin.builders.data.download(
           { url: structureUrl }, { state: { isGhost: true } }

@@ -11,6 +11,8 @@ import ProteinInfoPanel from "./ProteinInfoPanel";
 import React, { useEffect, useState } from "react";
 import type { GraphNode } from "biominer-components/dist/typings";
 
+import "./index.less";
+
 export {
   ExpressionAtlas,
   GeneInfoPanel,
