@@ -15,11 +15,16 @@ type ComposedProteinPanel = {
 
 const fetchProteinInfoByGeneInfo = async (geneInfo: GeneInfo): Promise<UniProtEntry> => {
     const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
-    if (!uniprotId) {
+    const uniprotIds = geneInfo.uniprot ? (geneInfo.uniprot.TrEMBL || []) : [];
+    if (!uniprotId && uniprotIds.length === 0) {
         return {} as UniProtEntry;
     }
 
-    return fetchProteinInfo(uniprotId);
+    if (uniprotId) {
+        return fetchProteinInfo(uniprotId);
+    } else {
+        return fetchProteinInfo(uniprotIds[0]);
+    }
 }
 
 const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
@@ -37,6 +42,8 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
     }>>({});
 
     useEffect(() => {
+        // Get the geneInfo and proteinInfo from the mygene.info and uniprot API.
+        // If possible, we would like to get all the geneInfo and proteinInfo from the homologene.
         const init = async () => {
             if (!geneInfo) {
                 return;
@@ -60,6 +67,8 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                     return isExpectedSpecies(`${taxid}`)
                 })
 
+                console.log("All expected species and genes: ", remaingGenes);
+
                 const geneInfos = remaingGenes.map(([taxid, entrezgene]) => {
                     if (taxid === geneInfo.taxid) {
                         return geneInfo;
@@ -80,40 +89,42 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                         return expectedOrder.indexOf(a.taxid.toString()) - expectedOrder.indexOf(b.taxid.toString());
                     });
                     setAllGeneInfos(orderedGeneInfos);
+
+                    const proteinInfos = remaingGenes.map(([taxid, entrezgene]) => {
+                        if (taxid === geneInfo.taxid) {
+                            return proteinInfo;
+                        }
+                        const gInfo = orderedGeneInfos.find((geneInfo) => geneInfo.taxid === taxid)?.geneInfo || {} as GeneInfo;
+                        return fetchProteinInfoByGeneInfo(gInfo);
+                    });
+
+                    Promise.all(proteinInfos).then((proteinInfos) => {
+                        const oProteinInfos = proteinInfos.map((proteinInfo, index) => {
+                            return proteinInfo;
+                        });
+
+                        const proteinInfoMap: Record<string, {
+                            proteinInfo: UniProtEntry;
+                            geneInfo: GeneInfo;
+                        }> = {};
+                        oProteinInfos.forEach((proteinInfo, index) => {
+                            const genePair = remaingGenes[index];
+                            const taxid = genePair[0].toString();
+                            const geneInfo = orderedGeneInfos.find((geneInfo) => geneInfo.taxid.toString() === taxid);
+                            proteinInfoMap[taxid] = {
+                                proteinInfo,
+                                // TODO: It might cause that we get the wrong fasta data at the AlignmentViewer.
+                                geneInfo: geneInfo?.geneInfo || {} as GeneInfo
+                            }
+                        });
+
+                        setAllProteinInfos(proteinInfoMap);
+                    }).catch((error) => {
+                        console.error(error);
+                    });
                 }).catch((error) => {
                     console.error(error);
                     setAllGeneInfos([]);
-                });
-
-                const proteinInfos = remaingGenes.map(([taxid, entrezgene]) => {
-                    if (taxid === geneInfo.taxid) {
-                        return proteinInfo;
-                    }
-                    return fetchProteinInfoByGeneInfo(geneInfo);
-                });
-
-                Promise.all(proteinInfos).then((proteinInfos) => {
-                    const oProteinInfos = proteinInfos.map((proteinInfo, index) => {
-                        return proteinInfo;
-                    });
-
-                    const proteinInfoMap: Record<string, {
-                        proteinInfo: UniProtEntry;
-                        geneInfo: GeneInfo;
-                    }> = {};
-                    oProteinInfos.forEach((proteinInfo, index) => {
-                        const genePair = remaingGenes[index];
-                        const taxid = genePair[0].toString();
-                        const geneInfo = allGeneInfos.find((geneInfo) => geneInfo.taxid.toString() === taxid);
-                        proteinInfoMap[taxid] = {
-                            proteinInfo,
-                            geneInfo: geneInfo?.geneInfo || {} as GeneInfo
-                        }
-                    });
-
-                    setAllProteinInfos(proteinInfoMap);
-                }).catch((error) => {
-                    console.error(error);
                 });
             }
         }
@@ -136,14 +147,22 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
         if (oItems.length === 0) {
             return;
         } else {
-            const alignmentData = Object.keys(allProteinInfos).map((taxid) => {
+            let alignmentData: any[] = [];
+            Object.keys(allProteinInfos).forEach((taxid) => {
                 const proteinInfo = allProteinInfos[taxid].proteinInfo;
                 const geneInfo = allProteinInfos[taxid].geneInfo;
-                return {
-                    sequence: proteinInfo.sequence.value,
-                    species: guessSpecies(taxid),
-                    geneSymbol: geneInfo.symbol,
-                    entrezgene: geneInfo.entrezgene           
+                if (proteinInfo?.sequence?.value) {
+                    alignmentData.push({
+                        sequenceVersion: proteinInfo.entryAudit?.sequenceVersion || 0,
+                        score: proteinInfo.annotationScore || 0,
+                        proteinName: proteinInfo.uniProtkbId,
+                        proteinDescription: proteinInfo.proteinDescription?.recommendedName?.fullName?.value || '',
+                        uniProtId: proteinInfo.primaryAccession,
+                        sequence: proteinInfo.sequence.value,
+                        species: guessSpecies(taxid),
+                        geneSymbol: geneInfo.symbol,
+                        entrezgene: geneInfo.entrezgene
+                    })
                 }
             });
             oItems.push({
@@ -154,7 +173,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
         }
 
         setItems(oItems);
-    }, [allGeneInfos]);
+    }, [allGeneInfos, allProteinInfos]);
 
     return (items.length === 0 ?
         <Empty description="No information available." /> :

@@ -101,7 +101,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
   return <Tabs
     className="plugins4kg tabs-nav-right"
     items={items && items.length > 0 ? items : defaultItems}
-  ></Tabs>
+  />
 }
 
 export default NodeInfoPanel;

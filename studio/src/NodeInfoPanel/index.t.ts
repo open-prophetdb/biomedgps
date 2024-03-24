@@ -230,6 +230,11 @@ export interface CrossReferenceProperty {
 }
 
 export interface AlignmentData {
+    proteinDescription: string;
+    proteinName: string;
+    sequenceVersion: number;
+    score: number;
+    uniProtId: string;
     sequence: string;
     species: string;
     geneSymbol: string;

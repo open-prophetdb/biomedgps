@@ -5,6 +5,7 @@ import { isProteinCoding, fetchProteinInfo } from "./utils";
 import type { DescriptionsProps } from 'antd';
 import { MolStarViewer } from "..";
 import { guessSpecies } from "@/components/util";
+import { isEmpty } from "lodash";
 
 import './index.less';
 
@@ -30,9 +31,12 @@ function PubMedLinks(text: string) {
 }
 
 export const getBiologyBackground = (proteinInfo: UniProtEntry): React.ReactNode => {
-    const background = proteinInfo.comments.filter((comment) => comment.commentType === 'FUNCTION');
-    if (background.length === 0) {
-        return <Empty description="No biology background found" />;
+    const background = proteinInfo?.comments?.filter((comment) => comment.commentType === 'FUNCTION');
+    if (!background || (background && background.length === 0)) {
+        return <div>
+            <h2>Biology Background</h2>
+            <Empty description="No biology background found" style={{ minHeight: '200px' }} />
+        </div>
     } else {
         return (
             <div>
@@ -85,6 +89,7 @@ export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }
             };
         });
         setPdbData(pdbData);
+        setCurrentPdbId(pdbData[0]?.id);
 
         const alphafoldData = proteinInfo.uniProtKBCrossReferences.filter(
             (ref) => ref.database === 'AlphaFoldDB'
@@ -101,12 +106,12 @@ export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }
                 };
             });
 
-            setPdbData([...pdbData, ...alphafoldPdbData]);
+            const oPdbData = [...pdbData, ...alphafoldPdbData];
+            setPdbData(oPdbData);
+            setCurrentPdbId(oPdbData[0]?.id);
         }).catch((err) => {
             console.error(err);
         });
-
-        setCurrentPdbId(pdbData[0]?.id);
     }, [proteinInfo]);
 
     return (
@@ -210,28 +215,27 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
     }, [geneInfo]);
 
     return (
-        Object.keys(proteinInfo).length === 0 ? <Empty description="No protein info found" /> :
-            <Row className="protein-info-panel">
-                <Col className="general-information">
-                    {/* @ts-ignore */}
-                    <Descriptions title="General Information" bordered items={generalInfo} column={2} />
-                </Col>
-                <Col className="biology-background">
-                    {proteinInfo ? (
-                        getBiologyBackground(proteinInfo)
-                    ) : (
-                        <Empty description="No protein info found" />
-                    )}
-                </Col>
-                <Col className="protein-snp">
+        <Row className="protein-info-panel">
+            <Col className="general-information">
+                {/* @ts-ignore */}
+                <Descriptions title="General Information" bordered items={generalInfo} column={2} />
+            </Col>
+            <Col className="biology-background">
+                {getBiologyBackground(proteinInfo)}
+            </Col>
+            <Col className="protein-snp">
 
-                </Col>
-                <Col className="protein-structure">
-                    <h2>Sequence</h2>
-                    <p>{proteinInfo.sequence.value}</p>
-                    <PdbInfo proteinInfo={proteinInfo} />
-                </Col>
-            </Row>
+            </Col>
+            <Col className="protein-structure">
+                <h2>Sequence</h2>
+                {isEmpty(proteinInfo) ? <Empty description="No reviewed sequence found" /> :
+                    <>
+                        <p>{proteinInfo.sequence.value}</p>
+                        <PdbInfo proteinInfo={proteinInfo} />
+                    </>
+                }
+            </Col>
+        </Row>
     );
 }
 

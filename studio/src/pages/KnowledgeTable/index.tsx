@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
@@ -491,24 +491,26 @@ const KnowledgeTable: React.FC = (props) => {
         return record.relid || `${JSON.stringify(record)}`;
     };
 
-    return (total === 0) ? (
-        <>
-            <Empty description={
-                <>
-                    <p>No Knowledges for Your Query {nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''}</p>
-                    <Button type="primary" onClick={() => history.push('/')}>
-                        Go Back to Home Page
-                    </Button>
-                </>
-            }
-                style={{
-                    height: '100%',
-                    flexDirection: 'column',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }} />
-        </>
+    return (total == 0) ? (
+        <Row className='knowledge-table-container'>
+            <Spin spinning={loading}>
+                <Empty description={
+                    <>
+                        <p>No Knowledges for Your Query {nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''}</p>
+                        <Button type="primary" onClick={() => history.push('/')}>
+                            Go Back to Home Page
+                        </Button>
+                    </>
+                }
+                    style={{
+                        height: '100%',
+                        flexDirection: 'column',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }} />
+            </Spin>
+        </Row>
     ) : (
         <Row className="knowledge-table-container">
             <div className='button-container'>

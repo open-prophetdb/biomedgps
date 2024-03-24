@@ -42,14 +42,18 @@ export const expectedOrder: string[] = [
     '9606',
     '10090',
     '10116',
-    '9541'
+    '9541',
+    '9544',
+    '9598'
 ]
 
 export const expectedSpecies: Record<string, string[]> = {
     '9606': ['Human', 'Human'],
     '10090': ['Mouse', 'Mouse'],
     '10116': ['Rattus norvegicus', 'Rat'],
-    '9541': ['Macaca fascicularis', 'Macaca']
+    '9541': ['Macaca fascicularis', 'M.fascicularis'],
+    '9544': ['Macaca mulatta', 'M.mulatta'],
+    '9598': ['Chimpanzee', 'Chimpanzee']
 }
 
 export const guessSpecies = (taxid: string) => {
