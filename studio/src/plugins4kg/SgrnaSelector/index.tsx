@@ -4,10 +4,22 @@ import { GuideScoperViewer } from 'biominer-components';
 type SgrnaSelectorProps = {
   rootId?: string,
   // Only support entrezId for now
-  geneId: number,
+  geneId: string,
   // Only support 9606(human), 10090(mouse) for now
   taxId?: number
   url?: string
+}
+
+const formatEntrezId = (geneId: string) => {
+  if (geneId.includes("ENTREZ:")) {
+    return geneId;
+  }
+
+  if (geneId.match(/^\d+$/)) {
+    return `ENTREZ:${geneId}`;
+  }
+
+  return geneId;
 }
 
 const SgrnaSelector: React.FC<SgrnaSelectorProps> = (props) => {
@@ -22,8 +34,8 @@ const SgrnaSelector: React.FC<SgrnaSelectorProps> = (props) => {
   }, []);
 
   return (
-    <GuideScoperViewer geneId={`${props.geneId}`} id={rootId}
-      url={"https://biosolver.cn/#/guider-query-details?entrezId="}>
+    <GuideScoperViewer geneId={formatEntrezId(props.geneId)} id={rootId}
+      url={"https://biosolver.cn/#/grna-query-details?entrezId="}>
     </GuideScoperViewer>
   )
 }

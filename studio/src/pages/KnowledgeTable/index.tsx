@@ -11,6 +11,7 @@ import type { EdgeInfo } from 'biominer-components/dist/EdgeInfoPanel/index.t';
 import { guessLink } from 'biominer-components/dist/utils';
 import { EdgeInfoPanel } from 'biominer-components';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
+import { NodeInfoPanel } from '@/plugins4kg';
 import { sortBy, filter, uniqBy } from 'lodash';
 
 import './index.less';
@@ -72,6 +73,7 @@ const KnowledgeTable: React.FC = (props) => {
     const [nodeName, setNodeName] = useState<string | undefined>(undefined);
     const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
+    const [currentNode, setCurrentNode] = useState<GraphNode | undefined>(undefined);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -214,11 +216,16 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'source_id',
             align: 'center',
             key: 'source_id',
-            render: (text) => {
+            render: (text, record) => {
+                console.log("Source ID: ", text, record);
                 return (
-                    <a target="_blank" href={guessLink(text)}>
-                        {text}
-                    </a>
+                    text.startsWith('ENTREZ:') ?
+                        <a onClick={() => { setCurrentNode(record.source_node) }}>
+                            {text}
+                        </a> :
+                        <a target="_blank" href={guessLink(text)}>
+                            {text}
+                        </a>
                 );
             }
         },
@@ -260,11 +267,15 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'target_id',
             align: 'center',
             key: 'target_id',
-            render: (text) => {
+            render: (text, record) => {
                 return (
-                    <a target="_blank" href={guessLink(text)}>
-                        {text}
-                    </a>
+                    text.startsWith('ENTREZ:') ?
+                        <a onClick={() => { setCurrentNode(record.target_node) }}>
+                            {text}
+                        </a> :
+                        <a target="_blank" href={guessLink(text)}>
+                            {text}
+                        </a>
                 );
             }
         },
@@ -469,9 +480,29 @@ const KnowledgeTable: React.FC = (props) => {
             ></Table>
             <Drawer
                 width={'80%'}
+                className='node-drawer'
+                height={'100%'}
+                title={currentNode ? `Node Information - ${currentNode.data.name}` : 'Node Information'}
+                rootStyle={{ position: 'absolute' }}
+                closable={true}
+                mask={true}
+                placement={'right'}
+                onClose={() => {
+                    setCurrentNode(undefined);
+                }}
+                open={currentNode !== undefined}
+            >
+                {
+                    currentNode ?
+                        <NodeInfoPanel node={currentNode} /> :
+                        <Empty description="No node data for this knowledge." />
+                }
+            </Drawer>
+            <Drawer
+                width={'80%'}
                 className='knowledge-drawer'
                 height={'100%'}
-                title={`Knowledge Information - ${edgeInfo?.startNode?.data.name} - ${edgeInfo?.edge?.relation_type} - ${edgeInfo?.endNode?.data.name}`}
+                title={`Knowledge Information - ${edgeInfo?.startNode?.data.name} - ${edgeInfo?.edge?.reltype} - ${edgeInfo?.endNode?.data.name}`}
                 rootStyle={{ position: 'absolute' }}
                 closable={true}
                 mask={true}

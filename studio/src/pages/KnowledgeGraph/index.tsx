@@ -9,8 +9,7 @@ import { MessageFilled, MessageOutlined } from '@ant-design/icons';
 import {
   fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts, fetchPublication, fetchPublications
 } from '@/services/swagger/KnowledgeGraph';
-import { getGeneInfo } from '@/plugins4kg/utils';
-import { getItems4GenePanel } from '@/plugins4kg';
+import { NodeInfoPanel } from '@/plugins4kg';
 
 
 import './index.less';
@@ -101,8 +100,7 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
               })
             },
           }}
-          getGeneInfo={getGeneInfo}
-          getItems4GenePanel={getItems4GenePanel}
+          NodeInfoPanel={NodeInfoPanel}
           postMessage={(message: string) => {
             if (chatBoxVisible) {
               setMessage(message)

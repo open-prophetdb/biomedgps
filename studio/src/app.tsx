@@ -1,6 +1,5 @@
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
-import ErrorBoundary from '@/components/ErrorBoundary';
 import { RequestConfig, history, RuntimeConfig } from 'umi';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
@@ -211,9 +210,7 @@ export const layout: RuntimeConfig = (initialState: any) => {
       } else {
         return (
           <>
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
+            {children}
           </>
         );
       }
