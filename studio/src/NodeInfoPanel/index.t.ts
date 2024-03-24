@@ -18,6 +18,10 @@ export interface GeneInfo {
     summary?: string;
     symbol: string;
     taxid: number;
+    homologene?: {
+        genes: number[][], // Such as "genes": [[3702, 824036], [9606, 1017]], the first number is the taxid and the second number is the entrezid.
+        id: number;
+    };
     type_of_gene: string;
     unigene?: string[];
     uniprot?: {
@@ -224,3 +228,10 @@ export interface CrossReferenceProperty {
     key: string;
     value: string;
 }
+
+export interface AlignmentData {
+    sequence: string;
+    species: string;
+    geneSymbol: string;
+    entrezgene: string;
+};

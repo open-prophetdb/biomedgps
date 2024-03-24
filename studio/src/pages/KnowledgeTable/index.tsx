@@ -6,13 +6,15 @@ import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
-import type { ComposeQueryItem, QueryItem, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
+import type { ComposeQueryItem, Entity, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import { guessLink } from 'biominer-components/dist/utils';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy } from 'lodash';
+import { guessColor } from '@/components/util';
+import EntityCard from '@/components/EntityCard';
 
 import './index.less';
 
@@ -220,10 +222,33 @@ const KnowledgeTable: React.FC = (props) => {
             sorter: (a, b) => a.source_name.localeCompare(b.source_name),
             onFilter: (value, record) => record.source_name.indexOf(value) === 0,
             render: (text, record) => {
+                const option = record.source_node as GraphNode;
+                const nodeData = option.data;
                 return <>
-                    <Tooltip title={text}>
-                        {truncateString(text)}
-                    </Tooltip>
+                    {nodeData ? (
+                        <Popover
+                            placement="rightTop"
+                            title={
+                                <span>
+                                    <Tag color={guessColor(nodeData.label)}>{nodeData.label}</Tag>
+                                    {nodeData.id} | {nodeData.name}
+                                </span>
+                            }
+                            content={EntityCard({ ...nodeData, idx: 0 })}
+                            trigger="hover"
+                            getPopupContainer={(triggeredNode: any) => document.body}
+                            overlayClassName="entity-id-popover"
+                            autoAdjustOverflow={false}
+                            destroyTooltipOnHide={true}
+                            zIndex={1500}
+                        >
+                            {truncateString(text)}
+                        </Popover>
+                    ) : (
+                        <Tooltip title={text}>
+                            {truncateString(text)}
+                        </Tooltip>
+                    )}
                     {<br />}
                     {record.source_id.startsWith('ENTREZ:') ?
                         <a onClick={() => { setCurrentNode(record.source_node) }}>
@@ -270,6 +295,9 @@ const KnowledgeTable: React.FC = (props) => {
             filterSearch: true,
             sorter: (a, b) => a.source_type.localeCompare(b.source_type),
             onFilter: (value, record) => record.source_type.indexOf(value) === 0,
+            render: (text) => {
+                return <Tag color={guessColor(text)}>{text}</Tag>;
+            }
         },
         {
             title: 'Target Name',
@@ -287,10 +315,33 @@ const KnowledgeTable: React.FC = (props) => {
             sorter: (a, b) => a.target_name.localeCompare(b.target_name),
             onFilter: (value, record) => record.target_name.indexOf(value) === 0,
             render: (text, record) => {
+                const option = record.target_node as GraphNode;
+                const nodeData = option.data;
                 return <>
-                    <Tooltip title={text}>
-                        {truncateString(text)}
-                    </Tooltip>
+                    {nodeData ? (
+                        <Popover
+                            placement="rightTop"
+                            title={
+                                <span>
+                                    <Tag color={guessColor(nodeData.label)}>{nodeData.label}</Tag>
+                                    {nodeData.id} | {nodeData.name}
+                                </span>
+                            }
+                            content={EntityCard({ ...nodeData, idx: 0 })}
+                            trigger="hover"
+                            getPopupContainer={(triggeredNode: any) => document.body}
+                            overlayClassName="entity-id-popover"
+                            autoAdjustOverflow={false}
+                            destroyTooltipOnHide={true}
+                            zIndex={1500}
+                        >
+                            {truncateString(text)}
+                        </Popover>
+                    ) : (
+                        <Tooltip title={text}>
+                            {truncateString(text)}
+                        </Tooltip>
+                    )}
                     {<br />}
                     {record.target_id.startsWith('ENTREZ:') ?
                         <a onClick={() => { setCurrentNode(record.target_node) }}>
@@ -335,6 +386,9 @@ const KnowledgeTable: React.FC = (props) => {
             filterSearch: true,
             sorter: (a, b) => a.target_type.localeCompare(b.target_type),
             onFilter: (value, record) => record.target_type.indexOf(value) === 0,
+            render: (text) => {
+                return <Tag color={guessColor(text)}>{text}</Tag>;
+            }
         },
         {
             title: 'Score',

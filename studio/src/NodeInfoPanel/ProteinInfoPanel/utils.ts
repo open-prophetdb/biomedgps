@@ -1,4 +1,4 @@
-import { GeneInfo, UniProtEntry } from './index.t';
+import { GeneInfo, UniProtEntry } from '../index.t';
 
 export const fetchMyGeneInfo = async (entrezId: string): Promise<GeneInfo> => {
     const response = await fetch(`https://mygene.info/v3/gene/${entrezId}?fields=all&dotfield=false&size=10`);

@@ -5,11 +5,11 @@ import MolStarViewer from "./MolStarViewer";
 import MutationViewer from "./MutationViewer";
 import SangerCosmic from "./SangerCosmic";
 import SgrnaSelector from "./SgrnaSelector";
-import type { GeneInfo } from "./ProteinInfoPanel/index.t";
-import { isProteinCoding, fetchMyGeneInfo } from "./ProteinInfoPanel/utils";
-import ProteinInfoPanel from "./ProteinInfoPanel";
+import type { GeneInfo } from "./index.t";
+import { fetchMyGeneInfo } from "./ProteinInfoPanel/utils";
 import React, { useEffect, useState } from "react";
 import type { GraphNode } from "biominer-components/dist/typings";
+import ComposedProteinPanel from "./ComposedProteinPanel";
 
 import "./index.less";
 
@@ -59,7 +59,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       {
         label: "Summary",
         key: "summary",
-        children: isProteinCoding(geneInfo) ? <ProteinInfoPanel geneInfo={geneInfo} /> : <GeneInfoPanel geneSymbol={geneSymbol} />
+        children: <ComposedProteinPanel geneInfo={geneInfo} />
       },
       {
         label: "Gene Expression",

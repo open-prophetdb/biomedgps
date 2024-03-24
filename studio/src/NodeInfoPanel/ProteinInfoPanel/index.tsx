@@ -1,14 +1,16 @@
 import { Empty, Row, Col, Badge, Descriptions, Table, Spin } from "antd";
 import React, { useEffect, useState } from "react";
-import type { GeneInfo, UniProtEntry } from "./index.t";
+import type { GeneInfo, UniProtEntry } from "../index.t";
 import { isProteinCoding, fetchProteinInfo } from "./utils";
 import type { DescriptionsProps } from 'antd';
 import { MolStarViewer } from "..";
+import { guessSpecies } from "@/components/util";
 
 import './index.less';
 
 export interface ProteinInfoPanelProps {
-    geneInfo?: GeneInfo;
+    geneInfo: GeneInfo;
+    proteinInfo: UniProtEntry;
 }
 
 function PubMedLinks(text: string) {
@@ -153,30 +155,13 @@ export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }
 }
 
 export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
-    const { geneInfo } = props;
-    const [proteinInfo, setProteinInfo] = useState<UniProtEntry | null>(null);
+    const { geneInfo, proteinInfo } = props;
     // @ts-ignore
     const [generalInfo, setGeneralInfo] = useState<DescriptionsProps['items']>([]);
-    const [loading, setLoading] = useState<boolean>(false);
 
     useEffect(() => {
         if (geneInfo && isProteinCoding(geneInfo)) {
-            setLoading(true);
             const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
-            if (!uniprotId) {
-                setProteinInfo(null);
-                return;
-            }
-
-            fetchProteinInfo(uniprotId).then((resp: UniProtEntry) => {
-                setProteinInfo(resp);
-                setLoading(false);
-            }).catch((err: any) => {
-                console.error(err);
-                setProteinInfo(null);
-                setLoading(false);
-            });
-
             // @ts-ignore
             const generalInfo: DescriptionsProps['items'] = [
                 {
@@ -199,7 +184,7 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                 {
                     key: 'alias',
                     label: 'Alias',
-                    children: geneInfo.alias ? geneInfo.alias.join(', ') : null,
+                    children: geneInfo.alias ? (geneInfo.alias.join ? geneInfo.alias.join(', ') : geneInfo.alias) : null,
                 },
                 {
                     key: 'location',
@@ -212,6 +197,11 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                     children: uniprotId ? <a href={`https://www.uniprot.org/uniprot/${uniprotId}`} target="_blank">
                         {uniprotId}
                     </a> : 'Unknown',
+                },
+                {
+                    key: 'species',
+                    label: 'Species',
+                    children: guessSpecies(`${geneInfo.taxid}`)
                 }
             ];
 
@@ -220,7 +210,7 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
     }, [geneInfo]);
 
     return (
-        proteinInfo ? (
+        Object.keys(proteinInfo).length === 0 ? <Empty description="No protein info found" /> :
             <Row className="protein-info-panel">
                 <Col className="general-information">
                     {/* @ts-ignore */}
@@ -230,7 +220,7 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                     {proteinInfo ? (
                         getBiologyBackground(proteinInfo)
                     ) : (
-                        <Empty description="No protein found" />
+                        <Empty description="No protein info found" />
                     )}
                 </Col>
                 <Col className="protein-snp">
@@ -242,9 +232,6 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                     <PdbInfo proteinInfo={proteinInfo} />
                 </Col>
             </Row>
-        ) : (
-            <Spin spinning={loading}><Empty description="No gene found" /></Spin>
-        )
     );
 }
 

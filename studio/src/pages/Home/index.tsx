@@ -8,6 +8,8 @@ import { fetchEntities } from '@/services/swagger/KnowledgeGraph';
 import type { OptionType, Entity, ComposeQueryItem, QueryItem } from 'biominer-components/dist/typings';
 import { Carousel } from 'react-responsive-carousel';
 import { filter } from 'lodash';
+import { guessColor } from '@/components/util';
+import EntityCard from '@/components/EntityCard';
 
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import './index.less';
@@ -15,41 +17,6 @@ import './index.less';
 const IconFont = createFromIconfontCN({
     scriptUrl: '//at.alicdn.com/t/c/font_4435889_2sgb9f98fdw.js',
 });
-
-const EntityCard = (metadata: Entity | undefined) => {
-    if (!metadata) {
-        return <div>No metadata found!</div>;
-    } else {
-        return (
-            <div style={{ overflowWrap: 'break-word', width: '500px' }}>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>Synonyms: </span>
-                    {metadata.synonyms || 'No synonyms found!'}
-                </p>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>Xrefs: </span>
-                    {metadata.xrefs || 'No xrefs found!'}
-                </p>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>Description: </span>
-                    {metadata.description || 'No description found!'}
-                </p>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>ID: </span>
-                    {metadata.id}
-                </p>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>Name: </span>
-                    {metadata.name}
-                </p>
-                <p style={{ marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>Label: </span>
-                    {metadata.label}
-                </p>
-            </div>
-        );
-    }
-};
 
 export function makeQueryEntityStr(params: Partial<Entity>, order?: string[]): string {
     let query: ComposeQueryItem = {} as ComposeQueryItem;
@@ -144,7 +111,7 @@ export const fetchNodes = async (
                 const options: OptionType[] = records.map((item: Entity, index: number) => ({
                     order: index,
                     value: `${item['label']}::${item['id']}`,
-                    label: <span><Tag>item['label']</Tag> {`${item['id']} | ${item['name']}`}</span>,
+                    label: <span><Tag color={guessColor(item['label'])}>{item['label']}</Tag> {`${item['id']} | ${item['name']}`}</span>,
                     description: item['description'],
                     metadata: item,
                 }));
@@ -155,7 +122,7 @@ export const fetchNodes = async (
                 if (error.response.status === 401) {
                     message.warning("Please login to see the search results.")
                 } else {
-                    message.warning("Your network is not stable, please try again later. If the problem persists, please contact the administrator.")
+                    message.warning("Cannot get search results for your query. Please try again later.")
                 }
                 console.log('requestNodes Error: ', error);
                 callback([]);
@@ -324,7 +291,7 @@ const HomePage: React.FC = () => {
                                 <Select.Option key={option.label} value={option.value} disabled={option.disabled}>
                                     {option.metadata ? (
                                         <Popover
-                                            placement="rightBottom"
+                                            placement="rightTop"
                                             title={option.label}
                                             content={EntityCard(option.metadata)}
                                             trigger="hover"
@@ -345,24 +312,34 @@ const HomePage: React.FC = () => {
                     <span className="desc">
                         Examples: {' '}
                         <a onClick={() => {
+                            onSearch('Gene::ENTREZ:3569', 'IL6')
+                        }}>
+                            <Tag color={guessColor("Gene")}>Gene:IL6</Tag>
+                        </a>
+                        <a onClick={() => {
+                            onSearch('Pathway::WikiPathways:WP1742', 'TP53 Network')
+                        }}>
+                            <Tag color={guessColor("Pathway")}>Pathway:TP53 Network</Tag>
+                        </a>
+                        <a onClick={() => {
                             onSearch('Disease::MONDO:0005404', 'ME/CFS')
                         }}>
-                            <Tag color='#108ee9'>ME/CFS</Tag>
+                            <Tag color={guessColor("Disease")}>Disease:ME/CFS</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Disease::MONDO:0100233', 'LongCOVID')
                         }}>
-                            <Tag color='#108ee9'>LongCOVID</Tag>
+                            <Tag color={guessColor("Disease")}>Disease:LongCOVID</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Compound::DrugBank:DB00028', 'Human immunoglobulin G')
                         }}>
-                            <Tag color='#108ee9'>Human immunoglobulin G</Tag>
+                            <Tag color={guessColor("Gene")}>Gene:Human immunoglobulin G</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Symptom::MESH:D005221', 'Fatigue')
                         }}>
-                            <Tag color='#108ee9'>Fatigue</Tag>
+                            <Tag color={guessColor("Symptom")}>Symptom:Fatigue</Tag>
                         </a>
                     </span>
                 </Col>

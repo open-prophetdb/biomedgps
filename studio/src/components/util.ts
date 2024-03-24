@@ -18,3 +18,48 @@ export const getJwtAccessToken = (): string | null => {
         return null;
     }
 }
+
+export const guessColor = (text: string): string => {
+    const colors: Record<string, string> = {
+        Anatomy: "#1f78b4",
+        BiologicalProcess: "#b15928",
+        CellularComponent: "#cab2d6",
+        Compound: "#33a02c",
+        Disease: "#fb9a99",
+        Gene: "#e31a1c",
+        Metabolite: "#a6cee3",
+        MolecularFunction: "#b2df8a",
+        Pathway: "#ff7f00",
+        PharmacologicClass: "#fdbf6f",
+        SideEffect: "#ffff99",
+        Symptom: "#6a3d9a"
+    }
+
+    return colors[text] || "#108ee9";
+}
+
+export const expectedOrder: string[] = [
+    '9606',
+    '10090',
+    '10116',
+    '9541'
+]
+
+export const expectedSpecies: Record<string, string[]> = {
+    '9606': ['Human', 'Human'],
+    '10090': ['Mouse', 'Mouse'],
+    '10116': ['Rattus norvegicus', 'Rat'],
+    '9541': ['Macaca fascicularis', 'Macaca']
+}
+
+export const guessSpecies = (taxid: string) => {
+    return expectedSpecies[`${taxid}`] ? expectedSpecies[`${taxid}`][0] : 'Unknown'
+}
+
+export const guessSpeciesAbbr = (taxid: string) => {
+    return expectedSpecies[`${taxid}`] ? expectedSpecies[`${taxid}`][1] : 'Unknown'
+}
+
+export const isExpectedSpecies = (taxid: string) => {
+    return expectedSpecies[`${taxid}`] ? true : false
+}
