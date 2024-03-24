@@ -23,7 +23,7 @@ export {
   SgrnaSelector,
 }
 
-export const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({ node, hiddenItems }) => {
+const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({ node, hiddenItems }) => {
   const [geneInfo, setGeneInfo] = useState<GeneInfo | null>(null);
   const [items, setItems] = useState<any[]>([]);
 
@@ -99,7 +99,9 @@ export const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] 
   }, [geneInfo]);
 
   return <Tabs
-    className="gene-info-panel tabs-nav-right"
+    className="plugins4kg tabs-nav-right"
     items={items && items.length > 0 ? items : defaultItems}
   ></Tabs>
 }
+
+export default NodeInfoPanel;

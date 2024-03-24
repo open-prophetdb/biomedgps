@@ -5443,10 +5443,10 @@ binary-search-bounds@^2.0.0, binary-search-bounds@^2.0.3, binary-search-bounds@^
   resolved "https://registry.yarnpkg.com/binary-search-bounds/-/binary-search-bounds-2.0.5.tgz#125e5bd399882f71e6660d4bf1186384e989fba7"
   integrity sha512-H0ea4Fd3lS1+sTEB2TgcLoK21lLhwEJzlQv3IN47pJS976Gx4zoWe0ak3q+uYh60ppQxg9F16Ri4tS1sfD4+jA==
 
-biominer-components@0.3.17:
-  version "0.3.17"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.17.tgz#a9ce4e43cdb5bd56cb117c5a48238034b278e453"
-  integrity sha512-znOtPkd6ZifC09lh+QntXNJzHi7NXwgIZl1G6eaXt8k/u6HUqC3dmhdcgiMVOzPcAG0Wo34S70vFtMvHoI1X3Q==
+biominer-components@0.3.18:
+  version "0.3.18"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.18.tgz#5f1654610cd5b0db6894b34ac6d655e5292a116d"
+  integrity sha512-D5MEqr8BFxVSaBemJHT5tVYbbAz2q3DPPwlAt+dxQbVQoxtfX5jTI5sC6ji8ogQ9X/ITuCFX8hAhpQh3bHDIpA==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^4.2.2"
     ag-grid-community "^31.0.1"

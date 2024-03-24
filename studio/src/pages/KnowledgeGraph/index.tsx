@@ -7,9 +7,10 @@ import { useAuth0 } from "@auth0/auth0-react";
 // import { KeepAlive } from 'umi';
 import { MessageFilled, MessageOutlined } from '@ant-design/icons';
 import {
-  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts, fetchPublication, fetchPublications
+  fetchEdgesAutoConnectNodes, fetchEntities, fetchEntity2D, fetchEntityColorMap, fetchOneStepLinkedNodes, fetchRelationCounts, fetchStatistics, fetchSubgraphs, fetchPredictedNodes, fetchNodes, fetchRelations, postSubgraph, deleteSubgraph, fetchPaths, askLlm, fetchSharedNodes, fetchPrompts as fetchLlmPrompts
 } from '@/services/swagger/KnowledgeGraph';
-import { NodeInfoPanel } from '@/plugins4kg';
+import NodeInfoPanel from '@/NodeInfoPanel';
+import EdgeInfoPanel from '@/EdgeInfoPanel';
 
 
 import './index.less';
@@ -87,20 +88,9 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
             GetSharedNodesFn: fetchSharedNodes,
             // @ts-ignore, it seems that we don't need to fix this.
             GetPromptsFn: fetchLlmPrompts,
-            GetPublicationFn: (id: string) => {
-              return fetchPublication({
-                id: id
-              })
-            },
-            GetPublicationsFn: (queryStr: string, page?: number, pageSize?: number) => {
-              return fetchPublications({
-                query_str: queryStr,
-                page: page,
-                page_size: pageSize
-              })
-            },
           }}
           NodeInfoPanel={NodeInfoPanel}
+          EdgeInfoPanel={EdgeInfoPanel}
           postMessage={(message: string) => {
             if (chatBoxVisible) {
               setMessage(message)

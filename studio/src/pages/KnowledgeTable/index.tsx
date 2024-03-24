@@ -5,13 +5,13 @@ import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
-import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchPublication, fetchPublications } from '@/services/swagger/KnowledgeGraph';
+import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
 import type { ComposeQueryItem, QueryItem, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
-import type { EdgeInfo } from 'biominer-components/dist/EdgeInfoPanel/index.t';
 import { guessLink } from 'biominer-components/dist/utils';
-import { EdgeInfoPanel } from 'biominer-components';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
-import { NodeInfoPanel } from '@/plugins4kg';
+import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
+import NodeInfoPanel from '@/NodeInfoPanel';
+import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy } from 'lodash';
 
 import './index.less';
@@ -127,6 +127,14 @@ const KnowledgeTable: React.FC = (props) => {
         history.push('/knowledge-graph');
     }
 
+    const truncateString = (str: string) => {
+        if (str.length > 20) {
+            return str.substring(0, 20) + '...';
+        } else {
+            return str;
+        }
+    }
+
     const getKnowledgesData = (nodeId: string, page: number, pageSize: number): Promise<GraphData> => {
         return new Promise((resolve, reject) => {
             let pairs = nodeId.split('::');
@@ -174,6 +182,7 @@ const KnowledgeTable: React.FC = (props) => {
             title: 'PMID',
             dataIndex: 'pmids',
             align: 'center',
+            width: 100,
             key: 'pmids',
             render: (text) => {
                 return (
@@ -210,28 +219,45 @@ const KnowledgeTable: React.FC = (props) => {
             filterSearch: true,
             sorter: (a, b) => a.source_name.localeCompare(b.source_name),
             onFilter: (value, record) => record.source_name.indexOf(value) === 0,
-        },
-        {
-            title: 'Source ID',
-            dataIndex: 'source_id',
-            align: 'center',
-            key: 'source_id',
             render: (text, record) => {
-                console.log("Source ID: ", text, record);
-                return (
-                    text.startsWith('ENTREZ:') ?
+                return <>
+                    <Tooltip title={text}>
+                        {truncateString(text)}
+                    </Tooltip>
+                    {<br />}
+                    {record.source_id.startsWith('ENTREZ:') ?
                         <a onClick={() => { setCurrentNode(record.source_node) }}>
-                            {text}
+                            {record.source_id}
                         </a> :
-                        <a target="_blank" href={guessLink(text)}>
-                            {text}
+                        <a target="_blank" href={guessLink(record.source_id)}>
+                            {record.source_id}
                         </a>
-                );
+                    }
+                </>;
             }
         },
+        // {
+        //     title: 'Source ID',
+        //     dataIndex: 'source_id',
+        //     align: 'center',
+        //     key: 'source_id',
+        //     render: (text, record) => {
+        //         console.log("Source ID: ", text, record);
+        //         return (
+        //             text.startsWith('ENTREZ:') ?
+        //                 <a onClick={() => { setCurrentNode(record.source_node) }}>
+        //                     {text}
+        //                 </a> :
+        //                 <a target="_blank" href={guessLink(text)}>
+        //                     {text}
+        //                 </a>
+        //         );
+        //     }
+        // },
         {
             title: 'Source Type',
             dataIndex: 'source_type',
+            width: 200,
             align: 'center',
             key: 'source_type',
             filters: sortBy(uniqBy(tableData.map((item) => {
@@ -250,7 +276,6 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'target_name',
             align: 'center',
             key: 'target_name',
-            width: 300,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.target_name,
@@ -261,24 +286,40 @@ const KnowledgeTable: React.FC = (props) => {
             filterSearch: true,
             sorter: (a, b) => a.target_name.localeCompare(b.target_name),
             onFilter: (value, record) => record.target_name.indexOf(value) === 0,
-        },
-        {
-            title: 'Target ID',
-            dataIndex: 'target_id',
-            align: 'center',
-            key: 'target_id',
             render: (text, record) => {
-                return (
-                    text.startsWith('ENTREZ:') ?
+                return <>
+                    <Tooltip title={text}>
+                        {truncateString(text)}
+                    </Tooltip>
+                    {<br />}
+                    {record.target_id.startsWith('ENTREZ:') ?
                         <a onClick={() => { setCurrentNode(record.target_node) }}>
-                            {text}
+                            {record.target_id}
                         </a> :
-                        <a target="_blank" href={guessLink(text)}>
-                            {text}
+                        <a target="_blank" href={guessLink(record.target_id)}>
+                            {record.target_id}
                         </a>
-                );
+                    }
+                </>;
             }
         },
+        // {
+        //     title: 'Target ID',
+        //     dataIndex: 'target_id',
+        //     align: 'center',
+        //     key: 'target_id',
+        //     render: (text, record) => {
+        //         return (
+        //             text.startsWith('ENTREZ:') ?
+        //                 <a onClick={() => { setCurrentNode(record.target_node) }}>
+        //                     {text}
+        //                 </a> :
+        //                 <a target="_blank" href={guessLink(text)}>
+        //                     {text}
+        //                 </a>
+        //         );
+        //     }
+        // },
         {
             title: 'Target Type',
             dataIndex: 'target_type',
@@ -300,6 +341,7 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'score',
             align: 'center',
             key: 'score',
+            width: 100,
             render: (text) => {
                 return <span>{text.toFixed(3)}</span>;
             },
@@ -514,19 +556,7 @@ const KnowledgeTable: React.FC = (props) => {
                 open={drawerVisible}
             >
                 {edgeInfo ?
-                    <EdgeInfoPanel edgeInfo={edgeInfo}
-                        fetchPublication={(id: string) => {
-                            return fetchPublication({
-                                id: id
-                            })
-                        }}
-                        fetchPublications={(queryStr: string, page?: number, pageSize?: number) => {
-                            return fetchPublications({
-                                query_str: queryStr,
-                                page: page,
-                                page_size: pageSize
-                            })
-                        }} />
+                    <EdgeInfoPanel edgeInfo={edgeInfo} />
                     : <Empty description="No publication data for this knowledge." />}
             </Drawer>
         </Row>
