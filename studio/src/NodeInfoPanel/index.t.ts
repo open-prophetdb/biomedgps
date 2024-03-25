@@ -235,6 +235,7 @@ export interface AlignmentData {
     sequenceVersion: number;
     score: number;
     uniProtId: string;
+    uniProtType: string;
     sequence: string;
     species: string;
     geneSymbol: string;

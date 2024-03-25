@@ -1,4 +1,4 @@
-import { Empty, Tabs } from "antd";
+import { Empty, Tabs, Spin } from "antd";
 import React, { useEffect, useState } from "react";
 import { fetchMyGeneInfo, isProteinCoding, fetchProteinInfo } from "../ProteinInfoPanel/utils";
 import type { GeneInfo, UniProtEntry } from "../index.t";
@@ -40,11 +40,13 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
         proteinInfo: UniProtEntry;
         geneInfo: GeneInfo;
     }>>({});
+    const [loading, setLoading] = useState<boolean>(false);
 
     useEffect(() => {
         // Get the geneInfo and proteinInfo from the mygene.info and uniprot API.
         // If possible, we would like to get all the geneInfo and proteinInfo from the homologene.
         const init = async () => {
+            setLoading(true);
             if (!geneInfo) {
                 return;
             }
@@ -121,10 +123,13 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                         setAllProteinInfos(proteinInfoMap);
                     }).catch((error) => {
                         console.error(error);
+                        setAllProteinInfos({});
+                        setLoading(false);
                     });
                 }).catch((error) => {
                     console.error(error);
                     setAllGeneInfos([]);
+                    setLoading(false);
                 });
             }
         }
@@ -151,6 +156,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
             Object.keys(allProteinInfos).forEach((taxid) => {
                 const proteinInfo = allProteinInfos[taxid].proteinInfo;
                 const geneInfo = allProteinInfos[taxid].geneInfo;
+                const uniProtType = geneInfo.uniprot && geneInfo.uniprot['Swiss-Prot'] ? 'Swiss-Prot' : 'TrEMBL';
                 if (proteinInfo?.sequence?.value) {
                     alignmentData.push({
                         sequenceVersion: proteinInfo.entryAudit?.sequenceVersion || 0,
@@ -158,6 +164,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                         proteinName: proteinInfo.uniProtkbId,
                         proteinDescription: proteinInfo.proteinDescription?.recommendedName?.fullName?.value || '',
                         uniProtId: proteinInfo.primaryAccession,
+                        uniProtType,
                         sequence: proteinInfo.sequence.value,
                         species: guessSpecies(taxid),
                         geneSymbol: geneInfo.symbol,
@@ -176,7 +183,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
     }, [allGeneInfos, allProteinInfos]);
 
     return (items.length === 0 ?
-        <Empty description="No information available." /> :
+        <Spin spinning={loading}><Empty description={loading ? 'Loading' : 'No information available.'} /></Spin> :
         <Tabs
             className="composed-protein-panel"
             tabPosition="left"

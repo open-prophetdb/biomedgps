@@ -7,7 +7,7 @@ import { BookOutlined, ToolOutlined, createFromIconfontCN } from '@ant-design/ic
 import { fetchEntities } from '@/services/swagger/KnowledgeGraph';
 import type { OptionType, Entity, ComposeQueryItem, QueryItem } from 'biominer-components/dist/typings';
 import { Carousel } from 'react-responsive-carousel';
-import { filter } from 'lodash';
+import { filter, orderBy } from 'lodash';
 import { guessColor } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
@@ -116,7 +116,7 @@ export const fetchNodes = async (
                     metadata: item,
                 }));
                 console.log('getLabels results: ', options);
-                callback(options);
+                callback(orderBy(options, ['value']));
             })
             .catch((error) => {
                 if (error.response.status === 401) {

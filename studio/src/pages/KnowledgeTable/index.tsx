@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin, Select } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
-import type { ComposeQueryItem, Entity, GraphData, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
+import type { ComposeQueryItem, OptionType, GraphData, GraphEdge, GraphNode, RelationCount } from 'biominer-components/dist/typings';
 import { guessLink } from 'biominer-components/dist/utils';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
-import { sortBy, filter, uniqBy } from 'lodash';
+import { sortBy, filter, uniqBy, groupBy, map, sumBy, set } from 'lodash';
 import { guessColor } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
@@ -25,7 +25,7 @@ export type GraphTableData = {
     pageSize: number;
 };
 
-const makeQueryStr = (entityType: string, entityId: string): string => {
+const makeQueryStr = (entityType: string, entityId: string, relationTypes?: string[]): string => {
     const source_query: ComposeQueryItem = {
         operator: 'and',
         items: [
@@ -63,6 +63,20 @@ const makeQueryStr = (entityType: string, entityId: string): string => {
         items: [source_query, target_query],
     };
 
+    if (relationTypes && relationTypes.length > 0) {
+        query = {
+            operator: 'and',
+            items: [
+                query,
+                {
+                    field: 'relation_type',
+                    operator: 'in',
+                    value: relationTypes,
+                },
+            ],
+        };
+    }
+
     return JSON.stringify(query);
 }
 
@@ -76,6 +90,7 @@ const KnowledgeTable: React.FC = (props) => {
     const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
     const [currentNode, setCurrentNode] = useState<GraphNode | undefined>(undefined);
+    const [relationTypes, setRelationTypes] = useState<any[]>([]);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -137,14 +152,17 @@ const KnowledgeTable: React.FC = (props) => {
         }
     }
 
-    const getKnowledgesData = (nodeId: string, page: number, pageSize: number): Promise<GraphData> => {
+    const getKnowledgesData = (
+        nodeId: string, page: number,
+        pageSize: number, relationTypes?: string[]
+    ): Promise<GraphData> => {
         return new Promise((resolve, reject) => {
             let pairs = nodeId.split('::');
             const entityType = pairs[0];
             const entityId = pairs[1];
             if (entityType && entityId) {
                 fetchOneStepLinkedNodes({
-                    query_str: makeQueryStr(entityType, entityId),
+                    query_str: makeQueryStr(entityType, entityId, relationTypes),
                     page_size: pageSize,
                     page: page
                 })
@@ -177,6 +195,7 @@ const KnowledgeTable: React.FC = (props) => {
             }), 'value'), 'value'),
             filterMode: 'menu',
             filterSearch: true,
+            filterMultiple: true,
             sorter: (a, b) => a.relation_type.localeCompare(b.relation_type),
             onFilter: (value, record) => record.relation_type.indexOf(value) === 0,
         },
@@ -431,32 +450,47 @@ const KnowledgeTable: React.FC = (props) => {
         }
     ];
 
-    useEffect(() => {
+    const fetchTableData = async (nodeId: string, page: number, pageSize: number, relationTypes?: string[]) => {
         setLoading(true);
-        if (!nodeId) {
-            setLoading(false);
-            return;
-        }
-
         let pairs = nodeId.split('::');
         const entityType = pairs[0];
         const entityId = pairs[1];
         if (entityType && entityId) {
-            fetchRelationCounts({ query_str: makeQueryStr(entityType, entityId) })
+            fetchRelationCounts({ query_str: makeQueryStr(entityType, entityId, relationTypes) })
                 .then((response) => {
                     const n = response.map((item) => item.ncount).reduce((a, b) => a + b, 0);
                     setTotal(n);
+
+                    if (!relationTypes || (relationTypes && relationTypes.length === 0)) {
+                        const r = response.map((item) => {
+                            return {
+                                relation_type: item.relation_type,
+                                ncount: item.ncount,
+                            };
+                        });
+                        const mergedR = sortBy(map(groupBy(r, 'relation_type'), (group: any, key: string) => ({
+                            relation_type: key,
+                            ncount: sumBy(group, 'ncount'),
+                        })), 'ncount').reverse();
+                        setRelationTypes(mergedR.map((item) => {
+                            return {
+                                label: `[${item.ncount}] ${item.relation_type}`,
+                                value: item.relation_type,
+                            };
+                        }));
+                    }
                 })
                 .catch((error) => {
                     console.log('Get relation counts error: ', error);
                     setTotal(0);
+                    setRelationTypes([]);
                 });
         } else {
             // Reset the component
             setTotal(0);
         }
 
-        getKnowledgesData(nodeId, page, pageSize)
+        getKnowledgesData(nodeId, page, pageSize, relationTypes)
             .then((response) => {
                 setGraphData(response);
                 setLoading(false);
@@ -485,6 +519,14 @@ const KnowledgeTable: React.FC = (props) => {
                 setGraphData({} as GraphData);
                 setLoading(false);
             });
+    }
+
+    useEffect(() => {
+        if (!nodeId) {
+            return;
+        }
+
+        fetchTableData(nodeId, page, pageSize);
     }, [nodeId, page, pageSize, refreshKey]);
 
     const getRowKey = (record: GraphEdge) => {
@@ -496,7 +538,17 @@ const KnowledgeTable: React.FC = (props) => {
             <Spin spinning={loading}>
                 <Empty description={
                     <>
-                        <p>No Knowledges for Your Query {nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''}</p>
+                        <p>
+                            {
+                                loading ? 'Loading Knowledges' : 'No Knowledges'
+                            }
+
+                            for Your Query
+
+                            {
+                                nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''
+                            }
+                        </p>
                         <Button type="primary" onClick={() => history.push('/')}>
                             Go Back to Home Page
                         </Button>
@@ -522,10 +574,42 @@ const KnowledgeTable: React.FC = (props) => {
                         </Button>
                     </Tooltip>
                 </span>
-                <Button size="large" onClick={() => {
-                    history.push('/')
+                <Select
+                    mode="multiple"
+                    allowClear
+                    maxTagCount={2}
+                    maxTagTextLength={12}
+                    style={{ width: '350px', marginRight: '10px' }}
+                    size="large"
+                    placeholder="Please select relation types to filter."
+                    defaultValue={[]}
+                    onChange={(value: string[]) => {
+                        if (nodeId) {
+                            fetchTableData(nodeId, page, pageSize, value);
+                        }
+                    }}
+                    options={relationTypes}
+                />
+                <Button size="large" type="default" onClick={() => {
+                    // Download as TSV file
+                    const header = columns.map((col) => col.title);
+                    const data = tableData.map((record) => {
+                        return columns.map((col: any) => {
+                            return record[col.key];
+                        });
+                    });
+                    const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
+                    const blob = new Blob([tsvData], { type: 'text/tsv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `knowledge_${nodeId}.tsv`;
+                    a.click();
+
+                    // Delete the url
+                    URL.revokeObjectURL(url);
                 }}>
-                    Back to Home
+                    Download As TSV File
                 </Button>
                 <Button type="primary" danger size="large"
                     // disabled={selectedRowKeys.length === 0}
@@ -562,7 +646,7 @@ const KnowledgeTable: React.FC = (props) => {
                 pagination={{
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    pageSizeOptions: ['10', '20', '50', '100', '300', '500', '1000'],
+                    pageSizeOptions: ['10', '20', '50', '100', '300', '500'],
                     current: page,
                     pageSize: pageSize,
                     total: total || 0,
