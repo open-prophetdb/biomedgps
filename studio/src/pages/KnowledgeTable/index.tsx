@@ -91,6 +91,7 @@ const KnowledgeTable: React.FC = (props) => {
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
     const [currentNode, setCurrentNode] = useState<GraphNode | undefined>(undefined);
     const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
+    const [selectedRelationTypes, setSelectedRelationTypes] = useState<string[]>([]);
     const [relationTypeDescs, setRelationTypeDescs] = useState<Record<string, string>>({});
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -548,7 +549,7 @@ const KnowledgeTable: React.FC = (props) => {
             return;
         }
 
-        fetchTableData(nodeId, page, pageSize);
+        fetchTableData(nodeId, page, pageSize, selectedRelationTypes);
     }, [nodeId, page, pageSize, refreshKey]);
 
     const getRowKey = (record: GraphEdge) => {
@@ -600,7 +601,8 @@ const KnowledgeTable: React.FC = (props) => {
                     mode="multiple"
                     allowClear
                     maxTagCount={2}
-                    maxTagTextLength={12}
+                    // It's not working, I use css to limit the tag text length instead.
+                    // maxTagTextLength={12}
                     style={{ width: '350px', marginRight: '10px' }}
                     size="large"
                     placeholder="Please select relation types to filter."
@@ -608,6 +610,11 @@ const KnowledgeTable: React.FC = (props) => {
                     onChange={(value: string[]) => {
                         if (nodeId) {
                             fetchTableData(nodeId, page, pageSize, value);
+                            setSelectedRelationTypes(value);
+
+                            // The total number of items has been changed, so we need to reset the page and page size.
+                            setPage(1);
+                            setPageSize(30);
                         }
                     }}
                 // options={relationTypeOptions}
