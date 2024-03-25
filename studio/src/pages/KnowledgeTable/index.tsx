@@ -5,9 +5,9 @@ import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
-import { fetchOneStepLinkedNodes, fetchRelationCounts } from '@/services/swagger/KnowledgeGraph';
+import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchRelationMetadata } from '@/services/swagger/KnowledgeGraph';
 import type { ComposeQueryItem, OptionType, GraphData, GraphEdge, GraphNode, RelationCount } from 'biominer-components/dist/typings';
-import { guessLink } from 'biominer-components/dist/utils';
+import { guessLink, makeRelationTypes } from 'biominer-components/dist/utils';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
@@ -90,7 +90,8 @@ const KnowledgeTable: React.FC = (props) => {
     const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
     const [currentNode, setCurrentNode] = useState<GraphNode | undefined>(undefined);
-    const [relationTypes, setRelationTypes] = useState<any[]>([]);
+    const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
+    const [relationTypeDescs, setRelationTypeDescs] = useState<Record<string, string>>({});
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -111,6 +112,14 @@ const KnowledgeTable: React.FC = (props) => {
     useEffect(() => {
         if (queriedNodeId) {
             setNodeId(queriedNodeId);
+            fetchRelationMetadata().then((relationStat) => {
+                const o = makeRelationTypes(relationStat)
+                let descs = {} as Record<string, string>;
+                o.forEach((item) => {
+                    descs[item.value] = item.description || 'Unknown';
+                });
+                setRelationTypeDescs(descs);
+            });
         }
 
         if (queriedNodeName) {
@@ -186,7 +195,6 @@ const KnowledgeTable: React.FC = (props) => {
             align: 'left',
             dataIndex: 'relation_type',
             fixed: 'left',
-            width: 300,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.relation_type,
@@ -198,6 +206,15 @@ const KnowledgeTable: React.FC = (props) => {
             filterMultiple: true,
             sorter: (a, b) => a.relation_type.localeCompare(b.relation_type),
             onFilter: (value, record) => record.relation_type.indexOf(value) === 0,
+            render(text, record) {
+                return (
+                    <span>
+                        <Tag>{text}</Tag>
+                        <br />
+                        {relationTypeDescs[text] || 'Unknown'}
+                    </span>
+                );
+            }
         },
         {
             title: 'PMID',
@@ -236,7 +253,7 @@ const KnowledgeTable: React.FC = (props) => {
                 };
             }), 'value'), 'value'),
             filterMode: 'menu',
-            width: 200,
+            // width: 200,
             filterSearch: true,
             sorter: (a, b) => a.source_name.localeCompare(b.source_name),
             onFilter: (value, record) => record.source_name.indexOf(value) === 0,
@@ -264,9 +281,10 @@ const KnowledgeTable: React.FC = (props) => {
                             {truncateString(text)}
                         </Popover>
                     ) : (
-                        <Tooltip title={text}>
-                            {truncateString(text)}
-                        </Tooltip>
+                        truncateString(text)
+                        // <Tooltip title={text}>
+                        //     {truncateString(text)}
+                        // </Tooltip>
                     )}
                     {<br />}
                     {record.source_id.startsWith('ENTREZ:') ?
@@ -323,6 +341,7 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'target_name',
             align: 'center',
             key: 'target_name',
+            // width: 200,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.target_name,
@@ -357,9 +376,10 @@ const KnowledgeTable: React.FC = (props) => {
                             {truncateString(text)}
                         </Popover>
                     ) : (
-                        <Tooltip title={text}>
-                            {truncateString(text)}
-                        </Tooltip>
+                        truncateString(text)
+                        // <Tooltip title={text}>
+                        //     {truncateString(text)}
+                        // </Tooltip>
                     )}
                     {<br />}
                     {record.target_id.startsWith('ENTREZ:') ?
@@ -395,6 +415,7 @@ const KnowledgeTable: React.FC = (props) => {
             dataIndex: 'target_type',
             align: 'center',
             key: 'target_type',
+            width: 200,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.target_type,
@@ -472,8 +493,9 @@ const KnowledgeTable: React.FC = (props) => {
                             relation_type: key,
                             ncount: sumBy(group, 'ncount'),
                         })), 'ncount').reverse();
-                        setRelationTypes(mergedR.map((item) => {
+                        setRelationTypeOptions(mergedR.map((item, index) => {
                             return {
+                                order: index,
                                 label: `[${item.ncount}] ${item.relation_type}`,
                                 value: item.relation_type,
                             };
@@ -483,7 +505,7 @@ const KnowledgeTable: React.FC = (props) => {
                 .catch((error) => {
                     console.log('Get relation counts error: ', error);
                     setTotal(0);
-                    setRelationTypes([]);
+                    setRelationTypeOptions([]);
                 });
         } else {
             // Reset the component
@@ -588,8 +610,19 @@ const KnowledgeTable: React.FC = (props) => {
                             fetchTableData(nodeId, page, pageSize, value);
                         }
                     }}
-                    options={relationTypes}
-                />
+                // options={relationTypeOptions}
+                >
+                    {relationTypeOptions.map((item: OptionType) => {
+                        return (
+                            <Select.Option key={item.value} value={item.value}>
+                                <div className="option-container">
+                                    <div className="option-label">{item.label}</div>
+                                    <div className="option-description">{item.description || relationTypeDescs[item.value] || 'Unknown'}</div>
+                                </div>
+                            </Select.Option>
+                        );
+                    })}
+                </Select>
                 <Button size="large" type="default" onClick={() => {
                     // Download as TSV file
                     const header = columns.map((col) => col.title);
