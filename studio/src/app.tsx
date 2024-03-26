@@ -4,7 +4,7 @@ import { RequestConfig, history, RuntimeConfig } from 'umi';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
-import { getJwtAccessToken } from '@/components/util';
+import { getJwtAccessToken, logout } from '@/components/util';
 // import * as Sentry from "@sentry/react";
 
 // Configure Sentry for error tracking
@@ -51,12 +51,18 @@ console.log('apiPrefix', process.env, apiPrefix);
 const getUsername = (): string | undefined => {
   const accessToken = getJwtAccessToken();
   if (accessToken) {
-    const payload = accessToken.split('.')[1];
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padLength = 4 - (base64.length % 4);
-    const paddedBase64 = padLength < 4 ? base64 + "=".repeat(padLength) : base64;
-    const payloadJson = JSON.parse(atob(paddedBase64));
-    return payloadJson['username'];
+    try {
+      const payload = accessToken.split('.')[1];
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padLength = 4 - (base64.length % 4);
+      const paddedBase64 = padLength < 4 ? base64 + "=".repeat(padLength) : base64;
+      const payloadJson = JSON.parse(atob(paddedBase64));
+      return payloadJson['username'];
+    } catch (error) {
+      logout();
+      console.log('Error in getUsername: ', error);
+      return undefined;
+    }
   } else {
     return undefined;
   }
@@ -198,9 +204,7 @@ export const layout: RuntimeConfig = (initialState: any) => {
     },
     links: [],
     logout: () => {
-      localStorage.removeItem('rapex-visitor-id');
-      localStorage.removeItem('jwt_access_token');
-      localStorage.removeItem('redirectUrl');
+      logout();
       history.push('/login');
     },
     // menuHeaderRender: false,

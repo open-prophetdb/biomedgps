@@ -38,7 +38,7 @@ export const guessColor = (text: string): string => {
     return colors[text] || "#108ee9";
 }
 
-export const expectedOrder: string[] = [
+export const expectedTaxIdOrder: string[] = [
     '9606',
     '10090',
     '10116',
@@ -47,7 +47,20 @@ export const expectedOrder: string[] = [
     '9598'
 ]
 
+export const expectedSpeciesOrder: string[] = [
+    'Human',
+    'Mouse',
+    'Rattus norvegicus',
+    'Rat',
+    'Macaca fascicularis',
+    'M.fascicularis',
+    'Macaca mulatta',
+    'M.mulatta',
+    'Chimpanzee'
+]
+
 export const expectedSpecies: Record<string, string[]> = {
+    // Full name, abbreviation
     '9606': ['Human', 'Human'],
     '10090': ['Mouse', 'Mouse'],
     '10116': ['Rattus norvegicus', 'Rat'],
@@ -66,4 +79,10 @@ export const guessSpeciesAbbr = (taxid: string) => {
 
 export const isExpectedSpecies = (taxid: string) => {
     return expectedSpecies[`${taxid}`] ? true : false
+}
+
+export const logout = () => {
+    localStorage.removeItem('rapex-visitor-id');
+    localStorage.removeItem('jwt_access_token');
+    localStorage.removeItem('redirectUrl');
 }

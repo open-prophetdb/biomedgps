@@ -5480,6 +5480,11 @@ biominer-components@0.3.18:
     viewerjs "^1.11.6"
     voca "^1.4.1"
 
+biomsa@^0.3.3:
+  version "0.3.3"
+  resolved "https://registry.yarnpkg.com/biomsa/-/biomsa-0.3.3.tgz#03fa9b137d324f71584ffe5d6a9240b2c14b48fa"
+  integrity sha512-SmpIwTMBE0JKAo18OHCWvIaUcrjKvED/opAltSFhHVx9Pz9j5HcWSHNhUvaU1o3AKDT5NVrWgc0Amp0OJRe+2w==
+
 bit-twiddle@^1.0.0, bit-twiddle@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/bit-twiddle/-/bit-twiddle-1.0.2.tgz#0c6c1fabe2b23d17173d9a61b7b7093eb9e1769e"

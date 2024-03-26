@@ -1,11 +1,11 @@
-import { Empty, Tabs, Spin } from "antd";
+import { Empty, Tabs, Spin, Tag } from "antd";
 import React, { useEffect, useState } from "react";
 import { fetchMyGeneInfo, isProteinCoding, fetchProteinInfo } from "../ProteinInfoPanel/utils";
 import type { GeneInfo, UniProtEntry } from "../index.t";
 import ProteinInfoPanel from "../ProteinInfoPanel";
 import AlignmentViewer from "../AlignmentViewer";
 import GeneInfoPanel from "../GeneInfoPanel";
-import { guessSpecies, isExpectedSpecies, expectedOrder, guessSpeciesAbbr } from '@/components/util';
+import { guessSpecies, isExpectedSpecies, expectedTaxIdOrder, guessSpeciesAbbr } from '@/components/util';
 
 import "./index.less";
 
@@ -88,7 +88,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                         };
                     })
                     const orderedGeneInfos = oGeneInfos.sort((a, b) => {
-                        return expectedOrder.indexOf(a.taxid.toString()) - expectedOrder.indexOf(b.taxid.toString());
+                        return expectedTaxIdOrder.indexOf(a.taxid.toString()) - expectedTaxIdOrder.indexOf(b.taxid.toString());
                     });
                     setAllGeneInfos(orderedGeneInfos);
 
@@ -173,7 +173,8 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                 }
             });
             oItems.push({
-                label: 'Alignment',
+                // @ts-ignore, we don't care about the warning. We need it to be a Tag component.
+                label: <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>Alignment</Tag>,
                 key: oItems.length + 1,
                 children: <AlignmentViewer data={alignmentData} />
             })

@@ -36,6 +36,7 @@
     "antd-schema-form": "^4.5.1",
     "axios": "^1.1.2",
     "biominer-components": "0.3.18",
+    "biomsa": "^0.3.3",
     "classnames": "^2.3.0",
     "handlebars": "^4.7.7",
     "handsontable": "^12.1.3",
