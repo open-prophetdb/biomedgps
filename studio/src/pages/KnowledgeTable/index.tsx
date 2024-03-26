@@ -266,7 +266,7 @@ const KnowledgeTable: React.FC = (props) => {
                         <Popover
                             placement="rightTop"
                             title={
-                                <span>
+                                <span className='entity-id-popover-title'>
                                     <Tag color={guessColor(nodeData.label)}>{nodeData.label}</Tag>
                                     {nodeData.id} | {nodeData.name}
                                 </span>
@@ -282,10 +282,9 @@ const KnowledgeTable: React.FC = (props) => {
                             {truncateString(text)}
                         </Popover>
                     ) : (
-                        truncateString(text)
-                        // <Tooltip title={text}>
-                        //     {truncateString(text)}
-                        // </Tooltip>
+                        <Tooltip title={text}>
+                            {truncateString(text)}
+                        </Tooltip>
                     )}
                     {<br />}
                     {record.source_id.startsWith('ENTREZ:') ?
@@ -361,7 +360,7 @@ const KnowledgeTable: React.FC = (props) => {
                         <Popover
                             placement="rightTop"
                             title={
-                                <span>
+                                <span className='entity-id-popover-title'>
                                     <Tag color={guessColor(nodeData.label)}>{nodeData.label}</Tag>
                                     {nodeData.id} | {nodeData.name}
                                 </span>
@@ -377,10 +376,9 @@ const KnowledgeTable: React.FC = (props) => {
                             {truncateString(text)}
                         </Popover>
                     ) : (
-                        truncateString(text)
-                        // <Tooltip title={text}>
-                        //     {truncateString(text)}
-                        // </Tooltip>
+                        <Tooltip title={text}>
+                            {truncateString(text)}
+                        </Tooltip>
                     )}
                     {<br />}
                     {record.target_id.startsWith('ENTREZ:') ?

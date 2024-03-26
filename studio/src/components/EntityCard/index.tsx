@@ -7,7 +7,7 @@ const EntityCard = (metadata: Entity | undefined) => {
         return <div>No metadata found!</div>;
     } else {
         return (
-            <div style={{ overflowWrap: 'break-word', width: '500px', maxHeight: '200px', overflow: 'scroll' }}>
+            <div style={{ overflowWrap: 'break-word', width: '420px', maxHeight: '200px', overflow: 'scroll' }}>
                 <p style={{ marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold' }}>Species: </span>
                     {guessSpecies(`${metadata.taxid}` || '')}
