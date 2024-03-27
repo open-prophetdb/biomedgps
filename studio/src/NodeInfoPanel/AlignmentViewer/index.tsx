@@ -5,6 +5,9 @@ import { AlignmentViewer as ReactAlignmentViewer } from 'react-alignment-viewer'
 import type { AlignmentData } from '../index.t';
 import biomsa from 'biomsa';
 import { expectedSpeciesOrder } from '@/components/util';
+import { Select } from 'antd';
+
+const { Option } = Select;
 
 import './index.less';
 
@@ -71,6 +74,7 @@ const AlignmentViewer: React.FC<AlignmentViewerProps> = (props) => {
     const [dataset, setDataset] = React.useState<string>("");
     const [errorMsg, setErrorMsg] = React.useState<string>("No data");
     const [loading, setLoading] = React.useState<boolean>(false);
+    const [tileHeight, setTileHeight] = React.useState<string>('20');
 
     useEffect(() => {
         if (props.data && props.data.length > 0) {
@@ -113,7 +117,21 @@ const AlignmentViewer: React.FC<AlignmentViewerProps> = (props) => {
                 <Spin spinning={loading}>
                     <Empty description={errorMsg} />
                 </Spin> :
-                <ReactAlignmentViewer data={dataset} height={"500px"} />
+                <>
+                    <Row style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '10px' }}>
+                        If you see the alignment is not properly displayed, you can adjust the tile height:
+                        <Select defaultValue={tileHeight} style={{ width: 80, marginLeft: '10px' }} onChange={(value) => {
+                            setTileHeight(value);
+                        }}>
+                            <Option value="20">20px</Option>
+                            <Option value="30">30px</Option>
+                            <Option value="40">40px</Option>
+                            <Option value="50">50px</Option>
+                            <Option value="60">60px</Option>
+                        </Select>
+                    </Row>
+                    <ReactAlignmentViewer data={dataset} tileheight={tileHeight} height={null} key={tileHeight} />
+                </>
         }
     </Row>
 }
