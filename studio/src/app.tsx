@@ -4,7 +4,7 @@ import { RequestConfig, history, RuntimeConfig } from 'umi';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
-import { getJwtAccessToken, logout } from '@/components/util';
+import { getJwtAccessToken, logout, logoutWithRedirect } from '@/components/util';
 // import * as Sentry from "@sentry/react";
 
 // Configure Sentry for error tracking
@@ -75,6 +75,12 @@ export const request: RequestConfig = {
   errorConfig: {
     errorHandler: (resData) => {
       console.log("errorHandler: ", resData);
+
+      // @ts-ignore
+      if (resData.response && resData.response.status === 401) {
+        logoutWithRedirect();
+      }
+  
       return {
         ...resData,
         success: false,
@@ -84,19 +90,15 @@ export const request: RequestConfig = {
     },
   },
   requestInterceptors: [(url: string, options) => {
-    const visitorId = localStorage.getItem('rapex-visitor-id')
     // How to get a jwt_access_token from the cookie?
     const jwt_access_token = getJwtAccessToken()
 
     let headers = {}
-    if (visitorId) {
-      headers = {
-        "x-auth-users": visitorId,
-        // TODO: Support JWT
-        "Authorization": "Bearer " + (jwt_access_token ? jwt_access_token : visitorId)
-      }
-    } else {
-      headers = {}
+
+    headers = {
+      "x-auth-users": getUsername(),
+      // TODO: Support JWT
+      "Authorization": "Bearer " + (jwt_access_token ? jwt_access_token : 'NOTOKEN')
     }
 
     return ({
@@ -108,17 +110,7 @@ export const request: RequestConfig = {
     (response) => {
       console.log("responseInterceptors: ", response);
       if (response.status === 401) {
-        // Save the current hash as the redirect url
-        let redirectUrl = window.location.hash.split("#").pop();
-        if (redirectUrl) {
-          redirectUrl = redirectUrl.replaceAll('/', '')
-          localStorage.setItem('redirectUrl', redirectUrl);
-          // Redirect to a warning page that its route name is 'not-authorized'.
-          history.push('/not-authorized?redirectUrl=' + redirectUrl);
-        } else {
-          localStorage.setItem('redirectUrl', '');
-          history.push('/not-authorized');
-        }
+        logoutWithRedirect();
 
         return new Promise(() => { });
       }

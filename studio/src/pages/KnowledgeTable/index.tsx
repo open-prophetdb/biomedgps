@@ -102,13 +102,6 @@ const KnowledgeTable: React.FC = (props) => {
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const { isAuthenticated } = useAuth0();
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            history.push('/not-authorized');
-        }
-    }, [isAuthenticated])
 
     useEffect(() => {
         if (queriedNodeId) {

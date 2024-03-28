@@ -800,8 +800,9 @@ impl Graph {
     /// * `Result<&Vec<Edge>, ValidationError>` - If the strict_mode is true, it will return the missed nodes in the graph.
     ///
     pub fn get_edges(&mut self, strict_mode: Option<bool>) -> Result<&Vec<Edge>, ValidationError> {
+        // sort_by will cause the ordering which is defined by the user failed.
+        // self.edges.sort_by(|a, b| a.relid.cmp(&b.relid));
         // Dedup the edges
-        self.edges.sort_by(|a, b| a.relid.cmp(&b.relid));
         self.edges.dedup_by(|a, b| a.relid == b.relid);
 
         self.nodes = self.get_nodes().to_vec();

@@ -1,3 +1,5 @@
+import { history } from 'umi';
+
 export const getJwtAccessToken = (): string | null => {
     let jwtToken = null;
     // Check if the cookie exists
@@ -82,7 +84,21 @@ export const isExpectedSpecies = (taxid: string) => {
 }
 
 export const logout = () => {
-    localStorage.removeItem('rapex-visitor-id');
     localStorage.removeItem('jwt_access_token');
     localStorage.removeItem('redirectUrl');
+}
+
+export const logoutWithRedirect = () => {
+    logout();
+    // Save the current hash as the redirect url
+    let redirectUrl = window.location.hash.split("#").pop();
+    if (redirectUrl) {
+        redirectUrl = redirectUrl.replaceAll('/', '')
+        localStorage.setItem('redirectUrl', redirectUrl);
+        // Redirect to a warning page that its route name is 'not-authorized'.
+        history.push('/not-authorized?redirectUrl=' + redirectUrl);
+    } else {
+        localStorage.setItem('redirectUrl', '');
+        history.push('/not-authorized');
+    }
 }

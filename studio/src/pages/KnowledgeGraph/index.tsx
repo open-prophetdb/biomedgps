@@ -19,20 +19,10 @@ const kgFullSpan = 24;
 const kgThreeQuartersSpan = 16;
 
 const KnowledgeGraphWithChatBot: React.FC = () => {
-  const { isAuthenticated } = useAuth0();
   const [message, setMessage] = useState<string>('')
   const [chatBoxVisible, setChatBoxVisible] = useState<boolean>(false)
   const [span, setSpan] = useState<number>(kgFullSpan)
   const ChatBox = React.lazy(() => import('@/components/ChatBox'));
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      history.push('/not-authorized');
-    } else {
-      // Initialize the chatbot
-      // initChat();
-    }
-  }, [isAuthenticated])
 
   useEffect(() => {
     if (chatBoxVisible) {
@@ -42,66 +32,64 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
     }
   }, [chatBoxVisible])
 
-  return isAuthenticated ? (
-    <Row gutter={8} className="chat-ai-container">
-      {
-        chatBoxVisible ? (
-          <Col xxl={24 - span} xl={24 - span} lg={24 - span} md={24} sm={24} xs={24}>
-            <Suspense fallback={
-              <Empty description="Loading Chatbot..." />
-            }>
-              <ChatBox message={message}></ChatBox>
-            </Suspense>
-          </Col>
-        ) : null
-      }
-      <Col xxl={span} xl={span} lg={span} md={24} sm={24} xs={24}>
-        <Button shape="default" className="chat-button" onClick={() => {
+  return <Row gutter={8} className="chat-ai-container">
+    {
+      chatBoxVisible ? (
+        <Col xxl={24 - span} xl={24 - span} lg={24 - span} md={24} sm={24} xs={24}>
+          <Suspense fallback={
+            <Empty description="Loading Chatbot..." />
+          }>
+            <ChatBox message={message}></ChatBox>
+          </Suspense>
+        </Col>
+      ) : null
+    }
+    <Col xxl={span} xl={span} lg={span} md={24} sm={24} xs={24}>
+      <Button shape="default" className="chat-button" onClick={() => {
+        if (chatBoxVisible) {
+          // Clear the message when chatbot is closed, otherwise it will activate the chat ai again when chatbot is opened.
+          setMessage('')
+        }
+        setChatBoxVisible(!chatBoxVisible)
+      }} icon={chatBoxVisible ? <MessageOutlined /> : <MessageFilled />}>
+        {chatBoxVisible ? 'Hide Chatbot' : 'Show Chatbot'}
+      </Button>
+      <KnowledgeGraph
+        apis={{
+          GetStatisticsFn: fetchStatistics,
+          // @ts-ignore, it doesn't matter, maybe we can fix this later.
+          GetEntitiesFn: fetchEntities,
+          // @ts-ignore, it doesn't matter, maybe we can fix this later.
+          GetRelationsFn: fetchRelations,
+          GetRelationCountsFn: fetchRelationCounts,
+          GetGraphHistoryFn: fetchSubgraphs,
+          PostGraphHistoryFn: postSubgraph,
+          DeleteGraphHistoryFn: deleteSubgraph,
+          GetNodesFn: fetchNodes,
+          GetPredictedNodesFn: fetchPredictedNodes,
+          GetOneStepLinkedNodesFn: fetchOneStepLinkedNodes,
+          GetConnectedNodesFn: fetchEdgesAutoConnectNodes,
+          GetEntity2DFn: fetchEntity2D,
+          GetEntityColorMapFn: fetchEntityColorMap,
+          GetNStepsLinkedNodesFn: fetchPaths,
+          // @ts-ignore, it doesn't matter, maybe we can fix this later.
+          AskLlmFn: askLlm,
+          GetSharedNodesFn: fetchSharedNodes,
+          // @ts-ignore, it seems that we don't need to fix this.
+          GetPromptsFn: fetchLlmPrompts,
+        }}
+        NodeInfoPanel={NodeInfoPanel}
+        EdgeInfoPanel={EdgeInfoPanel}
+        postMessage={(message: string) => {
           if (chatBoxVisible) {
-            // Clear the message when chatbot is closed, otherwise it will activate the chat ai again when chatbot is opened.
-            setMessage('')
+            setMessage(message)
+          } else {
+            AntMessage.warning('Please open the chatbot first.')
           }
-          setChatBoxVisible(!chatBoxVisible)
-        }} icon={chatBoxVisible ? <MessageOutlined /> : <MessageFilled />}>
-          {chatBoxVisible ? 'Hide Chatbot' : 'Show Chatbot'}
-        </Button>
-        <KnowledgeGraph
-          apis={{
-            GetStatisticsFn: fetchStatistics,
-            // @ts-ignore, it doesn't matter, maybe we can fix this later.
-            GetEntitiesFn: fetchEntities,
-            // @ts-ignore, it doesn't matter, maybe we can fix this later.
-            GetRelationsFn: fetchRelations,
-            GetRelationCountsFn: fetchRelationCounts,
-            GetGraphHistoryFn: fetchSubgraphs,
-            PostGraphHistoryFn: postSubgraph,
-            DeleteGraphHistoryFn: deleteSubgraph,
-            GetNodesFn: fetchNodes,
-            GetPredictedNodesFn: fetchPredictedNodes,
-            GetOneStepLinkedNodesFn: fetchOneStepLinkedNodes,
-            GetConnectedNodesFn: fetchEdgesAutoConnectNodes,
-            GetEntity2DFn: fetchEntity2D,
-            GetEntityColorMapFn: fetchEntityColorMap,
-            GetNStepsLinkedNodesFn: fetchPaths,
-            // @ts-ignore, it doesn't matter, maybe we can fix this later.
-            AskLlmFn: askLlm,
-            GetSharedNodesFn: fetchSharedNodes,
-            // @ts-ignore, it seems that we don't need to fix this.
-            GetPromptsFn: fetchLlmPrompts,
-          }}
-          NodeInfoPanel={NodeInfoPanel}
-          EdgeInfoPanel={EdgeInfoPanel}
-          postMessage={(message: string) => {
-            if (chatBoxVisible) {
-              setMessage(message)
-            } else {
-              AntMessage.warning('Please open the chatbot first.')
-            }
-          }}>
-        </KnowledgeGraph>
-      </Col>
-    </Row>
-  ) : null
+        }}>
+      </KnowledgeGraph>
+    </Col>
+  </Row>
 }
 
 export default memo(KnowledgeGraphWithChatBot);

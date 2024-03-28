@@ -1,7 +1,7 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { getJwtAccessToken } from '@/components/util';
+import { getJwtAccessToken, logoutWithRedirect } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
@@ -53,16 +53,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   useEffect(() => {
     // If the user is not authenticated, redirect to the login page.
     if (!isAuthenticated) {
-      // Save the current hash as the redirect url
-      let redirectUrl = window.location.hash.split("#").pop();
-      if (redirectUrl) {
-        redirectUrl = redirectUrl.replaceAll('/', '')
-        localStorage.setItem('redirectUrl', redirectUrl);
-      } else {
-        localStorage.setItem('redirectUrl', '');
-      }
-      // Redirect to a warning page that its route name is 'not-authorized'.
-      history.push('/not-authorized');
+      logoutWithRedirect();
+      return;
     }
 
     // Save the id token to the cookie.
@@ -134,7 +126,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
     }
   };
 
-  const logoutWithRedirect = () => {
+  const logoutWithRedirectRaw = () => {
     logout({ logoutParams: { returnTo: window.location.origin } }).then(() => {
       // Remove the jwt_access_token from the cookie.
       document.cookie = 'jwt_access_token=;max-age=0;path=/';
@@ -153,7 +145,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
       </Dropdown>
       <Button type={isAuthenticated ? 'default' : 'primary'} danger={isAuthenticated}
-        onClick={() => isAuthenticated ? logoutWithRedirect() : loginWithRedirect()}>
+        onClick={() => isAuthenticated ? logoutWithRedirectRaw() : loginWithRedirect()}>
         Sign {isAuthenticated ? 'Out' : 'In'}
       </Button>
     </Space>

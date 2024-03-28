@@ -214,7 +214,6 @@ const ModelConfig: React.FC = (props) => {
   const [form] = Form.useForm();
   const predictionType = Form.useWatch('prediction_type', form);
 
-  const { isAuthenticated } = useAuth0();
   const [loading, setLoading] = useState(false);
   const [currentModel, setCurrentModel] = useState(0);
   const [params, setParams] = useState({});
@@ -242,12 +241,6 @@ const ModelConfig: React.FC = (props) => {
     // Reset the entity_id field when the prediction type is changed, because the change of prediction type may lead to the component of entity_id missing.
     form.setFieldsValue({ entity_id: undefined });
   }, [predictionType]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      history.push('/not-authorized');
-    }
-  }, [isAuthenticated])
 
   const formatScore = (score: number) => {
     // Keep 3 decimal places
