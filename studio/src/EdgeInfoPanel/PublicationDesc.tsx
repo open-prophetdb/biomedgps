@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from 'antd';
+import { Button, Tag } from 'antd';
 import parse from 'html-react-parser';
 import type { PublicationDetail } from 'biominer-components/dist/typings';
 
@@ -61,7 +61,7 @@ const Desc: React.FC<{
                     <p>{parse(highlightWords(abstract, props.queryStr.split(SEPARATOR)))}</p> : null
             }
             <p>
-                {publication.year} | {publication.journal} &nbsp; | &nbsp; {publication.authors ? publication.authors.join(', ') : 'Unknown'}
+                <Tag>{publication.year}</Tag><Tag>Journal&nbsp;|&nbsp;{publication.journal}</Tag>&nbsp;{publication.authors ? publication.authors.join(', ') : 'Unknown'}
             </p>
             {
                 <p>

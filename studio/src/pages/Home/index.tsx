@@ -255,11 +255,13 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
-                    <h4 style={{ textAlign: 'center' }}>Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.<br /> If you want to predict new knowledges, please go to the <a onClick={
-                        () => {
-                            history.push('/predict-model');
-                        }
-                    }>Predict Drug/Target</a> page.</h4>
+                    <h4 style={{ textAlign: 'center', fontSize: '16px', lineHeight: '24px' }}>
+                        Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
+                        <br />
+                        If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-model'); }}>Predict Drug/Target</a> page.
+                        <br />
+                        Please click the following examples to see the results.
+                    </h4>
                     <Select
                         showSearch
                         allowClear

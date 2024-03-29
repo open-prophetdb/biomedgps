@@ -448,6 +448,7 @@ const KnowledgeTable: React.FC = (props) => {
                             </>
                         }
                         title="Note"
+                        overlayClassName='popover-note'
                     >
                         <Button type="primary" onClick={() => {
                             setEdgeInfo({

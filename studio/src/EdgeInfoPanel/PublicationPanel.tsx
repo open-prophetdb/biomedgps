@@ -93,9 +93,8 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
         <>
             <div className='publication-panel-header'>
                 <h3>
-                    Relevant Publications
+                    Top 10 Relevant Publications [<span>Keywords: {props.queryStr.split('#').join(', ')}</span>]
                 </h3>
-                <span>Keywords: {props.queryStr.split('#').join(', ')}</span>
             </div>
             <List
                 loading={loading}
