@@ -32,3 +32,4 @@ neo4j-data
 neo4j-import
 data/*.json
 data/*.parquet
+data/*.xml
