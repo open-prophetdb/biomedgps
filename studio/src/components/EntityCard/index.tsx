@@ -7,14 +7,21 @@ const EntityCard = (metadata: Entity | undefined) => {
         return <div>No metadata found!</div>;
     } else {
         return (
-            <div style={{ overflowWrap: 'break-word', width: '420px', maxHeight: '200px', overflow: 'scroll' }}>
+            <div style={{ overflowWrap: 'break-word', width: '420px', maxHeight: '200px', overflow: 'scroll' }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                }}>
                 <p style={{ marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold' }}>Species: </span>
                     {guessSpecies(`${metadata.taxid}` || '')}
                 </p>
                 <p style={{ marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold' }}>Synonyms: </span>
-                    {metadata.synonyms || 'No synonyms found!'}
+                    {
+                        metadata.synonyms ? metadata.synonyms.split("|").map(item => {
+                            return <Tag key={item}>{item}</Tag>;
+                        }) : 'No synonyms found!'
+                    }
                 </p>
                 <p style={{ marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold' }}>Xrefs: </span>

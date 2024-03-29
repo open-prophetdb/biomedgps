@@ -509,6 +509,7 @@ impl CheckData for Entity {
     }
 }
 
+// For importing attributes of entities into the graph database.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
 pub struct EntityAttribute {
     // Ignore this field when deserialize from json

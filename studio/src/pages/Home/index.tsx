@@ -150,6 +150,7 @@ const HomePage: React.FC = () => {
     const [nodeOptions, setNodeOptions] = useState<OptionType[] | undefined>(undefined);
     const [cookieName, setCookieName] = useState<string>('biomedgps-cookie-consent-form');
     const [cookieEnabled, setCookieEnabled] = useState<boolean | undefined>(undefined);
+    const [currentNodeOption, setCurrentNodeOption] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         const v = Cookies.get(cookieName);
@@ -288,9 +289,15 @@ const HomePage: React.FC = () => {
                     >
                         {nodeOptions &&
                             nodeOptions.map((option: any) => (
-                                <Select.Option key={option.label} value={option.value} disabled={option.disabled}>
+                                <Select.Option key={option.label} value={option.value} disabled={option.disabled} onMouseEnter={() => {
+                                    console.log('hover:', option);
+                                    setCurrentNodeOption(option.value);
+                                }} onMouseLeave={() => {
+                                    setCurrentNodeOption(undefined);
+                                }}>
                                     {option.metadata ? (
                                         <Popover
+                                            open={option.value === currentNodeOption}
                                             placement="rightTop"
                                             title={option.label}
                                             content={EntityCard(option.metadata)}
@@ -314,32 +321,32 @@ const HomePage: React.FC = () => {
                         <a onClick={() => {
                             onSearch('Gene::ENTREZ:3569', 'IL6')
                         }}>
-                            <Tag color={guessColor("Gene")}>Gene:IL6</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Pathway::WikiPathways:WP1742', 'TP53 Network')
-                        }}>
-                            <Tag color={guessColor("Pathway")}>Pathway:TP53 Network</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Disease::MONDO:0005404', 'ME/CFS')
-                        }}>
-                            <Tag color={guessColor("Disease")}>Disease:ME/CFS</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Disease::MONDO:0100233', 'LongCOVID')
-                        }}>
-                            <Tag color={guessColor("Disease")}>Disease:LongCOVID</Tag>
+                            <Tag color={guessColor("Gene")}>Gene | IL6</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Compound::DrugBank:DB00028', 'Human immunoglobulin G')
                         }}>
-                            <Tag color={guessColor("Gene")}>Gene:Human immunoglobulin G</Tag>
+                            <Tag color={guessColor("Gene")}>Gene | Human immunoglobulin G</Tag>
+                        </a>
+                        <a onClick={() => {
+                            onSearch('Pathway::WikiPathways:WP1742', 'TP53 Network')
+                        }}>
+                            <Tag color={guessColor("Pathway")}>Pathway | TP53 Network</Tag>
+                        </a>
+                        <a onClick={() => {
+                            onSearch('Disease::MONDO:0005404', 'ME/CFS')
+                        }}>
+                            <Tag color={guessColor("Disease")}>Disease | Chronic Fatigue Syndrome</Tag>
+                        </a>
+                        <a onClick={() => {
+                            onSearch('Disease::MONDO:0100233', 'LongCOVID')
+                        }}>
+                            <Tag color={guessColor("Disease")}>Disease | LongCOVID</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Symptom::MESH:D005221', 'Fatigue')
                         }}>
-                            <Tag color={guessColor("Symptom")}>Symptom:Fatigue</Tag>
+                            <Tag color={guessColor("Symptom")}>Symptom | Fatigue</Tag>
                         </a>
                     </span>
                 </Col>

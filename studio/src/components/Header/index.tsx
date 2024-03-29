@@ -42,6 +42,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         }
       } catch (error) {
         console.error('Error refreshing access token:', error);
+        loginWithRedirect();
       }
     };
 
