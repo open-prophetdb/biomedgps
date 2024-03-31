@@ -17,7 +17,7 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use model::core::{EntityAttribute, DEFAULT_DATASET_NAME};
 use model::kge::{EmbeddingMetadata, DEFAULT_MODEL_TYPES};
-use neo4rs::{ConfigBuilder, Graph, Query};
+use neo4rs::{ConfigBuilder, Graph, Query, query};
 use polars::prelude::{
     col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
 };
@@ -379,6 +379,35 @@ pub fn create_temp_file(dir: &PathBuf, extension: Option<&str>) -> PathBuf {
         .expect("Failed to set file permissions");
 
     return temp_filepath;
+}
+
+pub async fn build_index_by_jdbc(database_url: &str, graphdb: &Graph) {
+    let jdbc_url = database_url.replace("postgres://", "jdbc:postgresql://");
+    info!("jdbc_url: {}", jdbc_url);
+
+    let query_str = format!(
+        r#"
+            CALL apoc.load.jdbc(
+                "{jdbc_url}",
+                "SELECT label FROM biomedgps_entity GROUP BY label",
+            ) YIELD row RETURN row
+            CALL apoc.cypher.doIt('CREATE INDEX IF NOT EXISTS FOR (n:'+row.label+') ON (n.idx)', {{}}) YIELD value
+            RETURN count(*)
+        "#,
+        jdbc_url = jdbc_url
+
+    );
+
+    match graphdb.execute(query(&query_str)).await {
+        Ok(_) => {
+            info!("Build indexes successfully.");
+            return;
+        }
+        Err(e) => {
+            error!("Failed to build indexes: ({})", e);
+            return;
+        }
+    }
 }
 
 pub async fn build_index(

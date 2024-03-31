@@ -134,7 +134,7 @@ pub struct ImportDBArguments {
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
 
-    /// [Optional] The batch size for caching table.
+    /// [Optional] The batch size for syncing data to the graph database.
     #[structopt(
         name = "batch_size",
         short = "b",
@@ -510,23 +510,23 @@ async fn main() {
             )
             .await;
 
-            // Sync the entity data to the graph database. The relation data will be synced to the graph database in the cachetable command, because we need to compute the score for the relation data.
-            let neo4j_url = if arguments.neo4j_url.is_none() {
-                match std::env::var("NEO4J_URL") {
-                    Ok(v) => v,
-                    Err(_) => {
-                        error!(
-                            "{}",
-                            "NEO4J_URL is not set, so skip to sync the data to the graph database."
-                        );
-                        return ();
-                    }
-                }
-            } else {
-                arguments.neo4j_url.unwrap()
-            };
-
             if arguments.table == "entity" {
+                // Sync the entity data to the graph database. The relation data will be synced to the graph database in the cachetable command, because we need to compute the score for the relation data.
+                let neo4j_url = if arguments.neo4j_url.is_none() {
+                    match std::env::var("NEO4J_URL") {
+                        Ok(v) => v,
+                        Err(_) => {
+                            error!(
+                                "{}",
+                                "NEO4J_URL is not set, so skip to sync the data to the graph database."
+                            );
+                            return ();
+                        }
+                    }
+                } else {
+                    arguments.neo4j_url.unwrap()
+                };
+
                 let pool = match sqlx::PgPool::connect(&database_url).await {
                     Ok(v) => v,
                     Err(e) => {
@@ -560,6 +560,17 @@ async fn main() {
 
                 let graph = connect_graph_db(&neo4j_url).await;
                 let graph = Arc::new(graph);
+
+                info!("Build the index for the entity table before we sync the entity data to the graph database to improve the performance.");
+                // We need to build the index for the entity table before we sync the entity data to the graph database to improve the performance.
+                build_index(
+                    &graph,
+                    &arguments.filepath,
+                    arguments.skip_check,
+                    arguments.show_all_errors,
+                )
+                .await;
+
                 match kg_entity_table2graphdb(
                     &database_url,
                     &graph,
@@ -576,16 +587,8 @@ async fn main() {
                     }
                 }
 
-                build_index(
-                    &graph,
-                    &arguments.filepath,
-                    arguments.skip_check,
-                    arguments.show_all_errors,
-                )
-                .await
+                info!("We have synced the entity data to the graph database, but the relation data will be synced to the graph database in the cachetable command, because we need to compute the score for the relation data. Before you run the cachetable command, you need to ensure that the entity, relation, and the embedding data has been imported into the database.");
             }
-
-            info!("We have synced the entity data to the graph database, but the relation data will be synced to the graph database in the cachetable command, because we need to compute the score for the relation data. Before you run the cachetable command, you need to ensure that the entity, relation, and the embedding data has been imported into the database.");
         }
         SubCommands::ImportKGE(arguments) => {
             let database_url = if arguments.database_url.is_none() {

@@ -1,5 +1,6 @@
 //! SQL initialization strings for creating tables.
 
+use crate::build_index_by_jdbc;
 use crate::model::kge::{
     get_embedding_metadata, get_entity_emb_table_name, get_relation_emb_table_name,
     EmbeddingMetadata, DEFAULT_MODEL_NAME,
@@ -528,7 +529,7 @@ fn get_score_attr_name(table_prefix: &str) -> String {
 }
 
 /// Import the entity table to the graph database.
-/// 
+///
 /// # Arguments
 /// * `jdbc_url` - The JDBC URL of the database.
 /// * `graphdb` - The graph database.
@@ -610,7 +611,7 @@ pub async fn kg_entity_table2graphdb(
                     if batches == 0 && total == 0 {
                         warn!("The entity table is empty.");
                         return Ok(());
-                    }
+                    };
 
                     if failed_operations > 0 {
                         error!(
@@ -624,7 +625,9 @@ pub async fn kg_entity_table2graphdb(
                                 failed_operations, total, msg
                             )
                         );
-                    }
+                    };
+
+                    build_index_by_jdbc(&jdbc_url, &graphdb).await;
                 }
                 info!("The entity table is converted to the graph database successfully");
             }

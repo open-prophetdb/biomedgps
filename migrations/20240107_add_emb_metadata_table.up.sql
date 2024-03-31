@@ -4,7 +4,7 @@ CREATE TABLE
     id BIGSERIAL PRIMARY KEY, -- The entity metadata ID
     table_name VARCHAR(64) NOT NULL UNIQUE, -- The name of the embedding table. It is a prefix of the real embedding table name, such as if you use biomedgps as the table name, the real embedding table name is biomedgps_entity_embedding, biomedgps_relation_embedding, etc.
     model_name VARCHAR(64) NOT NULL UNIQUE, -- The name of the embedding model
-    model_type VARCHAR(64) NOT NULL, -- The type of the embedding model, such as TransE, DistMult, etc.
+    model_type VARCHAR(64) NOT NULL, -- The type of the embedding model, such as TransE_l2, DistMult, etc.
     description TEXT NOT NULL, -- The description of the embedding model
     datasets TEXT[] NOT NULL, -- The datasets which are used to train the embedding model. The dataset is the same as the dataset column in the biomedgps_relation table.
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- The created time of the embedding metadata

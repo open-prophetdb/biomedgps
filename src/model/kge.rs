@@ -124,14 +124,14 @@ pub async fn add_default_model(pool: &sqlx::PgPool) -> Result<(), anyhow::Error>
             return Ok(());
         }
         Err(_) => {
-            warn!("WARNING: The default model of BiomedKG does not exist, we will create it automatically. You may forget to create the default model.");
+            warn!("WARNING: The default model of BioMedKG does not exist, we will create it automatically. You may forget to create the default model.");
             let mut kge_models = KGE_MODELS.lock().unwrap();
             let metadata = EmbeddingMetadata {
                 id: 0,
                 table_name: DEFAULT_MODEL_NAME.to_string(),
                 model_name: DEFAULT_MODEL_NAME.to_string(),
-                model_type: "TransE".to_string(),
-                description: "The default model of BiomedKG".to_string(),
+                model_type: "TransE_l2".to_string(),
+                description: "The default model of BioMedKG".to_string(),
                 datasets: vec![DEFAULT_DATASET_NAME.to_string()],
                 created_at: Utc::now(),
                 dimension: 400,
@@ -139,12 +139,12 @@ pub async fn add_default_model(pool: &sqlx::PgPool) -> Result<(), anyhow::Error>
             };
             match &metadata.insert(pool).await {
                 Ok(_) => {
-                    info!("The default model of BiomedKG has been created successfully.");
+                    info!("The default model of BioMedKG has been created successfully.");
                 }
                 Err(e) => {
-                    warn!("WARNING: The default model of BiomedKG has not been created successfully: {}", e.to_string());
+                    warn!("WARNING: The default model of BioMedKG has not been created successfully: {}", e.to_string());
                     let msg = format!(
-                        "The default model of BiomedKG has not been created successfully: {}",
+                        "The default model of BioMedKG has not been created successfully: {}",
                         e.to_string()
                     );
                     return Err(anyhow::Error::msg(msg));
@@ -344,11 +344,11 @@ pub struct EmbeddingMetadata {
     ))]
     pub model_name: String,
 
-    // The model type, such as TransE, TransH, TransR, TransD, RotatE etc.
+    // The model type, such as TransE_l2, TransH, TransR, TransD, RotatE etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
-        message = "The length of model_type should be between 1 and 64, such as TransE, TransH, TransR, TransD, RotatE, etc."
+        message = "The length of model_type should be between 1 and 64, such as TransE_l2, TransH, TransR, TransD, RotatE, etc.",
     ))]
     pub model_type: String,
 
