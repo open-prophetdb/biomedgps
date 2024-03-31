@@ -652,7 +652,8 @@ const KnowledgeTable: React.FC = (props) => {
                         }
                         explainGraph(selectedRowKeys as string[]);
                     }}>
-                    Explain [{nodeName ? nodeName : nodeId}]
+                    {/* Explain [{nodeName ? nodeName : nodeId}] */}
+                    Explain
                 </Button>
             </div>
             <Table

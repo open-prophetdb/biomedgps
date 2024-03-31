@@ -3,7 +3,10 @@ extern crate log;
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
 use biomedgps::model::{
-    init_db::{create_score_table, get_kg_score_table_name, kg_score_table2graphdb},
+    init_db::{
+        create_score_table, get_kg_score_table_name, kg_entity_table2graphdb,
+        kg_score_table2graphdb,
+    },
     util::read_annotation_file,
 };
 use biomedgps::{
@@ -18,7 +21,7 @@ use std::sync::Arc;
 use structopt::StructOpt;
 
 /// NOTE: In the first time, you need to follow the order to run the commands: initdb -> importdb (entity + entity_metadata + relation + relation_metadata etc.) -> importkge (embeddings) -> cachetable (compound-disease-symptom, knowledge-score). In the current stage, we don't have a mechanism to check the format of entity ids and relation_types and keep the consistent of the data, such as whether all entities in the relation table exist in the entity table. But we provide a script for this purpose, you can follow this link to check the data consistency: https://github.com/open-prophetdb/biomedgps-data/blob/main/graph_data/scripts/correct_graph_data.py
-/// 
+///
 #[derive(StructOpt, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name = "A cli for biomedgps service.", author="Jingcheng Yang <yjcyxky@163.com>;")]
 struct Opt {
@@ -79,6 +82,10 @@ pub struct ImportDBArguments {
     #[structopt(name = "neo4j_url", short = "n", long = "neo4j-url")]
     neo4j_url: Option<String>,
 
+    /// [Optional] Database host, such as postgres-ml:5432. Only needed when you run your application in a docker container and the database is in another container.
+    #[structopt(name = "db_host", short = "D", long = "db-host")]
+    db_host: Option<String>,
+
     /// [Required] The file path of the data file to import. It may be a file or a directory. If you have multiple files to import, you can use the --filepath option with a directory path. We will import all files in the directory. But you need to disable the --drop option, otherwise, only the last file will be imported successfully.
     ///
     /// In the case of entity, the file should be a csv/tsv file which contains the id, name, label etc. More details about the format can be found in the github.com/yjcyxky/biomedgps-data.
@@ -126,6 +133,15 @@ pub struct ImportDBArguments {
     /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "e", long = "show-all-errors")]
     show_all_errors: bool,
+
+    /// [Optional] The batch size for caching table.
+    #[structopt(
+        name = "batch_size",
+        short = "b",
+        long = "batch-size",
+        default_value = "10000"
+    )]
+    batch_size: usize,
 }
 
 /// Cache tables for performance. You must run this command after the importdb command.
@@ -511,19 +527,54 @@ async fn main() {
             };
 
             if arguments.table == "entity" {
+                let pool = match sqlx::PgPool::connect(&database_url).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("Connect to database failed: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let total = match sqlx::query("SELECT count(*) FROM biomedgps_entity")
+                    .fetch_one(&pool)
+                    .await
+                {
+                    Ok(row) => row.get::<i64, _>("count"),
+                    Err(e) => {
+                        error!(
+                            "Failed to get the total number of the records in the score table: {}",
+                            e
+                        );
+                        std::process::exit(1);
+                    }
+                };
+
+                // Use the regex to replace the database host and port.
+                let re = Regex::new(r"(.*//.*?@)[^/]*(/.*)").unwrap();
+                let database_url = if arguments.db_host.is_none() {
+                    database_url
+                } else {
+                    let caps = re.captures(&database_url).unwrap();
+                    let db_host = arguments.db_host.unwrap();
+                    format!("{}{}{}", &caps[1], db_host, &caps[2])
+                };
+
                 let graph = connect_graph_db(&neo4j_url).await;
-                let batch_size = 10000;
-                import_graph_data(
+                let graph = Arc::new(graph);
+                match kg_entity_table2graphdb(
+                    &database_url,
                     &graph,
-                    &arguments.filepath,
-                    &arguments.table,
-                    arguments.skip_check,
-                    true,
-                    arguments.show_all_errors,
-                    batch_size,
-                    &arguments.dataset,
+                    total as usize,
+                    arguments.batch_size,
                 )
-                .await;
+                .await
+                {
+                    Ok(_) => {
+                        info!("Import kg score table to graph database successfully.")
+                    }
+                    Err(e) => {
+                        error!("Import kg score table to graph database failed: {}", e)
+                    }
+                }
 
                 build_index(
                     &graph,

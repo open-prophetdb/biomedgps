@@ -69,5 +69,5 @@ changelog:
 deploy: build-studio
 	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
 	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@drugs.3steps.cn:/data/biomedgps/bin
-	@rsync -avP assets/index.html root@drugs.3steps.cn:/var/www/html/biomedgps/index.html
-	@rsync -avP assets root@drugs.3steps.cn:/var/www/html/biomedgps/
+	@rsync -avP --delete assets/index.html root@drugs.3steps.cn:/var/www/html/biomedgps/index.html
+	@rsync -avP --delete assets root@drugs.3steps.cn:/var/www/html/biomedgps/

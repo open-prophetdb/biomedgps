@@ -527,7 +527,123 @@ fn get_score_attr_name(table_prefix: &str) -> String {
     format!("{}_score", table_prefix)
 }
 
-/// Convert the score table of the triple entity to the graph database.
+/// Import the entity table to the graph database.
+/// 
+/// # Arguments
+/// * `jdbc_url` - The JDBC URL of the database.
+/// * `graphdb` - The graph database.
+/// * `total` - The total number of the records in the entity table.
+/// * `batch_size` - The batch size for the iteration.
+pub async fn kg_entity_table2graphdb(
+    database_url: &str,
+    graphdb: &Arc<Graph>,
+    total: usize,
+    batch_size: usize,
+) -> Result<(), anyhow::Error> {
+    let jdbc_url = database_url.replace("postgres://", "jdbc:postgresql://");
+    info!("jdbc_url: {}", jdbc_url);
+
+    info!("Need to convert {} records to the graph database", total);
+    let batch = total as usize / batch_size;
+
+    for i in 0..batch {
+        info!(
+            "Run the batch: {}/{}, each batch has {} records",
+            i, batch, batch_size
+        );
+        let offset = i * batch_size;
+        // https://github.com/pgjdbc/pgjdbc
+
+        let query_str = format!(
+            r#"
+                CALL apoc.periodic.iterate(
+                    'CALL apoc.load.jdbc(
+                        "{jdbc_url}",
+                        "SELECT id, name, label, resource, COALESCE(label, \'\') || \'::\' || COALESCE(id, \'\') AS idx, description, taxid, synonyms, xrefs FROM biomedgps_entity LIMIT {limit} OFFSET {offset}") YIELD row RETURN row',
+                    'WITH row
+                     CALL apoc.merge.node([row.label], {{ idx: row.idx }}) YIELD node
+                     SET node.idx = row.idx,
+                         node.id = row.id,
+                         node.name = row.name,
+                         node.resource = row.resource,
+                         node.description = row.description,
+                         node.taxid = row.taxid,
+                         node.synonyms = row.synonyms,
+                         node.xrefs = row.xrefs',
+                    {{batchSize: {batch_size}, parallel: true, iterateList: true, retries: 0}}
+                )
+                YIELD batches, total, errorMessages, failedOperations
+                RETURN batches, total, errorMessages, failedOperations
+            "#,
+            limit = batch_size * 5,
+            offset = offset,
+            jdbc_url = jdbc_url,
+            batch_size = batch_size,
+        );
+
+        info!("query_str: {}", query_str);
+
+        let err_msg = "if you encounter a connection error and you are using the docker container, please try to set the --db-host to the hostname:port of your database docker container.";
+
+        match graphdb.execute(query(&query_str)).await {
+            Ok(mut result) => {
+                // Extract the batches, total and errorMessages from the result
+                while let Some(row) = result.next().await? {
+                    info!("row: {:?}", row);
+                    let batches = match row.get("batches") {
+                        Some(b) => b,
+                        None => 0,
+                    };
+                    let total = match row.get("total") {
+                        Some(t) => t,
+                        None => 0,
+                    };
+                    let failed_operations = match row.get::<i64>("failedOperations") {
+                        Some(f) => f,
+                        None => continue,
+                    };
+                    let msg = match row.get::<NeoNode>("errorMessages") {
+                        Some(e) => e,
+                        None => continue,
+                    };
+
+                    if batches == 0 && total == 0 {
+                        warn!("The entity table is empty.");
+                        return Ok(());
+                    }
+
+                    if failed_operations > 0 {
+                        error!(
+                            "The entity table is not empty, but the number of failed operations is {} out of {}. The error message: {:?}",
+                            failed_operations, total, msg
+                        );
+
+                        return Err(
+                            anyhow!(
+                                "The entity table is not empty, but the number of failed operations is {} out of {}. The error message: {:?}",
+                                failed_operations, total, msg
+                            )
+                        );
+                    }
+                }
+                info!("The entity table is converted to the graph database successfully");
+            }
+            Err(e) => {
+                error!(
+                    "Failed to set the embedding for the entity: {}, {}",
+                    e, err_msg
+                );
+                return Err(anyhow::Error::new(e));
+            }
+        }
+    }
+
+    info!("The entity table is converted to the graph database successfully");
+
+    Ok(())
+}
+
+/// Import the score table of the triple entity to the graph database.
 ///
 /// # Arguments
 /// * `jdbc_url` - The JDBC URL of the database.
