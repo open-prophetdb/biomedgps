@@ -164,7 +164,7 @@ pub struct CacheTableArguments {
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
-    /// [Optional] Relation types for compound-disease-symptom table. Separated by comma. e.g. STRING::BINDING::Gene:Gene,STRING::BINDING::Gene:Gene. The number and order of relation types should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.
+    /// [Optional] Relation types for compound-disease-symptom table. Separated by comma. e.g. DRUGBANK::treats::Compound:Disease,HSDN::has_symptom:Disease:Symptom. The number and order of relation types should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.
     #[structopt(name = "relation_types", short = "r", long = "relation-types")]
     relation_types: Option<String>,
 

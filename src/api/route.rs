@@ -255,7 +255,7 @@ impl BiomedgpsApi {
                     "id ASC".to_string()
                 } else {
                     // More fields will cause bad performance
-                    make_order_clause_by_pairs(pairs, 2)
+                    make_order_clause_by_pairs(pairs, 1)
                 }
             }
             None => "id ASC".to_string(),

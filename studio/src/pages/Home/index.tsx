@@ -93,10 +93,10 @@ export const fetchNodes = async (
     // If the value is a number, then maybe it is an id or xref but not for name or synonyms.
     if (value && !isNaN(Number(value))) {
         queryMap = { id: value, xrefs: value };
-        order = ['label', 'id', 'xrefs'];
+        order = ['id', 'xrefs', 'label'];
     } else {
         queryMap = { name: value, synonyms: value, xrefs: value, id: value };
-        order = ['label', 'name', 'synonyms', 'xrefs', 'id'];
+        order = ['name', 'synonyms', 'xrefs', 'id', 'label'];
     }
 
     const fetchData = () => {
@@ -104,6 +104,8 @@ export const fetchNodes = async (
             query_str: makeQueryEntityStr(queryMap, order),
             page: 1,
             page_size: 50,
+            // We only want to get all valid entities.
+            model_table_prefix: 'biomedgps',
         })
             .then((response) => {
                 const { records } = response;
@@ -291,7 +293,7 @@ const HomePage: React.FC = () => {
                     >
                         {nodeOptions &&
                             nodeOptions.map((option: any) => (
-                                <Select.Option key={option.label} value={option.value} disabled={option.disabled} onMouseEnter={() => {
+                                <Select.Option key={option.value} value={option.value} disabled={option.disabled} onMouseEnter={() => {
                                     console.log('hover:', option);
                                     setCurrentNodeOption(option.value);
                                 }} onMouseLeave={() => {
@@ -351,9 +353,11 @@ const HomePage: React.FC = () => {
                             <Tag color={guessColor("Symptom")}>Symptom | Fatigue</Tag>
                         </a>
                     </span>
+                    <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.<br /> Please give us feedback or check the <a href="https://drugs.3steps.cn/#/about">About</a> page for more information.</span>
                 </Col>
                 <Row className="statistics" gutter={16}>
-                    <Col className="data-stat" sm={24} md={12} xs={12} xxl={12}>
+                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
+                    <Col className="data-stat" sm={24} md={10} xs={10} xxl={10}>
                         <p className="desc" style={{ textAlign: 'justify' }}>
                             A platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.
                             <br />
@@ -367,8 +371,8 @@ const HomePage: React.FC = () => {
                             More resources about the platform can be found in the <a href="https://drugs.3steps.cn/#/about">About</a> page.
                         </p>
                     </Col>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="image-container" sm={24} md={11} xs={11} xxl={11}>
+                    <Col sm={0} md={2} xs={2} xxl={2}></Col>
+                    <Col className="image-container" sm={24} md={10} xs={10} xxl={10}>
                         <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
                             {images.map((item: ImageItem) => {
                                 return (
@@ -380,6 +384,7 @@ const HomePage: React.FC = () => {
                             })}
                         </Carousel>
                     </Col>
+                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
                 </Row>
                 <Row className="text-statistics">
                     {stats.map((item) => {

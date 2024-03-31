@@ -3,7 +3,6 @@ import { Layout, Menu, Form, Input, InputNumber, Button, Select, Empty, Col, Row
 import { DotChartOutlined, DribbbleOutlined, AimOutlined, BranchesOutlined, BugOutlined, ZoomInOutlined } from '@ant-design/icons';
 import { history } from 'umi';
 // import { createFromIconfontCN } from '@ant-design/icons';
-import { useAuth0 } from "@auth0/auth0-react";
 import { GraphTable } from 'biominer-components';
 import { makeDataSources, pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import { APIs, GraphData, COMPOSED_ENTITY_DELIMITER, Entity } from 'biominer-components/dist/typings';
