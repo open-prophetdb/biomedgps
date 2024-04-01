@@ -5,6 +5,7 @@ import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
 import { getJwtAccessToken, logout, logoutWithRedirect } from '@/components/util';
+
 // import * as Sentry from "@sentry/react";
 
 // Configure Sentry for error tracking

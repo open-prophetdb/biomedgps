@@ -2,7 +2,6 @@ import { history } from 'umi';
 import { Row, Col, Button, message as AntMessage, Empty } from 'antd';
 import { KnowledgeGraph } from 'biominer-components';
 import React, { useEffect, useState, memo, Suspense } from 'react';
-import { useAuth0 } from "@auth0/auth0-react";
 // TODO: KeepAlive will cause some bugs, so we disable it for now.
 // import { KeepAlive } from 'umi';
 import { MessageFilled, MessageOutlined } from '@ant-design/icons';
