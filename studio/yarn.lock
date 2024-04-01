@@ -5453,10 +5453,10 @@ bio.io@^1.0.6:
     xhr "^2.2.0"
     xmldoc "^0.5.1"
 
-biominer-components@0.3.19:
-  version "0.3.19"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.19.tgz#2609e079b561736463b08826521d934e44695a44"
-  integrity sha512-gXba3leP6r7xi+4cAnHdaubzDkp1i00QRNAdShJEpW6TSdtWIIWUbpTh/zzeZ8shlVMBqPcuVburriwox2GBOg==
+biominer-components@0.3.20:
+  version "0.3.20"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.20.tgz#f907ebe9463687b007033aa48bf49dd6abe16106"
+  integrity sha512-uWqleFUY5igsCWRgc5E9RbTVFtZY+eLlwUdIzoOIE3egJ3L47XysnpsCVI+pokcyf4BOLGVFc2M7RcW/2xIt4w==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^4.2.2"
     ag-grid-community "^31.0.1"
