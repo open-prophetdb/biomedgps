@@ -11,7 +11,7 @@ export const routes = [
   },
   {
     path: '/knowledge-table',
-    name: 'ME/CFS & LongCOVID',
+    name: 'Knowledge Table',
     icon: 'table',
     hideInMenu: true,
     component: './KnowledgeTable',
@@ -30,6 +30,16 @@ export const routes = [
     icon: 'comment',
     component: './KnowledgeGraph',
     category: 'knowledge-graph'
+  },
+  {
+    path: '/mecfs-longcovid',
+    name: 'ME/CFS & LongCOVID',
+    icon: 'table',
+    component: './KnowledgeTable',
+    category: 'knowledge-graph',
+    wrappers: [
+      '@/wrappers/param',
+    ],
   },
   {
     path: '/knowledge-graph-editor',

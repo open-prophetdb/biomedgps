@@ -97,5 +97,6 @@ export default defineConfig({
       mock: false,
     }
   ],
-  mfsu: {}
+  mfsu: {},
+  scripts: []
 });

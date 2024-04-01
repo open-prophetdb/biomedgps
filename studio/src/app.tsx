@@ -194,6 +194,14 @@ export const layout: RuntimeConfig = (initialState: any) => {
     footerRender: () => <Footer />,
     onPageChange: () => {
       const { location } = history;
+
+      // You can modify the css style of the menu item at the global.less file.
+      var spans = document.querySelectorAll('span.ant-pro-base-menu-horizontal-item-text');
+      spans.forEach(function (span) {
+        if (span.innerHTML.startsWith("ME/CFS")) {
+          span.classList.add('new-tag');
+        }
+      });
     },
     links: [],
     logout: () => {

@@ -24,19 +24,30 @@ export type GraphTableData = {
     pageSize: number;
 };
 
-const makeQueryStr = (entityType: string, entityId: string, relationTypes?: string[]): string => {
+const isValidNodeIds = (nodeIds: string[] | undefined): boolean => {
+    // Check whether the label is same among the nodeIds
+    if (nodeIds && nodeIds.length > 0) {
+        const label = nodeIds[0].split('::')[0];
+        return nodeIds.every((nodeId) => nodeId.split('::')[0] === label);
+    }
+
+    return false;
+}
+
+const makeQueryStr = (nodeIds: string[], relationTypes?: string[], resources?: string[]): string => {
+    // The source_type and target_type must be the same among the nodeIds
     const source_query: ComposeQueryItem = {
         operator: 'and',
         items: [
             {
                 field: 'source_type',
-                operator: '=',
-                value: entityType
+                operator: 'in',
+                value: nodeIds.map((nodeId) => nodeId.split('::')[0]),
             },
             {
                 field: 'source_id',
-                operator: '=',
-                value: entityId
+                operator: 'in',
+                value: nodeIds.map((nodeId) => nodeId.split('::')[1]),
             },
         ],
     };
@@ -46,13 +57,13 @@ const makeQueryStr = (entityType: string, entityId: string, relationTypes?: stri
         items: [
             {
                 field: 'target_type',
-                operator: '=',
-                value: entityType
+                operator: 'in',
+                value: nodeIds.map((nodeId) => nodeId.split('::')[0]),
             },
             {
                 field: 'target_id',
-                operator: '=',
-                value: entityId
+                operator: 'in',
+                value: nodeIds.map((nodeId) => nodeId.split('::')[1]),
             },
         ],
     };
@@ -76,6 +87,20 @@ const makeQueryStr = (entityType: string, entityId: string, relationTypes?: stri
         };
     }
 
+    if (resources && resources.length > 0) {
+        query = {
+            operator: 'and',
+            items: [
+                query,
+                {
+                    field: 'resource',
+                    operator: 'in',
+                    value: resources,
+                },
+            ],
+        };
+    }
+
     return JSON.stringify(query);
 }
 
@@ -83,15 +108,17 @@ const KnowledgeTable: React.FC = (props) => {
     const search = useLocation().search;
     // Such as Disease::MONDO:0005404
     const queriedNodeId = new URLSearchParams(search).get('nodeId') || undefined;
-    const queriedNodeName = new URLSearchParams(search).get('nodeName') || undefined;
-    const [nodeId, setNodeId] = useState<string | undefined>(undefined);
-    const [nodeName, setNodeName] = useState<string | undefined>(undefined);
+    const queriedNodeIds = new URLSearchParams(search).get('nodeIds') || undefined;
+
+    const [nodeIds, setNodeIds] = useState<string[] | undefined>(undefined);
     const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
     const [currentNode, setCurrentNode] = useState<GraphNode | undefined>(undefined);
     const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
     const [selectedRelationTypes, setSelectedRelationTypes] = useState<string[]>([]);
     const [relationTypeDescs, setRelationTypeDescs] = useState<Record<string, string>>({});
+    const [resources, setResources] = useState<OptionType[]>([]);
+    const [selectedResources, setSelectedResources] = useState<string[]>([]);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
@@ -103,8 +130,22 @@ const KnowledgeTable: React.FC = (props) => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
 
     useEffect(() => {
-        if (queriedNodeId) {
-            setNodeId(queriedNodeId);
+        if (queriedNodeId || queriedNodeIds) {
+            if (queriedNodeId) {
+                setNodeIds([queriedNodeId]);
+            } else {
+                setNodeIds(undefined);
+            }
+
+            if (queriedNodeIds) {
+                const ids = queriedNodeIds.split(',');
+                if (ids.length > 0) {
+                    setNodeIds(ids);
+                } else {
+                    setNodeIds(undefined);
+                }
+            }
+
             fetchRelationMetadata().then((relationStat) => {
                 const o = makeRelationTypes(relationStat)
                 let descs = {} as Record<string, string>;
@@ -112,11 +153,18 @@ const KnowledgeTable: React.FC = (props) => {
                     descs[item.value] = item.description || 'Unknown';
                 });
                 setRelationTypeDescs(descs);
-            });
-        }
 
-        if (queriedNodeName) {
-            setNodeName(queriedNodeName);
+                let res = [] as OptionType[];
+                relationStat.forEach((item, index) => {
+                    res.push({
+                        order: 0,
+                        label: item.resource,
+                        value: item.resource,
+                    });
+                });
+
+                setResources(uniqBy(res, 'value'));
+            });
         }
     }, [])
 
@@ -147,16 +195,16 @@ const KnowledgeTable: React.FC = (props) => {
     }
 
     const getKnowledgesData = (
-        nodeId: string, page: number,
-        pageSize: number, relationTypes?: string[]
+        nodeIds: string[],
+        page: number,
+        pageSize: number,
+        relationTypes?: string[],
+        resources?: string[]
     ): Promise<GraphData> => {
         return new Promise((resolve, reject) => {
-            let pairs = nodeId.split('::');
-            const entityType = pairs[0];
-            const entityId = pairs[1];
-            if (entityType && entityId) {
+            if (nodeIds && nodeIds.length > 0) {
                 fetchOneStepLinkedNodes({
-                    query_str: makeQueryStr(entityType, entityId, relationTypes),
+                    query_str: makeQueryStr(nodeIds, relationTypes, resources),
                     page_size: pageSize,
                     page: page
                 })
@@ -202,6 +250,14 @@ const KnowledgeTable: React.FC = (props) => {
             }
         },
         {
+            title: 'Resource',
+            dataIndex: 'resource',
+            key: 'resource',
+            align: 'center',
+            width: 100,
+            fixed: 'left',
+        },
+        {
             title: 'PMID',
             dataIndex: 'pmids',
             align: 'center',
@@ -214,7 +270,6 @@ const KnowledgeTable: React.FC = (props) => {
                     </a>
                 );
             },
-            fixed: 'left',
             filters: sortBy(uniqBy(filter(tableData.map((item) => {
                 return {
                     text: item.pmids,
@@ -455,13 +510,10 @@ const KnowledgeTable: React.FC = (props) => {
         }
     ];
 
-    const fetchTableData = async (nodeId: string, page: number, pageSize: number, relationTypes?: string[]) => {
+    const fetchTableData = async (nodeIds: string[], page: number, pageSize: number, relationTypes?: string[], resources?: string[]) => {
         setLoading(true);
-        let pairs = nodeId.split('::');
-        const entityType = pairs[0];
-        const entityId = pairs[1];
-        if (entityType && entityId) {
-            fetchRelationCounts({ query_str: makeQueryStr(entityType, entityId, relationTypes) })
+        if (nodeIds && nodeIds.length > 0) {
+            fetchRelationCounts({ query_str: makeQueryStr(nodeIds, relationTypes, resources) })
                 .then((response) => {
                     const n = response.map((item) => item.ncount).reduce((a, b) => a + b, 0);
                     setTotal(n);
@@ -496,7 +548,7 @@ const KnowledgeTable: React.FC = (props) => {
             setTotal(0);
         }
 
-        getKnowledgesData(nodeId, page, pageSize, relationTypes)
+        getKnowledgesData(nodeIds, page, pageSize, relationTypes, resources)
             .then((response) => {
                 setGraphData(response);
                 setLoading(false);
@@ -528,12 +580,12 @@ const KnowledgeTable: React.FC = (props) => {
     }
 
     useEffect(() => {
-        if (!nodeId) {
+        if (!nodeIds || !isValidNodeIds(nodeIds)) {
             return;
         }
 
-        fetchTableData(nodeId, page, pageSize, selectedRelationTypes);
-    }, [nodeId, page, pageSize, refreshKey]);
+        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, selectedResources);
+    }, [nodeIds, page, pageSize, refreshKey]);
 
     const getRowKey = (record: GraphEdge) => {
         return record.relid || `${JSON.stringify(record)}`;
@@ -552,7 +604,7 @@ const KnowledgeTable: React.FC = (props) => {
                             for Your Query
 
                             {
-                                nodeId ? `(${nodeId} ${nodeName ? nodeName : ''})` : ''
+                                nodeIds ? `( ${nodeIds.join(', ')} )` : ''
                             }
                         </p>
                         <Button type="primary" onClick={() => history.push('/')}>
@@ -586,13 +638,35 @@ const KnowledgeTable: React.FC = (props) => {
                     maxTagCount={2}
                     // It's not working, I use css to limit the tag text length instead.
                     // maxTagTextLength={12}
+                    style={{ width: '240px', marginRight: '10px' }}
+                    size="large"
+                    placeholder="Please select resources to filter."
+                    defaultValue={[]}
+                    onChange={(value: string[]) => {
+                        if (nodeIds) {
+                            fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value);
+                            setSelectedResources(value);
+
+                            // The total number of items has been changed, so we need to reset the page and page size.
+                            setPage(1);
+                            setPageSize(30);
+                        }
+                    }}
+                    options={resources}
+                />
+                <Select
+                    mode="multiple"
+                    allowClear
+                    maxTagCount={2}
+                    // It's not working, I use css to limit the tag text length instead.
+                    // maxTagTextLength={12}
                     style={{ width: '350px', marginRight: '10px' }}
                     size="large"
                     placeholder="Please select relation types to filter."
                     defaultValue={[]}
                     onChange={(value: string[]) => {
-                        if (nodeId) {
-                            fetchTableData(nodeId, page, pageSize, value);
+                        if (nodeIds) {
+                            fetchTableData(nodeIds, page, pageSize, value, selectedResources);
                             setSelectedRelationTypes(value);
 
                             // The total number of items has been changed, so we need to reset the page and page size.
@@ -626,7 +700,7 @@ const KnowledgeTable: React.FC = (props) => {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `knowledge_${nodeId}.tsv`;
+                    a.download = `knowledges-${nodeIds?.join('-')}-${new Date().toISOString()}.tsv`;
                     a.click();
 
                     // Delete the url
@@ -643,7 +717,6 @@ const KnowledgeTable: React.FC = (props) => {
                         }
                         explainGraph(selectedRowKeys as string[]);
                     }}>
-                    {/* Explain [{nodeName ? nodeName : nodeId}] */}
                     Explain
                 </Button>
             </div>
@@ -669,14 +742,14 @@ const KnowledgeTable: React.FC = (props) => {
                 }}
                 pagination={{
                     showSizeChanger: true,
-                    showQuickJumper: true,
+                    showQuickJumper: false,
                     pageSizeOptions: ['10', '20', '50', '100', '300', '500'],
                     current: page,
                     pageSize: pageSize,
                     total: total || 0,
                     position: ['topLeft'],
                     showTotal: (total) => {
-                        return `Total ${total} items`;
+                        return `Total ${total} records`;
                     },
                 }}
                 onChange={(pagination) => {
