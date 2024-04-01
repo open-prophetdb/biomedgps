@@ -3,7 +3,6 @@ import { history } from 'umi';
 import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin, Select } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useAuth0 } from "@auth0/auth0-react";
 import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchRelationMetadata } from '@/services/swagger/KnowledgeGraph';
 import type { ComposeQueryItem, OptionType, GraphData, GraphEdge, GraphNode, RelationCount } from 'biominer-components/dist/typings';
@@ -13,7 +12,7 @@ import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy, groupBy, map, sumBy, set } from 'lodash';
-import { guessColor } from '@/components/util';
+import { guessColor, truncateString } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
 import './index.less';
@@ -145,14 +144,6 @@ const KnowledgeTable: React.FC = (props) => {
         };
         pushGraphDataToLocalStorage(selectedGraphData);
         history.push('/knowledge-graph');
-    }
-
-    const truncateString = (str: string) => {
-        if (str.length > 20) {
-            return str.substring(0, 20) + '...';
-        } else {
-            return str;
-        }
     }
 
     const getKnowledgesData = (

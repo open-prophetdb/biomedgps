@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Menu, Form, Input, InputNumber, Button, Select, Empty, Col, Row, Tooltip, message, Spin } from 'antd';
+import { Layout, Menu, Form, Input, InputNumber, Button, Select, Empty, Col, Row, Tooltip, message, Spin, Popover } from 'antd';
 import { DotChartOutlined, DribbbleOutlined, AimOutlined, BranchesOutlined, BugOutlined, ZoomInOutlined } from '@ant-design/icons';
 import { history } from 'umi';
 // import { createFromIconfontCN } from '@ant-design/icons';
@@ -14,6 +14,8 @@ import { sortBy } from 'lodash';
 import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
 import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
+import EntityCard from '@/components/EntityCard';
+import { truncateString } from '@/components/util';
 
 import './index.less';
 
@@ -137,7 +139,7 @@ export const fetchNodes = async (
 };
 
 const NodeIdSearcher = (props: NodeIdSearcherProps) => {
-  const [entityOptions, setEntityOptions] = useState(undefined);
+  const [entityOptions, setEntityOptions] = useState<OptionType[] | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   const handleSearchNode = function (entityType: string, value: string) {
@@ -158,14 +160,15 @@ const NodeIdSearcher = (props: NodeIdSearcherProps) => {
     allowClear
     defaultActiveFirstOption={false}
     loading={loading}
-    showArrow={true}
     placeholder={props.placeholder}
-    onChange={(value) => { props.onSelect && props.onSelect(value) }}
+    onChange={(value) => {
+      props.onSelect && props.onSelect(value);
+    }}
     onSearch={(value) => handleSearchNode(props.entityType, value)}
     getPopupContainer={(triggerNode: HTMLElement) => {
       return triggerNode.parentNode as HTMLElement;
     }}
-    options={entityOptions}
+    // options={entityOptions}
     filterOption={false}
     notFoundContent={
       <Empty
@@ -180,7 +183,31 @@ const NodeIdSearcher = (props: NodeIdSearcherProps) => {
         }
       />
     }
-  ></Select>;
+  >
+    {entityOptions &&
+      entityOptions.map((option: any) => (
+        <Select.Option key={option.value} value={option.value} disabled={option.disabled}>
+          {option.metadata ? (
+            <Popover
+              mouseEnterDelay={0.5}
+              placement="rightTop"
+              title={option.label}
+              content={EntityCard(option.metadata)}
+              trigger="hover"
+              getPopupContainer={(triggeredNode: any) => document.body}
+              overlayClassName="entity-id-popover"
+              autoAdjustOverflow={false}
+              destroyTooltipOnHide={true}
+              zIndex={1500}
+            >
+              {truncateString(option.label, 50)}
+            </Popover>
+          ) : (
+            option.label
+          )}
+        </Select.Option>
+      ))}
+  </Select>;
 }
 
 type ModelParameter = {
@@ -672,6 +699,7 @@ const ModelConfig: React.FC = (props) => {
         }}
         allowMultiple={item.allowMultiple}
         handleSearchNode={(entityType, value) => console.log(entityType, value)}
+        // @ts-ignore
         getEntities={fetchEntities}
       />
     } else if (item.type === 'RelationTypeSearcher') {

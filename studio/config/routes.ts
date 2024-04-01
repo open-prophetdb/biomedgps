@@ -5,7 +5,7 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 export const routes = [
   {
     path: '/',
-    name: 'Home',
+    name: 'Search Knowledges',
     icon: 'home',
     component: './Home',
   },
@@ -19,7 +19,7 @@ export const routes = [
   },
   {
     path: '/predict-model',
-    name: 'Predict Drug/Target',
+    name: 'Predict Drugs/Targets',
     icon: 'history',
     component: './ModelConfig',
     category: 'predict-model'

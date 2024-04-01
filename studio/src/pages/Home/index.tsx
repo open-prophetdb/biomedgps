@@ -152,7 +152,6 @@ const HomePage: React.FC = () => {
     const [nodeOptions, setNodeOptions] = useState<OptionType[] | undefined>(undefined);
     const [cookieName, setCookieName] = useState<string>('biomedgps-cookie-consent-form');
     const [cookieEnabled, setCookieEnabled] = useState<boolean | undefined>(undefined);
-    const [currentNodeOption, setCurrentNodeOption] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         const v = Cookies.get(cookieName);
@@ -274,7 +273,12 @@ const HomePage: React.FC = () => {
                         loading={loading}
                         defaultActiveFirstOption={false}
                         placeholder="Enter a gene/protein, disease, drug or symptom name to start..."
-                        onSearch={(value) => fetchNodes(value, setNodeOptions)}
+                        onSearch={(value) => {
+                            setLoading(true);
+                            fetchNodes(value, setNodeOptions).finally(() => {
+                                setLoading(false);
+                            });
+                        }}
                         filterOption={false}
                         onSelect={(value, options) => {
                             onSearch(value);
@@ -293,15 +297,10 @@ const HomePage: React.FC = () => {
                     >
                         {nodeOptions &&
                             nodeOptions.map((option: any) => (
-                                <Select.Option key={option.value} value={option.value} disabled={option.disabled} onMouseEnter={() => {
-                                    console.log('hover:', option);
-                                    setCurrentNodeOption(option.value);
-                                }} onMouseLeave={() => {
-                                    setCurrentNodeOption(undefined);
-                                }}>
+                                <Select.Option key={option.value} value={option.value} disabled={option.disabled}>
                                     {option.metadata ? (
                                         <Popover
-                                            open={option.value === currentNodeOption}
+                                            mouseEnterDelay={0.5}
                                             placement="rightTop"
                                             title={option.label}
                                             content={EntityCard(option.metadata)}
@@ -353,7 +352,11 @@ const HomePage: React.FC = () => {
                             <Tag color={guessColor("Symptom")}>Symptom | Fatigue</Tag>
                         </a>
                     </span>
-                    <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.<br /> Please give us feedback or check the <a href="https://drugs.3steps.cn/#/about">About</a> page for more information.</span>
+                    <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
+                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
+                        <br />
+                        Please give us feedback or check the <a href="https://drugs.3steps.cn/#/about">About</a> page for more information.
+                    </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
                     <Col sm={0} md={1} xs={1} xxl={1}></Col>

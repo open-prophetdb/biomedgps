@@ -102,3 +102,15 @@ export const logoutWithRedirect = () => {
         history.push('/not-authorized');
     }
 }
+
+export const truncateString = (str: string, num?: number) => {
+    if (!num) {
+        num = 20;
+    }
+
+    if (str.length > num) {
+        return str.substring(0, num) + '...';
+    } else {
+        return str;
+    }
+}

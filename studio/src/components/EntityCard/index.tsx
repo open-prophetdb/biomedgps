@@ -1,6 +1,7 @@
 import type { Entity } from 'biominer-components/dist/typings';
 import { guessColor, guessSpecies } from '../util';
 import { Tag } from 'antd';
+import { uniq } from 'lodash';
 
 const EntityCard = (metadata: Entity | undefined) => {
     if (!metadata) {
@@ -18,7 +19,7 @@ const EntityCard = (metadata: Entity | undefined) => {
                 <p style={{ marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold' }}>Synonyms: </span>
                     {
-                        metadata.synonyms ? metadata.synonyms.split("|").map(item => {
+                        metadata.synonyms ? uniq(metadata.synonyms.split("|")).map(item => {
                             return <Tag key={item}>{item}</Tag>;
                         }) : 'No synonyms found!'
                     }
