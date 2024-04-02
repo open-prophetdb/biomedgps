@@ -239,6 +239,16 @@ def tojson(input_file, output_dir, format):
     for path, default in uncorrected_paths:
         drugs_data = [set_default_if_empty(drug, path, default) for drug in drugs_data]
 
+    # We don't like the following fields, because they might cause issues when we import the data into a database.
+    for drug in drugs_data:
+        if "type" in drug:
+            drug["compound_type"] = drug["type"]
+            del drug["type"]
+
+        if "state" in drug:
+            drug["compound_state"] = drug["state"]
+            del drug["state"]
+
     # Prepare the output JSON file path using version and exported-on attributes
     json_file_path = os.path.join(output_dir, f"drugbank_{version}_{exported_on}.json")
 
@@ -251,6 +261,7 @@ def tojson(input_file, output_dir, format):
 
     data = checktypes_wrapper(output_file, json_file_path)
     if format == "linejson":
+        json_file_path = json_file_path.replace(".json", ".jsonl")
         with open(json_file_path, "w", encoding="utf-8") as json_file:
             for drug in data:
                 json_file.write(json.dumps(drug, ensure_ascii=False) + "\n")

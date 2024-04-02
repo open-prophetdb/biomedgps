@@ -6,3 +6,4 @@ pub mod graph;
 pub mod llm;
 pub mod kge;
 pub mod init_db;
+pub mod metadata;

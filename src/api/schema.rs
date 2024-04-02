@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
 
-use super::req::{PublicationDetail, PublicationRecords};
+use super::publication::{PublicationDetail, PublicationRecords};
 
 #[derive(Tags)]
 pub enum ApiTags {

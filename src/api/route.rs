@@ -1,7 +1,7 @@
 //! This module defines the routes of the API.
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
-use crate::api::req::Publication;
+use crate::api::publication::Publication;
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
     GetPublicationsResponse, GetRecordsResponse, GetRelationCountResponse, GetStatisticsResponse,

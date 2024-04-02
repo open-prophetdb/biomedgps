@@ -2,6 +2,7 @@ extern crate log;
 
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
+use biomedgps::model::metadata::CompoundMetadata;
 use biomedgps::model::{
     init_db::{
         create_score_table, get_kg_score_table_name, kg_entity_table2graphdb,
@@ -10,8 +11,7 @@ use biomedgps::model::{
     util::read_annotation_file,
 };
 use biomedgps::{
-    build_index, connect_graph_db, import_data, import_graph_data, import_kge, init_logger,
-    run_migrations,
+    build_index, connect_graph_db, import_data, import_kge, init_logger, run_migrations,
 };
 use log::*;
 use regex::Regex;
@@ -114,7 +114,7 @@ pub struct ImportDBArguments {
     ///
     /// In addition, if you upgrade the entity and relation tables, you need to ensure that the entity2d, relation_metadata, entity_metadata, knowledge_curation, subgraph tables are also upgraded. For the entity_metadata and relation_metadata, you can use the importdb command to upgrade after the entity and relation tables are upgraded.
     ///
-    /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional].
+    /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional], compound-metadata[Optional].
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
@@ -471,6 +471,28 @@ async fn main() {
                 error!("Please specify the table name.");
                 return;
             };
+
+            if arguments.table == "compound-metadata" {
+                let pool = match sqlx::PgPool::connect(&database_url).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("Connect to database failed: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let filepath = match &arguments.filepath {
+                    Some(v) => PathBuf::from(v),
+                    None => {
+                        error!("Please specify the file path for the compound-metadata table.");
+                        std::process::exit(1);
+                    }
+                };
+                
+                match CompoundMetadata::sync2db(&pool, &filepath).await {
+                    Ok(_) => info!("Import compound-metadata table successfully."),
+                    Err(e) => error!("Import compound-metadata table failed: {}", e),
+                }
+            }
 
             // The annotation file is essential for relation table. We need the formatted_relation_type to annotate the relation_type.
             let relation_type_mappings = if arguments.table == "relation" {

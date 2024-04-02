@@ -20,9 +20,10 @@ cargo install json2parquet
 Get additional data for each compound from [DrugBank](https://www.drugbank.ca/). You might need to request access to the DrugBank data. If you have access, download the DrugBank XML file and save it to the `data` directory. We assume the file is named `drugbank_5.1_2024-01-03.xml`.
 
 ```bash
-python3 data/drugbank.py tojson --input-file data/drugbank_5.1_2024-01-03.xml --output-dir data
+python3 data/drugbank.py tojson --input-file data/drugbank/drugbank_5.1_2024-01-03.xml --output-dir data/drugbank
 
-json2parquet data/drugbank_5.1_2024-01-03.json data/drugbank_5.1_2024-01-03.parquet
+python3 data/drugbank.py tojson --input-file data/drugbank/drugbank_5.1_2024-01-03.xml --output-dir data/drugbank --format linejson
+json2parquet data/drugbank/drugbank_5.1_2024-01-03.jsonl data/drugbank/drugbank_5.1_2024-01-03.parquet
 ```
 
 ### Gene
