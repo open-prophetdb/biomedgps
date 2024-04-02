@@ -5,7 +5,8 @@ CREATE TABLE
         compound_type VARCHAR(64) NOT NULL, -- The type of the compound, such as drug, small molecule, etc.
         created VARCHAR(16) NOT NULL, -- The created time of the compound metadata
         updated VARCHAR(16) NOT NULL, -- The updated time of the compound metadata
-        drugbank_id ARRAY[TEXT] NOT NULL, -- The DrugBank IDs of the compound
+        drugbank_id VARCHAR(16) NOT NULL, -- The DrugBank ID of the compound
+        xrefs ARRAY[TEXT] NOT NULL, -- The DrugBank IDs of the compound
         name VARCHAR(128) NOT NULL, -- The name of the compound
         description TEXT NOT NULL, -- The description of the compound
         cas_number VARCHAR(32) NOT NULL, -- The CAS number of the compound

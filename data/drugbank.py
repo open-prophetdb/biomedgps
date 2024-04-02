@@ -249,6 +249,10 @@ def tojson(input_file, output_dir, format):
             drug["compound_state"] = drug["state"]
             del drug["state"]
 
+        if "drugbank_id" in drug:
+            drug["xrefs"] = drug["drugbank_id"]
+            drug["drugbank_id"] = "DrugBank:" + drug["drugbank_id"][0] if drug["drugbank_id"][0].startswith("DB") else drug["drugbank_id"][0]
+
     # Prepare the output JSON file path using version and exported-on attributes
     json_file_path = os.path.join(output_dir, f"drugbank_{version}_{exported_on}.json")
 
