@@ -1,5 +1,6 @@
 import click
 import os
+import csv
 import tempfile
 import xml.etree.ElementTree as ET
 import json
@@ -25,7 +26,7 @@ cli = click.Group()
 @click.option(
     "--format",
     "-f",
-    type=click.Choice(["json", "linejson"], case_sensitive=False),
+    type=click.Choice(["json", "linejson", "tsv"], case_sensitive=False),
     default="json",
     help="The format of the JSON file. Default is 'json'. The 'linejson' format writes each JSON object on a separate line.",
 )
@@ -157,7 +158,7 @@ def tojson(input_file, output_dir, format):
         return obj
 
     # Load the XML file
-    print(f"Converting {input_file} to JSON...")
+    print(f"Converting {input_file} to {format}...")
     tree = ET.parse(input_file)
     root = tree.getroot()
 
@@ -234,6 +235,9 @@ def tojson(input_file, output_dir, format):
         [["transporters", "polypeptide"], []],
         [["products", "ndc_id"], ""],
         [["ahfs_codes"], []],
+        [["pdb_entries"], []],
+        [["snp_effects"], []],
+        [["snp_adverse_drug_reactions"], []],
     ]
 
     for path, default in uncorrected_paths:
@@ -259,6 +263,40 @@ def tojson(input_file, output_dir, format):
     # Save the processed data to a JSON file
     print(f"Saving JSON file to {json_file_path}...")
 
+    def format_value(value):
+        if isinstance(value, list):
+            formatted_elements = [format_value(item) for item in value]
+            return "{" + ",".join(formatted_elements) + "}"
+        elif isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False)
+        elif isinstance(value, str):
+            escaped_value = value.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            return f'"{escaped_value}"'
+        else:
+            return str(value)
+
+
+    def save_data_as_tsv(data, json_file_path):
+        json_file_path = json_file_path.replace(".json", ".tsv")
+        all_fields = [set(item.keys()) for item in data]
+        common_fields = set.intersection(*all_fields)
+
+        with open(json_file_path, "w", encoding="utf-8", newline="") as tsv_file:
+            writer = csv.DictWriter(
+                tsv_file,
+                fieldnames=list(common_fields),
+                delimiter="\t",
+                extrasaction="ignore",
+            )
+            writer.writeheader()
+            for item in data:
+                row = {
+                    field: format_value(item[field])
+                    for field in common_fields
+                    if field in item
+                }
+                writer.writerow(row)
+
     output_file = tempfile.NamedTemporaryFile(delete=True).name
     with open(output_file, "w", encoding="utf-8") as json_file:
         json.dump(drugs_data, json_file, ensure_ascii=False, indent=4)
@@ -269,6 +307,8 @@ def tojson(input_file, output_dir, format):
         with open(json_file_path, "w", encoding="utf-8") as json_file:
             for drug in data:
                 json_file.write(json.dumps(drug, ensure_ascii=False) + "\n")
+    elif format == "tsv":
+        save_data_as_tsv(data, json_file_path)
 
 
 @cli.command(help="Check the types of the data in a JSON file.")

@@ -670,6 +670,7 @@ const ModelConfig: React.FC = (props) => {
     }
   };
 
+  // TODO: Need to change the default relation types if we changed the relation types in our database.
   const getDefaultRelationType = (entityType: string, predictionType: string) => {
     const DefaultRelationTypeMap: Record<string, string> = {
       'Disease:Disease': 'Hetionet::DrD::Disease:Disease',
@@ -680,7 +681,7 @@ const ModelConfig: React.FC = (props) => {
       'Compound:Gene': 'DRUGBANK::target::Compound:Gene',
       'Gene:Disease': 'GNBR::J::Gene:Disease',
       // TODO: the relation type is non-standard
-      'Symptom:Disease': 'HSDN::has_symptom:Disease:Symptom',
+      'Symptom:Disease': 'HSDN::has_symptom::Disease:Symptom',
       'Symptom:Compound': 'DrugBank::treats::Compound:Symptom',
     };
 

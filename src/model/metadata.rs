@@ -1,14 +1,18 @@
 //! Add metadata to the entity and relationship model.
-use log::debug;
+use crate::model::core::CheckData;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::fs::File;
+use std::io::BufReader;
 use std::{error::Error, path::PathBuf};
-use validator::{Validate, ValidationErrors};
+use validator::Validate;
+use log::debug;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Category {
     pub category: String,
+    #[serde(default = "default_as_empty_string")]
     pub mesh_id: String,
 }
 
@@ -21,31 +25,54 @@ pub struct Patent {
     pub pediatric_extension: String,
 }
 
+fn default_as_empty_string() -> String {
+    String::new()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct CompoundMetadata {
+    #[serde(default = "default_as_empty_string")]
     pub compound_type: String,
+    #[serde(default = "default_as_empty_string")]
     pub created: String,
+    #[serde(default = "default_as_empty_string")]
     pub updated: String,
     pub drugbank_id: String,
     pub xrefs: Vec<String>,
     pub name: String,
+    #[serde(default = "default_as_empty_string")]
     pub description: String,
+    #[serde(default = "default_as_empty_string")]
     pub cas_number: String,
+    #[serde(default = "default_as_empty_string")]
     pub unii: String,
+    #[serde(default = "default_as_empty_string")]
     pub compound_state: String,
     pub groups: Vec<String>,
     // pub general_references: GeneralReference,
+    #[serde(default = "default_as_empty_string")]
     pub synthesis_reference: String,
+    #[serde(default = "default_as_empty_string")]
     pub indication: String,
+    #[serde(default = "default_as_empty_string")]
     pub pharmacodynamics: String,
+    #[serde(default = "default_as_empty_string")]
     pub mechanism_of_action: String,
+    #[serde(default = "default_as_empty_string")]
     pub toxicity: String,
+    #[serde(default = "default_as_empty_string")]
     pub metabolism: String,
+    #[serde(default = "default_as_empty_string")]
     pub absorption: String,
+    #[serde(default = "default_as_empty_string")]
     pub half_life: String,
+    #[serde(default = "default_as_empty_string")]
     pub protein_binding: String,
+    #[serde(default = "default_as_empty_string")]
     pub route_of_elimination: String,
+    #[serde(default = "default_as_empty_string")]
     pub volume_of_distribution: String,
+    #[serde(default = "default_as_empty_string")]
     pub clearance: String,
     // pub classification: Classification,
     // pub salts: Vec<String>,
@@ -79,106 +106,9 @@ pub struct CompoundMetadata {
     // pub transporters: Vec<Transporter>,
 }
 
-impl CompoundMetadata {
-    pub async fn sync2db(pool: &sqlx::PgPool, filepath: &PathBuf) -> Result<(), Box<dyn Error>> {
-        match sqlx::query("DROP TABLE IF EXISTS staging")
-            .execute(pool)
-            .await
-        {
-            Ok(_) => debug!("Drop table staging successfully."),
-            Err(e) => debug!("Drop table staging failed: {:?}", e),
-        }
-
-        let mut tx = pool.begin().await?;
-        sqlx::query(
-            "CREATE TEMPORARY TABLE staging (LIKE biomedgps_compound_metadata INCLUDING DEFAULTS)",
-        )
-        .execute(&mut tx)
-        .await?;
-
-        let columns = Self::fields().join(", ");
-        let query_str = format!(
-            "COPY staging ({}) FROM {} WITH (FORMAT JSON)",
-            columns,
-            filepath.display()
-        );
-
-        debug!("Start to copy data to the staging table.");
-        sqlx::query(&query_str).execute(&mut tx).await?;
-
-        let where_clause = Self::unique_fields()
-            .iter()
-            .map(|c| format!("biomedgps_compound_metadata.{} = staging.{}", c, c))
-            .collect::<Vec<String>>()
-            .join(" AND ");
-
-        sqlx::query(&format!(
-            "INSERT INTO biomedgps_compound_metadata ({})
-             SELECT {} FROM staging
-             WHERE NOT EXISTS (SELECT 1 FROM biomedgps_compound_metadata WHERE {})
-             ON CONFLICT DO NOTHING",
-            columns, columns, where_clause
-        ))
-        .execute(&mut tx)
-        .await?;
-
-        tx.commit().await?;
-
-        match sqlx::query("DROP TABLE IF EXISTS staging")
-            .execute(pool)
-            .await
-        {
-            Ok(_) => {}
-            Err(_) => {}
-        };
-
-        Ok(())
-    }
-}
-
-pub trait CheckMetadata {
-    fn check_json_is_valid(filepath: &PathBuf) -> Vec<Box<ValidationErrors>>;
-
-    // Implement the check function
-    fn check_json_is_valid_default<
-        S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug,
-    >(
-        filepath: &PathBuf,
-    ) -> Vec<Box<ValidationErrors>> {
-        let file = std::fs::File::open(filepath).unwrap();
-        let reader = std::io::BufReader::new(file);
-        let data: Vec<S> = serde_json::from_reader(reader).unwrap();
-        let mut errors: Vec<Box<ValidationErrors>> = Vec::new();
-        for d in data.iter() {
-            match d.validate() {
-                Ok(_) => {}
-                Err(e) => {
-                    errors.push(Box::new(e));
-                }
-            }
-        }
-        errors
-    }
-
-    fn fields() -> Vec<String>;
-
-    fn unique_fields() -> Vec<String>;
-
-    fn get_error_msg<S: for<'de> serde::Deserialize<'de> + Validate + std::fmt::Debug>(
-        r: Result<Vec<S>, Box<ValidationErrors>>,
-    ) -> String {
-        match r {
-            Ok(_) => "".to_string(),
-            Err(e) => {
-                return e.to_string();
-            }
-        }
-    }
-}
-
-impl CheckMetadata for CompoundMetadata {
-    fn check_json_is_valid(filepath: &PathBuf) -> Vec<Box<ValidationErrors>> {
-        Self::check_json_is_valid_default::<CompoundMetadata>(filepath)
+impl CheckData for CompoundMetadata {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<CompoundMetadata>(filepath)
     }
 
     fn unique_fields() -> Vec<String> {
@@ -191,6 +121,7 @@ impl CheckMetadata for CompoundMetadata {
             "created".to_string(),
             "updated".to_string(),
             "drugbank_id".to_string(),
+            "xrefs".to_string(),
             "name".to_string(),
             "description".to_string(),
             "cas_number".to_string(),
@@ -213,5 +144,81 @@ impl CheckMetadata for CompoundMetadata {
             "patents".to_string(),
             "synonyms".to_string(),
         ]
+    }
+}
+
+impl CompoundMetadata {
+    pub async fn sync2db(pool: &sqlx::PgPool, filepath: &PathBuf, clean_table: bool) -> Result<(), Box<dyn Error>> {
+        if clean_table {
+            let _ = sqlx::query("TRUNCATE TABLE biomedgps_compound_metadata")
+                .execute(pool)
+                .await?;
+        };
+        let file = File::open(filepath)?;
+        let reader = BufReader::new(file);
+        let compounds: Vec<CompoundMetadata> = serde_json::from_reader(reader)?;
+
+        let mut tx = pool.begin().await?;
+        let fields_str = CompoundMetadata::fields().join(", ");
+        let placeholders_str = CompoundMetadata::fields().iter().enumerate()
+            .map(|(i, field)| {
+                if field == "categories" || field == "patents" {
+                    format!("${}", i + 1)
+                } else {
+                    format!("${}", i + 1)
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+            
+        let sql = format!(
+            "INSERT INTO biomedgps_compound_metadata ({}) VALUES ({})",
+            fields_str, placeholders_str
+        );
+
+        for compound in compounds {
+            debug!("Name: {:?}", compound.name);
+            debug!("Groups: {:?}", compound.groups);
+            debug!("Synonyms: {:?}", compound.synonyms);
+
+            let result = sqlx::query(&sql)
+                .bind(&compound.compound_type)
+                .bind(&compound.created)
+                .bind(&compound.updated)
+                .bind(&compound.drugbank_id)
+                .bind(&compound.xrefs)
+                .bind(&compound.name)
+                .bind(&compound.description)
+                .bind(&compound.cas_number)
+                .bind(&compound.unii)
+                .bind(&compound.compound_state)
+                .bind(&compound.groups)
+                .bind(&compound.synthesis_reference)
+                .bind(&compound.indication)
+                .bind(&compound.pharmacodynamics)
+                .bind(&compound.mechanism_of_action)
+                .bind(&compound.toxicity)
+                .bind(&compound.metabolism)
+                .bind(&compound.absorption)
+                .bind(&compound.half_life)
+                .bind(&compound.protein_binding)
+                .bind(&compound.route_of_elimination)
+                .bind(&compound.volume_of_distribution)
+                .bind(&compound.clearance)
+                .bind(&serde_json::to_value(compound.categories)?)
+                .bind(&serde_json::to_value(compound.patents)?)
+                .bind(&compound.synonyms)
+                .execute(&mut tx)
+                .await;
+
+            if let Err(e) = result {
+                tx.rollback().await?;
+                return Err(Box::new(e));
+            }
+        }
+
+        tx.commit().await?;
+
+        Ok(())
     }
 }

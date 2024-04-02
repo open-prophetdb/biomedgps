@@ -17,7 +17,7 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use model::core::{EntityAttribute, DEFAULT_DATASET_NAME};
 use model::kge::{EmbeddingMetadata, DEFAULT_MODEL_TYPES};
-use neo4rs::{ConfigBuilder, Graph, Query, query};
+use neo4rs::{query, ConfigBuilder, Graph, Query};
 use polars::prelude::{
     col, lit, CsvReader, CsvWriter, IntoLazy, NamedFrom, SerReader, SerWriter, Series,
 };
@@ -34,6 +34,7 @@ use crate::model::core::{
 };
 use crate::model::graph::{Edge, Node};
 use crate::model::kge::{EntityEmbedding, LegacyRelationEmbedding, RelationEmbedding};
+use crate::model::metadata::CompoundMetadata;
 use crate::model::util::{
     drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
     update_entity_metadata, update_relation_metadata,
@@ -395,7 +396,6 @@ pub async fn build_index_by_jdbc(database_url: &str, graphdb: &Graph) {
             RETURN count(*)
         "#,
         jdbc_url = jdbc_url
-
     );
 
     match graphdb.execute(query(&query_str)).await {

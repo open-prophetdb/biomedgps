@@ -6,13 +6,13 @@ CREATE TABLE
         created VARCHAR(16) NOT NULL, -- The created time of the compound metadata
         updated VARCHAR(16) NOT NULL, -- The updated time of the compound metadata
         drugbank_id VARCHAR(16) NOT NULL, -- The DrugBank ID of the compound
-        xrefs ARRAY[TEXT] NOT NULL, -- The DrugBank IDs of the compound
-        name VARCHAR(128) NOT NULL, -- The name of the compound
+        xrefs VARCHAR(64)[] NOT NULL, -- The cross-references of the compound
+        name TEXT NOT NULL, -- The name of the compound
         description TEXT NOT NULL, -- The description of the compound
         cas_number VARCHAR(32) NOT NULL, -- The CAS number of the compound
         unii VARCHAR(32) NOT NULL, -- The UNII of the compound
         compound_state VARCHAR(32) NOT NULL, -- The state of the compound, such as solid, liquid, etc.
-        groups ARRAY[TEXT] NOT NULL, -- The groups of the compound, such as approved, investigational, etc.
+        groups VARCHAR(128)[] NOT NULL, -- The groups of the compound, such as approved, investigational, etc.
         synthesis_reference TEXT NOT NULL, -- The synthesis reference of the compound
         indication TEXT NOT NULL, -- The indication of the compound
         pharmacodynamics TEXT NOT NULL, -- The pharmacodynamics of the compound
@@ -25,7 +25,8 @@ CREATE TABLE
         route_of_elimination TEXT NOT NULL, -- The route of elimination of the compound
         volume_of_distribution TEXT NOT NULL, -- The volume of distribution of the compound
         clearance TEXT NOT NULL, -- The clearance of the compound
-        synonyms ARRAY[TEXT] NOT NULL, -- The synonyms of the compound
+        synonyms TEXT[] NOT NULL, -- The synonyms of the compound
         categories JSONB NOT NULL, -- The categories of the compound
         patents JSONB NOT NULL, -- The patents of the compound
+        CONSTRAINT biomedgps_compound_metadata_uniq_key UNIQUE (drugbank_id)
     );

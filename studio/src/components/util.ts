@@ -22,6 +22,7 @@ export const getJwtAccessToken = (): string | null => {
 }
 
 export const guessColor = (text: string): string => {
+    // TODO: We must change the colors if we add new types or change the existing ones in our database.
     const colors: Record<string, string> = {
         Anatomy: "#1f78b4",
         BiologicalProcess: "#b15928",

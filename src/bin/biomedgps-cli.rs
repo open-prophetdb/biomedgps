@@ -16,6 +16,7 @@ use biomedgps::{
 use log::*;
 use regex::Regex;
 use sqlx::Row;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -46,12 +47,24 @@ enum SubCommands {
     CacheTable(CacheTableArguments),
     #[structopt(name = "cleandb")]
     CleanDB(CleanDBArguments),
+    #[structopt(name = "statdb")]
+    StatDB(StatDBArguments),
 }
 
 /// Initialize the database, only for the postgres database. In common, we don't need to initialize the graph database, such as neo4j. We can clean the graph database by the cleandb command simply before we import the data. We might need to run the initdb command when we want to upgrade the database schema or the first time we run the application.
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - initdb", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct InitDbArguments {
+    /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
+    #[structopt(name = "database_url", short = "d", long = "database-url")]
+    database_url: Option<String>,
+}
+
+/// Output the statistics of the database, such as the number of entities, relations, metadata etc.
+/// The statistics include the number of entities, relations, metadata, subgraph, knowledge_curation, entity2d, compound-disease-symptom, knowledge-score, embedding, graph etc.
+#[derive(StructOpt, PartialEq, Debug)]
+#[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - statdb", author="Jingcheng Yang <yjcyxky@163.com>")]
+pub struct StatDBArguments {
     /// Database url, such as postgres://postgres:postgres@localhost:5432/rnmpdb, if not set, use the value of environment variable DATABASE_URL.
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
@@ -66,7 +79,7 @@ pub struct CleanDBArguments {
     database_url: Option<String>,
 
     /// Which table to clean. e.g. entity, relation, entity_metadata, relation_metadata, knowledge_curation, subgraph, entity2d, compound-disease-symptom, knowledge-score, embedding, graph etc.
-    #[structopt(name = "table", short = "t", long = "table")]
+    #[structopt(name = "table", short = "t", long = "table", possible_values = &["entity", "entity2d", "relation", "relation_metadata", "entity_metadata", "knowledge_curation", "subgraph", "compound-disease-symptom", "knowledge-score", "embedding", "graph"])]
     table: String,
 }
 
@@ -110,12 +123,12 @@ pub struct ImportDBArguments {
     #[structopt(name = "annotation_file", short = "a", long = "annotation-file")]
     annotation_file: Option<String>,
 
-    /// [Required] The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph. Please note that we don't check whether the entities in other tables, such as entity2d, relation, knowledge etc. exist in the entity table. So you need to make sure that.
+    /// [Required] The table name to import data into. supports entity, entity2d, relation, relation_metadata, entity_metadata, knowledge_curation, subgraph, compound_metadata. Please note that we don't check whether the entities in other tables, such as entity2d, relation, knowledge etc. exist in the entity table. So you need to make sure that.
     ///
     /// In addition, if you upgrade the entity and relation tables, you need to ensure that the entity2d, relation_metadata, entity_metadata, knowledge_curation, subgraph tables are also upgraded. For the entity_metadata and relation_metadata, you can use the importdb command to upgrade after the entity and relation tables are upgraded.
     ///
-    /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional], compound-metadata[Optional].
-    #[structopt(name = "table", short = "t", long = "table")]
+    /// The order of the tables to import is: entity, relation, entity_metadata, relation_metadata, knowledge_curation [Optional], subgraph [Optional], entity2d [Optional], compound_metadata[Optional].
+    #[structopt(name = "table", short = "t", long = "table", possible_values = &["entity", "entity2d", "relation", "relation_metadata", "entity_metadata", "knowledge_curation", "subgraph", "compound_metadata"])]
     table: String,
 
     /// [Optional] Drop the table before import data. If you have multiple files to import, don't use this option. If you use this option, only the last file will be imported successfully.
@@ -164,7 +177,7 @@ pub struct CacheTableArguments {
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
-    /// [Optional] Relation types for compound-disease-symptom table. Separated by comma. e.g. DRUGBANK::treats::Compound:Disease,HSDN::has_symptom:Disease:Symptom. The number and order of relation types should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.
+    /// [Optional] Relation types for compound-disease-symptom table. Separated by comma. e.g. DRUGBANK::treats::Compound:Disease,HSDN::has_symptom::Disease:Symptom. The number and order of relation types should be consistent with the pairs of table name. e.g. compound-disease-symptom table should have two relation types for compound-disease and disease-symptom.
     #[structopt(name = "relation_types", short = "r", long = "relation-types")]
     relation_types: Option<String>,
 
@@ -234,7 +247,7 @@ pub struct ImportKGEArguments {
     model_name: String,
 
     /// [Required] The model type of generated embedding files. e.g. TransE_l1, TransE_l2, DistMult, ComplEx, etc. This feature is used to distinguish different models. Users can choose the model for their own purpose.
-    #[structopt(name = "model_type", short = "M", long = "model-type")]
+    #[structopt(name = "model_type", short = "M", long = "model-type", default_value = "TransE_l2", possible_values = &["TransE_l1", "TransE_l2", "TransH", "TransR", "TransD", "RotatE", "DistMult", "ComplEx"])]
     model_type: String,
 
     /// [Required] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
@@ -339,7 +352,7 @@ async fn main() {
             match arguments.table.as_str() {
                 "compound-disease-symptom" => {
                     let default_relation_types =
-                        "DRUGBANK::treats::Compound:Disease,HSDN::has_symptom:Disease:Symptom";
+                        "DRUGBANK::treats::Compound:Disease,HSDN::has_symptom::Disease:Symptom";
                     let relation_types = arguments.relation_types.unwrap_or(
                         // TODO: the HSDN::has_symptom::Disease:Symptom is non-standard relation type. We need to change it to the standard format.
                         default_relation_types.to_string(),
@@ -472,28 +485,6 @@ async fn main() {
                 return;
             };
 
-            if arguments.table == "compound-metadata" {
-                let pool = match sqlx::PgPool::connect(&database_url).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("Connect to database failed: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-                let filepath = match &arguments.filepath {
-                    Some(v) => PathBuf::from(v),
-                    None => {
-                        error!("Please specify the file path for the compound-metadata table.");
-                        std::process::exit(1);
-                    }
-                };
-                
-                match CompoundMetadata::sync2db(&pool, &filepath).await {
-                    Ok(_) => info!("Import compound-metadata table successfully."),
-                    Err(e) => error!("Import compound-metadata table failed: {}", e),
-                }
-            }
-
             // The annotation file is essential for relation table. We need the formatted_relation_type to annotate the relation_type.
             let relation_type_mappings = if arguments.table == "relation" {
                 if arguments.annotation_file.is_none() {
@@ -520,18 +511,34 @@ async fn main() {
                 None
             };
 
-            import_data(
-                &database_url,
-                &arguments.filepath,
-                &arguments.table,
-                &arguments.dataset,
-                &relation_type_mappings,
-                arguments.drop,
-                arguments.skip_check,
-                arguments.show_all_errors,
-            )
-            .await;
+            if arguments.table == "compound_metadata" {
+                let pool = match sqlx::PgPool::connect(&database_url).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("Connect to database failed: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                let filepath = PathBuf::from(arguments.filepath.as_ref().unwrap());
+                match CompoundMetadata::sync2db(&pool, &filepath, arguments.drop).await {
+                    Ok(_) => info!("Import compound metadata successfully."),
+                    Err(e) => error!("Import compound metadata failed: {}", e),
+                }
+            } else {
+                import_data(
+                    &database_url,
+                    &arguments.filepath,
+                    &arguments.table,
+                    &arguments.dataset,
+                    &relation_type_mappings,
+                    arguments.drop,
+                    arguments.skip_check,
+                    arguments.show_all_errors,
+                )
+                .await;
+            }
 
+            // Sync the data to the graph database, we will sync the relations to the graph database in the cachetable command, because we need to compute the score for the relation data first.
             if arguments.table == "entity" {
                 // Sync the entity data to the graph database. The relation data will be synced to the graph database in the cachetable command, because we need to compute the score for the relation data.
                 let neo4j_url = if arguments.neo4j_url.is_none() {
@@ -669,6 +676,67 @@ async fn main() {
         }
         SubCommands::CleanDB(arguments) => {
             info!("To be implemented.")
+        }
+        SubCommands::StatDB(arguments) => {
+            let database_url = if arguments.database_url.is_none() {
+                match std::env::var("DATABASE_URL") {
+                    Ok(v) => v,
+                    Err(_) => {
+                        error!("{}", "DATABASE_URL is not set.");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                arguments.database_url.unwrap()
+            };
+
+            let pool = match sqlx::PgPool::connect(&database_url).await {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("Connect to database failed: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            let mut all_tables = vec![];
+            let sql =
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+            let rows = match sqlx::query(sql).fetch_all(&pool).await {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("Query tables failed: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            for row in rows {
+                let table_name: String = row.get("table_name");
+                all_tables.push(table_name);
+            }
+
+            info!("All tables in the database: {:?}", all_tables);
+
+            let mut counts = HashMap::new();
+
+            for table in all_tables {
+                let total = match sqlx::query(&format!("SELECT count(*) FROM {}", table))
+                    .fetch_one(&pool)
+                    .await
+                {
+                    Ok(row) => row.get::<i64, _>("count"),
+                    Err(e) => {
+                        error!(
+                            "Failed to get the total number of the records in the {} table: {}",
+                            table, e
+                        );
+                        std::process::exit(1);
+                    }
+                };
+
+                counts.insert(table, total);
+            }
+
+            info!("The statistics of the database: {:?}", counts);
         }
     }
 }
