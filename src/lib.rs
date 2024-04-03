@@ -34,7 +34,6 @@ use crate::model::core::{
 };
 use crate::model::graph::{Edge, Node};
 use crate::model::kge::{EntityEmbedding, LegacyRelationEmbedding, RelationEmbedding};
-use crate::model::metadata::CompoundMetadata;
 use crate::model::util::{
     drop_records, drop_table, get_delimiter, import_file_in_loop, show_errors,
     update_entity_metadata, update_relation_metadata,

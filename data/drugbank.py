@@ -238,6 +238,8 @@ def tojson(input_file, output_dir, format):
         [["pdb_entries"], []],
         [["snp_effects"], []],
         [["snp_adverse_drug_reactions"], []],
+        [["experimental_properties"], []],
+        [["classification"], []],
     ]
 
     for path, default in uncorrected_paths:
@@ -274,7 +276,6 @@ def tojson(input_file, output_dir, format):
             return f'"{escaped_value}"'
         else:
             return str(value)
-
 
     def save_data_as_tsv(data, json_file_path):
         json_file_path = json_file_path.replace(".json", ".tsv")

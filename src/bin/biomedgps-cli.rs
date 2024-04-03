@@ -2,7 +2,7 @@ extern crate log;
 
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
-use biomedgps::model::metadata::CompoundMetadata;
+use biomedgps::model::entity_attr::CompoundAttr;
 use biomedgps::model::{
     init_db::{
         create_score_table, get_kg_score_table_name, kg_entity_table2graphdb,
@@ -520,7 +520,7 @@ async fn main() {
                     }
                 };
                 let filepath = PathBuf::from(arguments.filepath.as_ref().unwrap());
-                match CompoundMetadata::sync2db(&pool, &filepath, arguments.drop).await {
+                match CompoundAttr::sync2db(&pool, &filepath, arguments.drop).await {
                     Ok(_) => info!("Import compound metadata successfully."),
                     Err(e) => error!("Import compound metadata failed: {}", e),
                 }
@@ -736,7 +736,35 @@ async fn main() {
                 counts.insert(table, total);
             }
 
-            info!("The statistics of the database: {:?}", counts);
+            info!("The statistics of the database:");
+            for (table, total) in counts {
+                println!("\t{}: {}", table, total);
+            }
+
+            // TODO: We must change the following codes to match the updates, such as adding a new cache table.
+            let table_name = "biomedgps_compound_disease_symptom_score";
+            let total = match sqlx::query(&format!("SELECT count(*) FROM {}", table_name))
+                .fetch_one(&pool)
+                .await
+            {
+                Ok(row) => row.get::<i64, _>("count"),
+                Err(e) => {
+                    error!(
+                        "Failed to get the total number of the records in the {} table: {}",
+                        table_name, e
+                    );
+                    std::process::exit(1);
+                }
+            };
+
+            if total > 0 {
+                info!(
+                    "The number of records in the {} table: {}",
+                    table_name, total
+                );
+            } else {
+                error!("The {} table is empty, but we need to cache the table for symptom-compound prediction.", table_name);
+            }
         }
     }
 }

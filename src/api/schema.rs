@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::model::core::{RecordResponse, RelationCount, Statistics};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
+use crate::model::entity_attr::EntityAttr;
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
 use log::warn;
@@ -228,6 +229,32 @@ pub enum GetPublicationDetailResponse {
 impl GetPublicationDetailResponse {
     pub fn ok(publication_detail: PublicationDetail) -> Self {
         Self::Ok(Json(publication_detail))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetEntityAttrResponse {
+    #[oai(status = 200)]
+    Ok(Json<EntityAttr>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetEntityAttrResponse {
+    pub fn ok(entity_attr: EntityAttr) -> Self {
+        Self::Ok(Json(entity_attr))
     }
 
     pub fn bad_request(msg: String) -> Self {

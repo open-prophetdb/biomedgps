@@ -3,15 +3,17 @@
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::publication::Publication;
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
-    GetPublicationsResponse, GetRecordsResponse, GetRelationCountResponse, GetStatisticsResponse,
-    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
-    PredictedNodeQuery, PromptList, SubgraphIdQuery,
+    ApiTags, DeleteResponse, GetEntityAttrResponse, GetEntityColorMapResponse, GetGraphResponse,
+    GetPromptResponse, GetPublicationsResponse, GetRecordsResponse, GetRelationCountResponse,
+    GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
+    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery,
 };
 use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
     RelationMetadata, Statistics, Subgraph,
 };
+use crate::model::entity_attr::EntityAttr;
+use crate::model::entity_attr::{CompoundAttr, EntityAttrRecordResponse};
 use crate::model::graph::Graph;
 use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
@@ -145,6 +147,95 @@ impl BiomedgpsApi {
                 let err = format!("Failed to fetch entity metadata: {}", e);
                 warn!("{}", err);
                 return GetWholeTableResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-attr` with query params to fetch all entity attributes.
+    #[oai(
+        path = "/entity-attr",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityAttributes"
+    )]
+    async fn fetch_entity_attributes(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        query_str: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        entity_type: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetEntityAttrResponse {
+        let pool_arc = pool.clone();
+        let entity_type = entity_type.0;
+        let page = page.0;
+        let page_size = page_size.0;
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetEntityAttrResponse::bad_request(err);
+                }
+            }
+        };
+
+        let order_by_clause = match query.clone() {
+            Some(q) => {
+                let pairs = get_all_field_pairs(&q);
+                if pairs.len() == 0 {
+                    "id ASC".to_string()
+                } else {
+                    // More fields will cause bad performance
+                    make_order_clause_by_pairs(pairs, 1)
+                }
+            }
+            None => "id ASC".to_string(),
+        };
+
+        match entity_type.to_lowercase().as_str() {
+            "compound" => {
+                match EntityAttrRecordResponse::<CompoundAttr>::fetch_records(
+                    &pool_arc,
+                    &query,
+                    page,
+                    page_size,
+                    Some(order_by_clause.as_str()),
+                )
+                .await
+                {
+                    Ok(resp) => {
+                        let resp = EntityAttr {
+                            compounds: Some(resp),
+                        };
+                        GetEntityAttrResponse::ok(resp)
+                    }
+                    Err(e) => {
+                        let err = format!("Failed to fetch entity attributes: {}", e);
+                        warn!("{}", err);
+                        return GetEntityAttrResponse::bad_request(err);
+                    }
+                }
+            }
+            _ => {
+                let err = format!("Invalid entity type: {}", entity_type);
+                warn!("{}", err);
+                return GetEntityAttrResponse::bad_request(err);
             }
         }
     }

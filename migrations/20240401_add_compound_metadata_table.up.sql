@@ -13,6 +13,7 @@ CREATE TABLE
         unii VARCHAR(32) NOT NULL, -- The UNII of the compound
         compound_state VARCHAR(32) NOT NULL, -- The state of the compound, such as solid, liquid, etc.
         groups VARCHAR(128)[] NOT NULL, -- The groups of the compound, such as approved, investigational, etc.
+        general_references JSONB NOT NULL, -- The general references of the compound
         synthesis_reference TEXT NOT NULL, -- The synthesis reference of the compound
         indication TEXT NOT NULL, -- The indication of the compound
         pharmacodynamics TEXT NOT NULL, -- The pharmacodynamics of the compound
@@ -25,8 +26,22 @@ CREATE TABLE
         route_of_elimination TEXT NOT NULL, -- The route of elimination of the compound
         volume_of_distribution TEXT NOT NULL, -- The volume of distribution of the compound
         clearance TEXT NOT NULL, -- The clearance of the compound
+        classification JSONB NOT NULL, -- The classification of the compound
         synonyms TEXT[] NOT NULL, -- The synonyms of the compound
+        products JSONB NOT NULL, -- The products of the compound
+        packagers JSONB NOT NULL, -- The packagers of the compound
+        manufacturers JSONB NOT NULL, -- The manufacturers of the compound
+        prices JSONB NOT NULL, -- The prices of the compound
         categories JSONB NOT NULL, -- The categories of the compound
+        affected_organisms VARCHAR(128)[] NOT NULL, -- The affected organisms of the compound
+        dosages JSONB NOT NULL, -- The dosages of the compound
+        atc_codes JSONB NOT NULL, -- The ATC codes of the compound
         patents JSONB NOT NULL, -- The patents of the compound
+        food_interactions TEXT[] NOT NULL, -- The food interactions of the compound
+        sequences JSONB NOT NULL, -- The sequences of the compound
+        experimental_properties JSONB NOT NULL, -- The experimental properties of the compound
+        external_identifiers JSONB NOT NULL, -- The external identifiers of the compound
+        external_links JSONB NOT NULL, -- The external links of the compound
+        targets JSONB NOT NULL, -- The targets of the compound
         CONSTRAINT biomedgps_compound_metadata_uniq_key UNIQUE (drugbank_id)
     );

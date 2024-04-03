@@ -36,7 +36,8 @@ sqlx = { version = "0.6.3", features = [
     "macros",
     "runtime-tokio-rustls",
     "migrate",
-    "chrono"
+    "chrono",
+    "json"
 ] }
 include_dir = "0.7.3"
 regex = "1"

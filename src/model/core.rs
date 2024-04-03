@@ -14,7 +14,6 @@ use log::{debug, info};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use sqlx::query;
 use std::{error::Error, option::Option, path::PathBuf};
 use validator::Validate;
 
