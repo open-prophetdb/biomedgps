@@ -1,4 +1,12 @@
-.protein-info-panel {
+.composed-compound-info-panel {
+    .ant-tabs-tab {
+        text-align: left;
+        width: 120px;
+        padding: 8px 0 !important;
+    }
+}
+
+.compound-info-panel {
     .biology-background, .protein-structure, .general-information {
         width: 100%;
     }
@@ -14,28 +22,11 @@
     .biology-background {
         margin-top: 10px;
         text-align: justify;
-    }
 
-    .protein-structure {
-        overflow-wrap: anywhere;
-
-        .pdb-info {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-
-            .ant-table-wrapper {
-                width: 100%;
-                margin-top: 10px;
+        .section {
+            h2 {
+                font-size: 1.5em;
             }
         }
-    }
-}
-
-.composed-protein-panel {
-    .ant-tabs-tab {
-        text-align: left;
-        width: 90px;
-        padding: 8px 0 !important;
     }
 }

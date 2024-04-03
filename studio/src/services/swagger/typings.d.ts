@@ -1,6 +1,80 @@
-declare namespace swagger {
+export declare namespace swagger {
+  type Article = {
+    ref_id: string;
+    pubmed_id: string;
+    citation: string;
+  };
+
   type askLLMParams = {
     prompt_template_id: string;
+  };
+
+  type AtcCode = {
+    code: string;
+    level: AtcCodeLevel[];
+  };
+
+  type AtcCodeLevel = {
+    code: string;
+    text: string;
+  };
+
+  type Category = {
+    category: string;
+    mesh_id: string;
+  };
+
+  type Classification = {
+    description: string;
+    direct_parent: string;
+    kingdom: string;
+    superclass: string;
+    class: string;
+    subclass: string;
+  };
+
+  export type CompoundAttr = {
+    compound_type: string;
+    created: string;
+    updated: string;
+    drugbank_id: string;
+    xrefs: string[];
+    name: string;
+    description: string;
+    cas_number: string;
+    unii: string;
+    compound_state: string;
+    groups: string[];
+    general_references?: GeneralReferences;
+    synthesis_reference: string;
+    indication: string;
+    pharmacodynamics: string;
+    mechanism_of_action: string;
+    toxicity: string;
+    metabolism: string;
+    absorption: string;
+    half_life: string;
+    protein_binding: string;
+    route_of_elimination: string;
+    volume_of_distribution: string;
+    clearance: string;
+    classification?: Classification;
+    synonyms: string[];
+    products: Product[];
+    packagers: Packager[];
+    manufacturers: Manufacturer[];
+    prices: Price[];
+    categories: Category[];
+    affected_organisms: string[];
+    dosages: Dosage[];
+    atc_codes: AtcCode[];
+    patents: Patent[];
+    food_interactions: string[];
+    sequences: Sequence[];
+    experimental_properties?: ExperimentalProperty;
+    external_identifiers: ExternalIdentifier[];
+    external_links: ExternalLink[];
+    targets: Target[];
   };
 
   type Context = {
@@ -9,12 +83,23 @@ declare namespace swagger {
     subgraph_with_ctx?: SubgraphWithCtx;
   };
 
+  type Cost = {
+    currency: string;
+    text: string;
+  };
+
   type deleteCuratedKnowledgeParams = {
     id: number;
   };
 
   type deleteSubgraphParams = {
     id: string;
+  };
+
+  type Dosage = {
+    form: string;
+    route: string;
+    strength: string;
   };
 
   type Edge = {
@@ -78,6 +163,21 @@ declare namespace swagger {
     tsne_y: number;
   };
 
+  type EntityAttr = {
+    compounds?: EntityAttrRecordResponseCompoundAttr;
+  };
+
+  type EntityAttrRecordResponseCompoundAttr = {
+    /** data */
+    records: CompoundAttr[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
   type EntityMetadata = {
     id: number;
     resource: string;
@@ -93,6 +193,20 @@ declare namespace swagger {
     relation: Relation;
     source: Entity;
     target: Entity;
+  };
+
+  type ExperimentalProperty = {
+    property: Property[];
+  };
+
+  type ExternalIdentifier = {
+    resource: string;
+    identifier: string;
+  };
+
+  type ExternalLink = {
+    resource: string;
+    url: string;
   };
 
   type fetchCuratedGraphParams = {
@@ -133,6 +247,13 @@ declare namespace swagger {
     page?: number;
     page_size?: number;
     query_str?: string;
+  };
+
+  type fetchEntityAttributesParams = {
+    query_str?: string;
+    page?: number;
+    page_size?: number;
+    entity_type: string;
   };
 
   type fetchNodesParams = {
@@ -194,6 +315,16 @@ declare namespace swagger {
     query_str?: string;
   };
 
+  type GeneralReferences = {
+    articles: Article[];
+    links: Link[];
+  };
+
+  type GoClassifier = {
+    category: string;
+    description: string;
+  };
+
   type Graph = {
     nodes: Node[];
     edges: Edge[];
@@ -231,10 +362,22 @@ declare namespace swagger {
     position: string;
   };
 
+  type Link = {
+    ref_id: string;
+    title: string;
+    url: string;
+  };
+
   type LlmResponse = {
     prompt: string;
     response: string;
     created_at: string;
+  };
+
+  type Manufacturer = {
+    text: string;
+    generic: string;
+    url: string;
   };
 
   type Node = {
@@ -278,6 +421,79 @@ declare namespace swagger {
     icon: Icon;
   };
 
+  type Organism = {
+    text: string;
+    ncbi_taxonomy_id: string;
+  };
+
+  type Packager = {
+    name: string;
+    url: string;
+  };
+
+  type Patent = {
+    number: string;
+    country: string;
+    approved: string;
+    expires: string;
+    pediatric_extension: string;
+  };
+
+  type Pfam = {
+    identifier: string;
+    name: string;
+  };
+
+  type Polypeptide = {
+    id: string;
+    source: string;
+    name: string;
+    general_function: string;
+    specific_function: string;
+    gene_name: string;
+    locus: string;
+    cellular_location: string;
+    transmembrane_regions: string;
+    signal_regions: string;
+    theoretical_pi: string;
+    molecular_weight: string;
+    chromosome_location: string;
+    organism: Organism;
+    external_identifiers: ExternalIdentifier[];
+    synonyms: string[];
+    amino_acid_sequence: Sequence;
+    gene_sequence: Sequence;
+    pfams: Pfam[];
+    go_classifiers: GoClassifier[];
+  };
+
+  type Price = {
+    description: string;
+    cost: Cost;
+    unit: string;
+  };
+
+  type Product = {
+    name: string;
+    labeller: string;
+    ndc_id: string;
+    ndc_product_code: string;
+    dpd_id: string;
+    ema_product_code: string;
+    ema_ma_number: string;
+    started_marketing_on: string;
+    ended_marketing_on: string;
+    dosage_form: string;
+    strength: string;
+    route: string;
+    fda_application_number: string;
+    generic: string;
+    over_the_counter: string;
+    approved: string;
+    country: string;
+    source: string;
+  };
+
   type PromptList = {
     /** data */
     records: Record<string, any>[];
@@ -287,6 +503,12 @@ declare namespace swagger {
     page: number;
     /** default 10 */
     page_size: number;
+  };
+
+  type Property = {
+    kind: string;
+    value: string;
+    source: string;
   };
 
   type Publication = {
@@ -416,6 +638,11 @@ declare namespace swagger {
     description?: string;
   };
 
+  type Sequence = {
+    text: string;
+    format: string;
+  };
+
   type Statistics = {
     entity_stat: EntityMetadata[];
     relation_stat: RelationMetadata[];
@@ -436,5 +663,16 @@ declare namespace swagger {
   type SubgraphWithCtx = {
     context_str: string;
     subgraph: string;
+  };
+
+  type Target = {
+    position: string;
+    id: string;
+    name: string;
+    organism: string;
+    actions: string[];
+    references: GeneralReferences;
+    known_action: string;
+    polypeptide?: Polypeptide[];
   };
 }

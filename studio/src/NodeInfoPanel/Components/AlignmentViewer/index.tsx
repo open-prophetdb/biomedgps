@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Empty, Row, Spin } from 'antd';
 // @ts-ignore
 import { AlignmentViewer as ReactAlignmentViewer } from 'react-alignment-viewer';
-import type { AlignmentData } from '../index.t';
+import type { AlignmentData } from '../../index.t';
 import biomsa from 'biomsa';
 import { expectedSpeciesOrder } from '@/components/util';
 import { Select } from 'antd';

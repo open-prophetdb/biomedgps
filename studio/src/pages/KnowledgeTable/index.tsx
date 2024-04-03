@@ -326,7 +326,7 @@ const KnowledgeTable: React.FC = (props) => {
                         </Tooltip>
                     )}
                     {<br />}
-                    {record.source_id.startsWith('ENTREZ:') ?
+                    {(record.target_id.startsWith('ENTREZ:') || record.target_id.startsWith('DrugBank:')) ?
                         <a onClick={() => { setCurrentNode(record.source_node) }}>
                             {record.source_id}
                         </a> :
@@ -420,7 +420,7 @@ const KnowledgeTable: React.FC = (props) => {
                         </Tooltip>
                     )}
                     {<br />}
-                    {record.target_id.startsWith('ENTREZ:') ?
+                    {(record.target_id.startsWith('ENTREZ:') || record.target_id.startsWith('DrugBank:')) ?
                         <a onClick={() => { setCurrentNode(record.target_node) }}>
                             {record.target_id}
                         </a> :

@@ -1,242 +1,196 @@
-import { Empty, Row, Col, Badge, Descriptions, Table, Spin } from "antd";
+import { Empty, Tabs, Spin, Tag } from "antd";
 import React, { useEffect, useState } from "react";
+import { fetchMyGeneInfo, isProteinCoding, fetchProteinInfo } from "./utils";
 import type { GeneInfo, UniProtEntry } from "../index.t";
-import { isProteinCoding, fetchProteinInfo } from "./utils";
-import type { DescriptionsProps } from 'antd';
-import { MolStarViewer } from "..";
-import { guessSpecies } from "@/components/util";
-import { isEmpty } from "lodash";
+import ProteinInfoPanel from "./InfoPanel";
+import AlignmentViewer from "../Components/AlignmentViewer";
+import GeneInfoPanel from "../GeneInfoPanel";
+import { guessSpecies, isExpectedSpecies, expectedTaxIdOrder, guessSpeciesAbbr } from '@/components/util';
 
-import './index.less';
+import "./index.less";
 
-export interface ProteinInfoPanelProps {
+type ComposedProteinPanel = {
     geneInfo: GeneInfo;
-    proteinInfo: UniProtEntry;
 }
 
-function PubMedLinks(text: string) {
-    const parts = text.split(/(PubMed:\d+)/);
+const fetchProteinInfoByGeneInfo = async (geneInfo: GeneInfo): Promise<UniProtEntry> => {
+    const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
+    const uniprotIds = geneInfo.uniprot ? (geneInfo.uniprot.TrEMBL || []) : [];
+    if (!uniprotId && uniprotIds.length === 0) {
+        return {} as UniProtEntry;
+    }
 
-    const components = parts.map((part, index) => {
-        if (/PubMed:\d+/.test(part)) {
-            // @ts-ignore, Extract the PubMed ID from the part
-            const pubMedId = part.match(/\d+/)[0];
-            return <a key={index} href={`https://www.ncbi.nlm.nih.gov/pubmed/${pubMedId}`} target="_blank">{part}</a>;
-        } else {
-            return <span key={index}>{part}</span>;
-        }
-    });
-
-    return <div>{components}</div>;
-}
-
-export const getBiologyBackground = (proteinInfo: UniProtEntry): React.ReactNode => {
-    const background = proteinInfo?.comments?.filter((comment) => comment.commentType === 'FUNCTION');
-    if (!background || (background && background.length === 0)) {
-        return <div>
-            <h2>Biology Background</h2>
-            <Empty description="No biology background found" style={{ minHeight: '200px' }} />
-        </div>
+    if (uniprotId) {
+        return fetchProteinInfo(uniprotId);
     } else {
-        return (
-            <div>
-                <h2>Biology Background</h2>
-                {background.map((comment, index) => (
-                    <div key={index}>
-                        {comment.texts.map((text, index) => (
-                            <p key={index}>
-                                {PubMedLinks(text.value)}
-                            </p>
-                        ))}
-                    </div>
-                ))}
-            </div>
-        );
+        return fetchProteinInfo(uniprotIds[0]);
     }
 }
 
-export const fetchAlphafoldData = async (uniprotId: string): Promise<{
-    id: string;
-    chain: string;
-}> => {
-    const response = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotId}`);
-    const data = await response.json();
-
-    return data.map((entry: any) => {
-        return {
-            id: entry.entryId,
-            chain: `${entry.uniprotStart}-${entry.uniprotEnd}`
-        }
-    });
-}
-
-export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }) => {
-    const [currentPdbId, setCurrentPdbId] = useState<string>('');
-    const [pdbData, setPdbData] = useState<any[]>([]);
+const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
+    const { geneInfo } = props;
+    const [items, setItems] = useState<any[]>([]);
+    const [allGeneInfos, setAllGeneInfos] = useState<{
+        taxid: number;
+        geneInfo: GeneInfo;
+        species: string;
+        abbr: string;
+    }[]>([]);
+    const [allProteinInfos, setAllProteinInfos] = useState<Record<string, {
+        proteinInfo: UniProtEntry;
+        geneInfo: GeneInfo;
+    }>>({});
+    const [loading, setLoading] = useState<boolean>(false);
 
     useEffect(() => {
-        const pdbInfo = proteinInfo.uniProtKBCrossReferences.filter(
-            (ref) => ref.database === 'PDB'
-        );
-        const pdbData = pdbInfo.map((ref) => {
-            return {
-                key: ref.id,
-                id: ref.id,
-                category: ref.database,
-                method: ref.properties.find((prop) => prop.key === 'Method')?.value,
-                resolution: ref.properties.find((prop) => prop.key === 'Resolution')?.value,
-                chain: ref.properties.find((prop) => prop.key === 'Chains')?.value,
-            };
-        });
-        setPdbData(pdbData);
-        setCurrentPdbId(pdbData[0]?.id);
+        // Get the geneInfo and proteinInfo from the mygene.info and uniprot API.
+        // If possible, we would like to get all the geneInfo and proteinInfo from the homologene.
+        const init = async () => {
+            setLoading(true);
+            if (!geneInfo) {
+                return;
+            }
 
-        const alphafoldData = proteinInfo.uniProtKBCrossReferences.filter(
-            (ref) => ref.database === 'AlphaFoldDB'
-        );
-        Promise.all(alphafoldData.map((ref) => fetchAlphafoldData(ref.id))).then((data) => {
-            const alphafoldPdbData = data.flat().map((entry: any) => {
-                return {
-                    key: entry.id,
-                    id: entry.id,
-                    category: 'AlphaFoldDB',
-                    method: 'Predicted',
-                    resolution: 'Unknown',
-                    chain: entry.chain,
-                };
-            });
+            const proteinInfo = await fetchProteinInfoByGeneInfo(geneInfo);
+            setItems([
+                {
+                    label: guessSpeciesAbbr(`${geneInfo.taxid}`),
+                    key: geneInfo.taxid,
+                    children: isProteinCoding(geneInfo) ?
+                        < ProteinInfoPanel geneInfo={geneInfo} proteinInfo={proteinInfo} /> :
+                        <GeneInfoPanel geneSymbol={geneInfo.symbol} />
+                }
+            ])
 
-            const oPdbData = [...pdbData, ...alphafoldPdbData];
-            setPdbData(oPdbData);
-            setCurrentPdbId(oPdbData[0]?.id);
-        }).catch((err) => {
-            console.error(err);
-        });
-    }, [proteinInfo]);
+            if (!geneInfo.homologene) {
+                return;
+            } else {
+                const remaingGenes = geneInfo.homologene.genes.filter(([taxid, entrezgene]) => {
+                    return isExpectedSpecies(`${taxid}`)
+                })
 
-    return (
-        pdbData.length === 0 ? <Empty description="No PDB found" /> :
-            <Row className="pdb-info">
-                <MolStarViewer pdbId={currentPdbId} dimensions={['80%', '600px']}
-                    className="molstar-viewer" useInterface showControls showAxes
-                />
-                <Table dataSource={pdbData} columns={[
-                    {
-                        title: 'Database',
-                        dataIndex: 'category',
-                        key: 'category',
-                    },
-                    {
-                        title: 'ID',
-                        dataIndex: 'id',
-                        key: 'id',
-                    },
-                    {
-                        title: 'Method',
-                        dataIndex: 'method',
-                        key: 'method',
-                    },
-                    {
-                        title: 'Resolution',
-                        dataIndex: 'resolution',
-                        key: 'resolution',
-                    },
-                    {
-                        title: 'Chain',
-                        dataIndex: 'chain',
-                        key: 'chain',
+                console.log("All expected species and genes: ", remaingGenes);
+
+                const geneInfos = remaingGenes.map(([taxid, entrezgene]) => {
+                    if (taxid === geneInfo.taxid) {
+                        return geneInfo;
                     }
-                ]} onRow={(row) => {
-                    return {
-                        onClick: (event) => {
-                            setCurrentPdbId(row.id);
-                        }
-                    };
-                }} pagination={{
-                    pageSize: 5,
-                }} />
-            </Row>
-    );
-}
+                    return fetchMyGeneInfo(entrezgene.toString());
+                });
 
-export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
-    const { geneInfo, proteinInfo } = props;
-    // @ts-ignore
-    const [generalInfo, setGeneralInfo] = useState<DescriptionsProps['items']>([]);
+                Promise.all(geneInfos).then((geneInfos) => {
+                    const oGeneInfos = geneInfos.map((geneInfo, index) => {
+                        return {
+                            taxid: geneInfo.taxid,
+                            geneInfo,
+                            species: guessSpecies(`${geneInfo.taxid}`),
+                            abbr: guessSpeciesAbbr(`${geneInfo.taxid}`)
+                        };
+                    })
+                    const orderedGeneInfos = oGeneInfos.sort((a, b) => {
+                        return expectedTaxIdOrder.indexOf(a.taxid.toString()) - expectedTaxIdOrder.indexOf(b.taxid.toString());
+                    });
+                    setAllGeneInfos(orderedGeneInfos);
+
+                    const proteinInfos = remaingGenes.map(([taxid, entrezgene]) => {
+                        if (taxid === geneInfo.taxid) {
+                            return proteinInfo;
+                        }
+                        const gInfo = orderedGeneInfos.find((geneInfo) => geneInfo.taxid === taxid)?.geneInfo || {} as GeneInfo;
+                        return fetchProteinInfoByGeneInfo(gInfo);
+                    });
+
+                    Promise.all(proteinInfos).then((proteinInfos) => {
+                        const oProteinInfos = proteinInfos.map((proteinInfo, index) => {
+                            return proteinInfo;
+                        });
+
+                        const proteinInfoMap: Record<string, {
+                            proteinInfo: UniProtEntry;
+                            geneInfo: GeneInfo;
+                        }> = {};
+                        oProteinInfos.forEach((proteinInfo, index) => {
+                            const genePair = remaingGenes[index];
+                            const taxid = genePair[0].toString();
+                            const geneInfo = orderedGeneInfos.find((geneInfo) => geneInfo.taxid.toString() === taxid);
+                            proteinInfoMap[taxid] = {
+                                proteinInfo,
+                                // TODO: It might cause that we get the wrong fasta data at the AlignmentViewer.
+                                geneInfo: geneInfo?.geneInfo || {} as GeneInfo
+                            }
+                        });
+
+                        setAllProteinInfos(proteinInfoMap);
+                    }).catch((error) => {
+                        console.error(error);
+                        setAllProteinInfos({});
+                        setLoading(false);
+                    });
+                }).catch((error) => {
+                    console.error(error);
+                    setAllGeneInfos([]);
+                    setLoading(false);
+                });
+            }
+        }
+
+        init();
+    }, []);
 
     useEffect(() => {
-        if (geneInfo && isProteinCoding(geneInfo)) {
-            const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
-            // @ts-ignore
-            const generalInfo: DescriptionsProps['items'] = [
-                {
-                    key: 'official-gene-symbol',
-                    label: 'Official Gene Symbol',
-                    children: geneInfo.symbol,
-                },
-                {
-                    key: 'official-full-name',
-                    label: 'Official Full Name',
-                    children: geneInfo.name,
-                },
-                {
-                    key: 'ncbi-gene-id',
-                    label: 'NCBI Gene ID',
-                    children: <a href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneInfo.entrezgene}`} target="_blank">
-                        {geneInfo.entrezgene}
-                    </a>,
-                },
-                {
-                    key: 'alias',
-                    label: 'Alias',
-                    children: geneInfo.alias ? (geneInfo.alias.join ? geneInfo.alias.join(', ') : geneInfo.alias) : null,
-                },
-                {
-                    key: 'location',
-                    label: 'Chromosome Location',
-                    children: geneInfo.map_location ? geneInfo.map_location : 'Unknown',
-                },
-                {
-                    key: 'uniport-id',
-                    label: 'UniProt ID',
-                    children: uniprotId ? <a href={`https://www.uniprot.org/uniprot/${uniprotId}`} target="_blank">
-                        {uniprotId}
-                    </a> : 'Unknown',
-                },
-                {
-                    key: 'species',
-                    label: 'Species',
-                    children: guessSpecies(`${geneInfo.taxid}`)
-                }
-            ];
+        let oItems = allGeneInfos.map((geneInfoMap) => {
+            const proteinInfo = allProteinInfos[geneInfoMap.taxid.toString()]?.proteinInfo;
+            return {
+                label: geneInfoMap.abbr,
+                key: geneInfoMap.taxid,
+                children: isProteinCoding(geneInfoMap.geneInfo) ?
+                    < ProteinInfoPanel geneInfo={geneInfoMap.geneInfo} proteinInfo={proteinInfo} /> :
+                    <GeneInfoPanel geneSymbol={geneInfoMap.geneInfo.symbol} />
+            }
+        });
 
-            setGeneralInfo(generalInfo);
+        if (oItems.length === 0) {
+            return;
+        } else {
+            let alignmentData: any[] = [];
+            Object.keys(allProteinInfos).forEach((taxid) => {
+                const proteinInfo = allProteinInfos[taxid].proteinInfo;
+                const geneInfo = allProteinInfos[taxid].geneInfo;
+                const uniProtType = geneInfo.uniprot && geneInfo.uniprot['Swiss-Prot'] ? 'Swiss-Prot' : 'TrEMBL';
+                if (proteinInfo?.sequence?.value) {
+                    alignmentData.push({
+                        sequenceVersion: proteinInfo.entryAudit?.sequenceVersion || 0,
+                        score: proteinInfo.annotationScore || 0,
+                        proteinName: proteinInfo.uniProtkbId,
+                        proteinDescription: proteinInfo.proteinDescription?.recommendedName?.fullName?.value || '',
+                        uniProtId: proteinInfo.primaryAccession,
+                        uniProtType,
+                        sequence: proteinInfo.sequence.value,
+                        species: guessSpecies(taxid),
+                        geneSymbol: geneInfo.symbol,
+                        entrezgene: geneInfo.entrezgene
+                    })
+                }
+            });
+            oItems.push({
+                // @ts-ignore, we don't care about the warning. We need it to be a Tag component.
+                label: <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>Alignment</Tag>,
+                key: oItems.length + 1,
+                children: <AlignmentViewer data={alignmentData} />
+            })
         }
-    }, [geneInfo]);
 
-    return (
-        <Row className="protein-info-panel">
-            <Col className="general-information">
-                {/* @ts-ignore */}
-                <Descriptions title="General Information" bordered items={generalInfo} column={2} />
-            </Col>
-            <Col className="biology-background">
-                {getBiologyBackground(proteinInfo)}
-            </Col>
-            <Col className="protein-snp">
+        setItems(oItems);
+    }, [allGeneInfos, allProteinInfos]);
 
-            </Col>
-            <Col className="protein-structure">
-                <h2>Sequence</h2>
-                {isEmpty(proteinInfo) ? <Empty description="No reviewed sequence found" /> :
-                    <>
-                        <p>{proteinInfo.sequence.value}</p>
-                        <PdbInfo proteinInfo={proteinInfo} />
-                    </>
-                }
-            </Col>
-        </Row>
-    );
+    return (items.length === 0 ?
+        <Spin spinning={loading}><Empty description={loading ? 'Loading' : 'No information available.'} /></Spin> :
+        <Tabs
+            className="composed-protein-panel"
+            tabPosition="left"
+            items={items}
+        />
+    )
 }
 
-export default ProteinInfoPanel;
+export default ComposedProteinPanel;

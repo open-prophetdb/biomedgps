@@ -1,4 +1,5 @@
 import React, { Component } from 'react'
+// @ts-ignore
 import LollipopPlot from 'react-mutation-plot';
 
 export const lollipops = [

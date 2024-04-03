@@ -125,6 +125,21 @@ export async function fetchEntities(
   });
 }
 
+/** Call `/api/v1/entity-attr` with query params to fetch all entity attributes. GET /api/v1/entity-attr */
+export async function fetchEntityAttributes(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEntityAttributesParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.EntityAttr>('/api/v1/entity-attr', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/entity-colormap` with query params to fetch all entity colormap. GET /api/v1/entity-colormap */
 export async function fetchEntityColorMap(options?: { [key: string]: any }) {
   return request<Record<string, any>>('/api/v1/entity-colormap', {
