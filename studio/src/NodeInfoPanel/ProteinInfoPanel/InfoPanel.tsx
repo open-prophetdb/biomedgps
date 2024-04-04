@@ -168,7 +168,7 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
         if (geneInfo && isProteinCoding(geneInfo)) {
             const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
             // @ts-ignore
-            const generalInfo: DescriptionsProps['items'] = [
+            const infoItems: DescriptionsProps['items'] = [
                 {
                     key: 'official-gene-symbol',
                     label: 'Official Gene Symbol',
@@ -207,12 +207,17 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                     key: 'species',
                     label: 'Species',
                     children: guessSpecies(`${geneInfo.taxid}`)
+                },
+                {
+                    key: 'sequence-length',
+                    label: 'Amino acids',
+                    children: proteinInfo?.sequence ? proteinInfo?.sequence?.length : 'Unknown',
                 }
             ];
 
-            setGeneralInfo(generalInfo);
+            setGeneralInfo(infoItems);
         }
-    }, [geneInfo]);
+    }, [geneInfo, proteinInfo]);
 
     return (
         <Row className="protein-info-panel">

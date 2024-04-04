@@ -1,4 +1,4 @@
-import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { getJwtAccessToken, logoutWithRedirect } from '@/components/util';
@@ -85,11 +85,11 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   }, [props.username, user]);
 
   const directItems: MenuProps['items'] = [
-    {
-      label: username,
-      key: 'user',
-      icon: <UserOutlined />,
-    },
+    // {
+    //   label: username,
+    //   key: 'user',
+    //   icon: <UserOutlined />,
+    // },
     {
       label: 'v0.3.1',
       key: 'version',
@@ -115,6 +115,15 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
     },
   ]
 
+  const userItems: MenuProps['items'] = [
+    {
+      label: 'Logout',
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      danger: true,
+    },
+  ]
+
   const onClick = (item: any) => {
     if (item.key === 'about') {
       history.push('/about')
@@ -124,6 +133,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       history.push('/changelog')
     } else if (item.key === 'version') {
       window.open('https://github.com/open-prophetdb/biomedgps/releases', '_blank');
+    } else if (item.key === 'logout') {
+      logoutWithRedirectRaw();
     }
   };
 
@@ -145,10 +156,17 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
         <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
       </Dropdown>
-      <Button type={isAuthenticated ? 'default' : 'primary'} danger={isAuthenticated}
-        onClick={() => isAuthenticated ? logoutWithRedirectRaw() : loginWithRedirect()}>
-        Sign {isAuthenticated ? 'Out' : 'In'}
-      </Button>
+      {
+        !isAuthenticated ? (
+          <Button type={isAuthenticated ? 'default' : 'primary'} onClick={() => loginWithRedirect()}>
+            Sign In / Sign Up
+          </Button>
+        ) : (
+          <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
+              <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+          </Dropdown>
+        )
+      }
     </Space>
   );
 };

@@ -14,6 +14,7 @@ type ComposedProteinPanel = {
 }
 
 const fetchProteinInfoByGeneInfo = async (geneInfo: GeneInfo): Promise<UniProtEntry> => {
+    console.log("Fetching protein info by gene info: ", geneInfo)
     const uniprotId = geneInfo.uniprot ? geneInfo.uniprot['Swiss-Prot'] : null;
     const uniprotIds = geneInfo.uniprot ? (geneInfo.uniprot.TrEMBL || []) : [];
     if (!uniprotId && uniprotIds.length === 0) {
@@ -23,7 +24,13 @@ const fetchProteinInfoByGeneInfo = async (geneInfo: GeneInfo): Promise<UniProtEn
     if (uniprotId) {
         return fetchProteinInfo(uniprotId);
     } else {
-        return fetchProteinInfo(uniprotIds[0]);
+        if (typeof uniprotIds === 'string') {
+            return fetchProteinInfo(uniprotIds);
+        } else if (typeof uniprotIds === 'object' && uniprotIds.length > 0) {
+            return fetchProteinInfo(uniprotIds[0]);
+        } else {
+            return {} as UniProtEntry;
+        }
     }
 }
 

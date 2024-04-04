@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
 import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin, Select } from 'antd';
-import { QuestionCircleOutlined } from '@ant-design/icons';
+import { DownloadOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchRelationMetadata } from '@/services/swagger/KnowledgeGraph';
@@ -228,6 +228,7 @@ const KnowledgeTable: React.FC = (props) => {
             align: 'left',
             dataIndex: 'relation_type',
             fixed: 'left',
+            width: 350,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.relation_type,
@@ -255,32 +256,32 @@ const KnowledgeTable: React.FC = (props) => {
             key: 'resource',
             align: 'center',
             width: 100,
-            fixed: 'left',
+            // fixed: 'left',
         },
-        {
-            title: 'PMID',
-            dataIndex: 'pmids',
-            align: 'center',
-            width: 100,
-            key: 'pmids',
-            render: (text) => {
-                return (
-                    <a target="_blank" href={`https://pubmed.ncbi.nlm.nih.gov/?term=${text}`}>
-                        {text}
-                    </a>
-                );
-            },
-            filters: sortBy(uniqBy(filter(tableData.map((item) => {
-                return {
-                    text: item.pmids,
-                    value: item.pmids,
-                };
-            }), (item) => item.text !== ""), 'value'), 'value'),
-            filterMode: 'menu',
-            filterSearch: true,
-            sorter: (a, b) => a.pmids.localeCompare(b.pmids),
-            onFilter: (value, record) => record.pmids.indexOf(value) === 0,
-        },
+        // {
+        //     title: 'PMID',
+        //     dataIndex: 'pmids',
+        //     align: 'center',
+        //     width: 100,
+        //     key: 'pmids',
+        //     render: (text) => {
+        //         return (
+        //             <a target="_blank" href={`https://pubmed.ncbi.nlm.nih.gov/?term=${text}`}>
+        //                 {text}
+        //             </a>
+        //         );
+        //     },
+        //     filters: sortBy(uniqBy(filter(tableData.map((item) => {
+        //         return {
+        //             text: item.pmids,
+        //             value: item.pmids,
+        //         };
+        //     }), (item) => item.text !== ""), 'value'), 'value'),
+        //     filterMode: 'menu',
+        //     filterSearch: true,
+        //     sorter: (a, b) => a.pmids.localeCompare(b.pmids),
+        //     onFilter: (value, record) => record.pmids.indexOf(value) === 0,
+        // },
         {
             title: 'Source Name',
             dataIndex: 'source_name',
@@ -326,7 +327,7 @@ const KnowledgeTable: React.FC = (props) => {
                         </Tooltip>
                     )}
                     {<br />}
-                    {(record.target_id.startsWith('ENTREZ:') || record.target_id.startsWith('DrugBank:')) ?
+                    {(record.source_id.startsWith('ENTREZ:') || record.source_id.startsWith('DrugBank:')) ?
                         <a onClick={() => { setCurrentNode(record.source_node) }}>
                             {record.source_id}
                         </a> :
@@ -638,7 +639,7 @@ const KnowledgeTable: React.FC = (props) => {
                     maxTagCount={2}
                     // It's not working, I use css to limit the tag text length instead.
                     // maxTagTextLength={12}
-                    style={{ width: '240px', marginRight: '10px' }}
+                    style={{ width: '210px', marginRight: '10px' }}
                     size="large"
                     placeholder="Please select resources to filter."
                     defaultValue={[]}
@@ -687,27 +688,27 @@ const KnowledgeTable: React.FC = (props) => {
                         );
                     })}
                 </Select>
-                <Button size="large" type="default" onClick={() => {
-                    // Download as TSV file
-                    const header = columns.map((col) => col.title);
-                    const data = tableData.map((record) => {
-                        return columns.map((col: any) => {
-                            return record[col.key];
+                <Tooltip title="Download the table data as a TSV file.">
+                    <Button size="large" type="default" onClick={() => {
+                        // Download as TSV file
+                        const header = columns.map((col) => col.title);
+                        const data = tableData.map((record) => {
+                            return columns.map((col: any) => {
+                                return record[col.key];
+                            });
                         });
-                    });
-                    const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
-                    const blob = new Blob([tsvData], { type: 'text/tsv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `knowledges-${nodeIds?.join('-')}-${new Date().toISOString()}.tsv`;
-                    a.click();
+                        const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
+                        const blob = new Blob([tsvData], { type: 'text/tsv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `knowledges-${nodeIds?.join('-')}-${new Date().toISOString()}.tsv`;
+                        a.click();
 
-                    // Delete the url
-                    URL.revokeObjectURL(url);
-                }}>
-                    Download As TSV File
-                </Button>
+                        // Delete the url
+                        URL.revokeObjectURL(url);
+                    }} icon={<DownloadOutlined />} />
+                </Tooltip>
                 <Button type="primary" danger size="large"
                     // disabled={selectedRowKeys.length === 0}
                     onClick={() => {

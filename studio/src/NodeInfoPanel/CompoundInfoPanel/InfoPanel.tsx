@@ -1,7 +1,7 @@
 import { Empty, Row, Col, Tag, Descriptions, Table, Spin } from "antd";
 import React, { useEffect, useState } from "react";
 import type { DescriptionsProps } from 'antd';
-import { CompoundInfo } from "./index.t";
+import { CompoundInfo, Classification } from "./index.t";
 
 import './index.less';
 
@@ -9,20 +9,22 @@ export interface InfoPanelProps {
     compoundInfo: CompoundInfo
 }
 
-const PubMedLinks = (text: string) => {
-    const parts = text.split(/(PubMed:\d+)/);
+const formatClassification = (classification: Classification): JSX.Element => {
+    return <span>
+        {classification.direct_parent} &gt;
+        {classification.kingdom} &gt;
+        {classification.superclass} &gt;
+        {classification.class} &gt;
+        {classification.subclass}
+    </span>
+}
 
-    const components = parts.map((part, index) => {
-        if (/PubMed:\d+/.test(part)) {
-            // @ts-ignore, Extract the PubMed ID from the part
-            const pubMedId = part.match(/\d+/)[0];
-            return <a key={index} href={`https://www.ncbi.nlm.nih.gov/pubmed/${pubMedId}`} target="_blank">{part}</a>;
-        } else {
-            return <span key={index}>{part}</span>;
-        }
-    });
-
-    return <div>{components}</div>;
+const formatSynonyms = (synonyms: string[]): JSX.Element => {
+    return <span>
+        {synonyms.map((synonym, index) => {
+            return <Tag key={index}>{synonym}</Tag>
+        })}
+    </span>
 }
 
 const BoldTextComponent = ({ text }: { text: string }) => {
@@ -124,6 +126,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = (props) => {
                     key: 'updated',
                     label: 'Updated',
                     children: compoundInfo.updated
+                },
+                {
+                    key: 'classification',
+                    label: 'Classification',
+                    children: compoundInfo.classification ? formatClassification(compoundInfo.classification) : null
+                },
+                {
+                    key: 'synonyms',
+                    label: 'Synonyms',
+                    children: compoundInfo.synonyms ? formatSynonyms(compoundInfo.synonyms) : null
                 }
             ];
 
@@ -139,6 +151,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = (props) => {
                 metabolism: compoundInfo?.metabolism,
                 absorption: compoundInfo?.absorption,
                 half_life: compoundInfo?.half_life,
+                protein_binding: compoundInfo?.protein_binding,
+                route_of_elimination: compoundInfo?.route_of_elimination,
+                volume_of_distribution: compoundInfo?.volume_of_distribution,
+                clearance: compoundInfo?.clearance,
             }
 
             setBackground(background);

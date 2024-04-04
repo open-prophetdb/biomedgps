@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Empty, Spin, Tabs, Descriptions, Table } from 'antd'
 import type { CompoundInfo, Patent } from './index.t';
 import InfoPanel from './InfoPanel';
+import Reference from './Reference';
 
 type CompoundInfoPanelProps = {
     rootId?: string,
@@ -92,7 +93,7 @@ const CompoundInfoPanel: React.FC<CompoundInfoPanelProps> = (props) => {
             {
                 label: 'References',
                 key: 'references',
-                children: <Empty description="Coming soon..." />
+                children: <Reference compoundInfo={compoundInfo} />
             },
             {
                 label: 'Drug Interactions',
