@@ -98,5 +98,7 @@ export default defineConfig({
     }
   ],
   mfsu: {},
+  // https://github.com/umijs/umi/issues/8442
+  // https://umijs.org/docs/api/plugin-api#addhtmlheadscripts
   scripts: []
 });

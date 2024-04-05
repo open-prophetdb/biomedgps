@@ -38,9 +38,11 @@
     "biominer-components": "0.3.20",
     "biomsa": "^0.3.3",
     "classnames": "^2.3.0",
+    "file-saver": "^2.0.5",
+    "gtex-d3": "yjcyxky/gtex-viz#58b6493a",
     "handlebars": "^4.7.7",
     "handsontable": "^12.1.3",
-    "jwt-decode": "^4.0.0",
+    "jwt-decode": "^3.1.2",
     "lodash": "^4.17.0",
     "molstar": "^3.27.0",
     "molstar-react": "^0.5.2",
@@ -87,7 +89,8 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@umijs/plugins": "^4.1.2",
-    "compression-webpack-plugin": "^11.1.0",
+    "commander": "11.1.0",
+    "compression-webpack-plugin": "^10.0.0",
     "cross-env": "^7.0.3",
     "husky": "^8.0.3",
     "lint-staged": "^13.2.0",
@@ -109,6 +112,9 @@
     "process": false,
     "util": false,
     "assert": false
+  },
+  "resolutions": {
+    "**/mockjs/commander": "11.1.0"
   },
   "browserslist": [
     "> 1%",

@@ -1,7 +1,7 @@
 import { Empty, Tabs } from "antd";
-import ExpressionAtlas from "./Components/ExpressionAtlas";
 import GeneInfoPanel from "./GeneInfoPanel";
 import CompoundInfoPanel from "./CompoundInfoPanel";
+import GTexViewer from "./Components/GTexViewer";
 import MolStarViewer from "./Components/MolStarViewer";
 import MutationViewer from "./Components/MutationViewer";
 import SangerCosmic from "./Components/SangerCosmic";
@@ -18,7 +18,6 @@ import "./index.less";
 
 export {
   CompoundInfoPanel,
-  ExpressionAtlas,
   GeneInfoPanel,
   // GTexViewer,
   MolStarViewer,
@@ -91,6 +90,8 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
 
     const geneSymbol = geneInfo.symbol;
     const entrezId = geneInfo.entrezgene;
+    // TODO: We might get several ensembl ids, how to handle this?
+    const ensemblId = geneInfo?.ensembl?.gene;
     const geneItems = [
       {
         label: "Summary",
@@ -100,20 +101,20 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       {
         label: "Gene Expression",
         key: "gene",
-        // children: <GTexViewer officialGeneSymbol={ensemblId} type="gene" />
-        children: <Empty description="Comming soon..." />
+        children: <GTexViewer ensemblId={ensemblId} type="gene" />
+        // children: <Empty description="Comming soon..." />
       },
       {
         label: "Transcript Expression",
         key: "transcript",
-        // children: <GTexViewer officialGeneSymbol={ensemblId} type="transcript" />
-        children: <Empty description="Comming soon..." />
+        children: <GTexViewer ensemblId={ensemblId} type="transcript" />
+        // children: <Empty description="Comming soon..." />
       },
-      {
-        label: "Expression Atlas",
-        key: "expression-atlas",
-        children: <ExpressionAtlas geneSymbol={geneSymbol} />
-      },
+      // {
+      //   label: "Expression Atlas",
+      //   key: "expression-atlas",
+      //   children: <ExpressionAtlas geneSymbol={geneSymbol} />
+      // },
       {
         label: "Mutation",
         key: "mutation",

@@ -337,7 +337,7 @@ const HomePage: React.FC = () => {
                 </Col>
                 <Row className="statistics" gutter={16}>
                     <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="data-stat" sm={24} md={10} xs={10} xxl={10}>
+                    <Col className="data-stat" sm={24} md={11} xs={11} xxl={11}>
                         <p className="desc" style={{ textAlign: 'justify' }}>
                             A platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.
                             <br />
@@ -351,7 +351,7 @@ const HomePage: React.FC = () => {
                             More resources about the platform can be found in the <a href="https://drugs.3steps.cn/#/about">About</a> page.
                         </p>
                     </Col>
-                    <Col sm={0} md={2} xs={2} xxl={2}></Col>
+                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
                     <Col className="image-container" sm={24} md={10} xs={10} xxl={10}>
                         <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
                             {images.map((item: ImageItem) => {

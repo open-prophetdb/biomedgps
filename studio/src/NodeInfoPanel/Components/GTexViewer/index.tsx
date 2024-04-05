@@ -1,9 +1,6 @@
-// @ts-nocheck
 import React, { useEffect, useState } from 'react'
-import {
-  GTexTranscriptViewer, GTexGeneBoxplotViewer,
-  GTexGeneViolinViewer
-} from 'biominer-components';
+import GTexGeneViolinViewer from './Components/GTexGeneViolinViewer';
+import GTexTranscriptViewer from './Components/GTexTranscriptViewer';
 
 import './index.less';
 
@@ -11,14 +8,23 @@ type GTexViewerProps = {
   rootId?: string,
   type: string, // gene or transcript
   title?: string,
-  officialGeneSymbol: string // e.g. 'PRG4', only support human gene for now
+  ensemblId: string, // e.g. 'ENSG00000141510'
+  description?: string,
 }
-
-const defaultSummary = "Overall, this table provides insights into the tissue-specific expression pattern of the PRG4 gene in human tissues, as well as the specific transcript variants that are expressed in each tissue. The median expression levels suggest that PRG4 is highly expressed in some tissues, such as Adipose_Visceral_Omentum and Artery_Tibial, but not expressed or expressed at very low levels in other tissues, such as Bladder and Brain_Amygdala. The information in this table can be used to gain a better understanding of the role of PRG4 in different tissues and may be useful in designing future studies investigating the gene's function in health and disease."
 
 const GTexViewer: React.FC<GTexViewerProps> = (props) => {
   const [rootId, setRootId] = useState<string>("");
-  const [summary, setSummary] = useState<string>(defaultSummary);
+  const [versionedEnsemblId, setVersionedEnsemblId] = useState<string>("");
+
+  const fetchVersionedEnsemblId = async (ensemblId: string) => {
+    const response = await fetch(`https://gtexportal.org/api/v2/reference/geneSearch?geneId=${ensemblId}`);
+    const data = await response.json();
+    if (data.data.length > 0) {
+      return data.data[0].gencodeId;
+    } else {
+      return null;
+    }
+  }
 
   useEffect(() => {
     if (!props.rootId) {
@@ -28,12 +34,21 @@ const GTexViewer: React.FC<GTexViewerProps> = (props) => {
     }
   }, []);
 
+  useEffect(() => {
+    const init = async () => {
+      const versionedEnsemblId = await fetchVersionedEnsemblId(props.ensemblId);
+      setVersionedEnsemblId(versionedEnsemblId);
+    }
+
+    init();
+  }, [props.ensemblId]);
+
   return (
     <div className='gtex-viewer'>
       <div className='summary'>
-        <h3 className='summary-title'>Summary [Summarized by AI]</h3>
+        <h3 className='summary-title'>Description</h3>
         <p className='summary-content'>
-          {summary}
+          {props.description || 'Gene expression data from the Genotype-Tissue Expression (GTEx) project.'}
         </p>
       </div>
       {
@@ -42,25 +57,21 @@ const GTexViewer: React.FC<GTexViewerProps> = (props) => {
             <GTexTranscriptViewer
               rootId={rootId + '-isoform-transposed'}
               type="isoformTransposed" title={props.title || "Isoform Transposed"}
-              geneId={props.officialGeneSymbol} />
+              geneId={versionedEnsemblId} />
             <GTexTranscriptViewer
               rootId={rootId + '-exon'} title={props.title || "Exon"}
-              type="exon" geneId={props.officialGeneSymbol} />
+              type="exon" geneId={versionedEnsemblId} />
             <GTexTranscriptViewer
               rootId={rootId + '-junction'} title={props.title || "Junction"}
-              type="junction" geneId={props.officialGeneSymbol} />
+              type="junction" geneId={versionedEnsemblId} />
           </div>
           : null
       }
       {
         props.type == 'gene' ?
           <div className='gene-figures'>
-            <GTexGeneBoxplotViewer rootId={rootId + 'boxplot'}
-              title={props.title || 'Boxplot'}
-              geneId={props.officialGeneSymbol} />
-            <GTexGeneViolinViewer rootId={rootId + 'violin'}
-              title={props.title || 'Violin Plot'}
-              geneId={props.officialGeneSymbol} />
+            <GTexGeneViolinViewer title={props.title || 'Violin Plot'}
+              geneId={versionedEnsemblId} />
           </div>
           : null
       }
