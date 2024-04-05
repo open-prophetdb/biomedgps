@@ -12,6 +12,41 @@ type GTexViewerProps = {
   description?: string,
 }
 
+const links = [
+  {
+    rel: "stylesheet",
+    href: "https://gtexportal.org/external/bootstrap/3.3.7/bootstrap.min.css"
+  },
+  {
+    rel: "stylesheet",
+    href: "https://gtexportal.org/external/jquery-ui-1.11.4.custom/jquery-ui.css"
+  },
+  {
+    rel: "stylesheet",
+    href: "https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+  }
+]
+
+const loadStyles = (links: any) => {
+  links.forEach((link: any) => {
+    if (!document.querySelector(`link[href="${link.href}"]`)) {
+      const linkElement = document.createElement('link');
+      linkElement.rel = link.rel;
+      linkElement.href = link.href;
+      document.head.appendChild(linkElement);
+    }
+  });
+}
+
+const unloadStyles = (links: any) => {
+  links.forEach((link: any) => {
+    const existingLinkElement = document.querySelector(`link[href="${link.href}"]`);
+    if (existingLinkElement) {
+      document.head.removeChild(existingLinkElement);
+    }
+  });
+}
+
 const GTexViewer: React.FC<GTexViewerProps> = (props) => {
   const [rootId, setRootId] = useState<string>("");
   const [versionedEnsemblId, setVersionedEnsemblId] = useState<string>("");
@@ -32,6 +67,12 @@ const GTexViewer: React.FC<GTexViewerProps> = (props) => {
     } else {
       setRootId(props.rootId)
     }
+
+    loadStyles(links);
+
+    return () => {
+      unloadStyles(links);
+    };
   }, []);
 
   useEffect(() => {

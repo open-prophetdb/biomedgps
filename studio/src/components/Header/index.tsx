@@ -5,7 +5,7 @@ import { getJwtAccessToken, logoutWithRedirect } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
-import { jwtDecode } from "jwt-decode";
+import jwtDecode from "jwt-decode";
 
 import styles from './index.less';
 import './extra.less'

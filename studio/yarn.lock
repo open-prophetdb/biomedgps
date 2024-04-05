@@ -9922,9 +9922,9 @@ grid-index@^1.1.0:
   resolved "https://registry.yarnpkg.com/grid-index/-/grid-index-1.1.0.tgz#97f8221edec1026c8377b86446a7c71e79522ea7"
   integrity sha512-HZRwumpOGUrHyxO5bqKZL0B0GlUpwtCAzZ42sgxUPniu33R1LSFH5yrIcBCHjkctCAh3mtWKcKd9J4vDDdeVHA==
 
-gtex-d3@yjcyxky/gtex-viz#58b6493a:
-  version "0.1.1"
-  resolved "https://codeload.github.com/yjcyxky/gtex-viz/tar.gz/58b6493a801d0f18847a168d0a62c32e4f069030"
+gtex-d3@yjcyxky/gtex-viz#09dc0705:
+  version "0.1.2"
+  resolved "https://codeload.github.com/yjcyxky/gtex-viz/tar.gz/09dc070591ad5497a48503da13a7f6f3b2e7cf3a"
   dependencies:
     bootstrap "^5.3.3"
     d3 "^5.0.0"
@@ -9932,14 +9932,6 @@ gtex-d3@yjcyxky/gtex-viz#58b6493a:
     jquery "^3.3.1"
     jquery-ui "^1.13.2"
     popper.js "^1.14.7"
-
-gtex-d3@yjcyxky/gtex-viz#master:
-  version "0.1.0"
-  resolved "https://codeload.github.com/yjcyxky/gtex-viz/tar.gz/573dfa134ade75e1af9d6255f1e73f36530bedfb"
-  dependencies:
-    d3 "^5"
-    file-saver "^2.0.5"
-    jquery "^3.7.1"
 
 gzip-size@^6.0.0:
   version "6.0.0"

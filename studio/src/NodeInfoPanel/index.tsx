@@ -156,7 +156,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
   }, [compoundInfo]);
 
   return <Tabs
-    className="plugins4kg tabs-nav-right"
+    className="plugins4kg tabs-nav-right" destroyInactiveTabPane
     items={items && items.length > 0 ? items : defaultItems}
   />
 }
