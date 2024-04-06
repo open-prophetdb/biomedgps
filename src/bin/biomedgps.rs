@@ -9,21 +9,20 @@ use biomedgps::model::core::EntityMetadata;
 use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::llm::init_prompt_templates;
 use biomedgps::model::util::update_existing_colors;
+use biomedgps::proxy::website::proxy_website;
 use biomedgps::{check_db_version, connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
 use itertools::Itertools;
 use log::LevelFilter;
-use poem::middleware::AddData;
-use poem::EndpointExt;
 use poem::{
     async_trait,
     endpoint::EmbeddedFilesEndpoint,
-    handler,
+    get, handler,
     http::{header, Method, StatusCode},
     listener::TcpListener,
-    middleware::Cors,
+    middleware::{AddData, Cors},
     web::Redirect,
-    Endpoint, Request, Response, Result, Route, Server,
+    Endpoint, EndpointExt, Request, Response, Result, Route, Server,
 };
 use poem_openapi::OpenApiService;
 use rust_embed::RustEmbed;
@@ -298,7 +297,7 @@ async fn main() -> Result<(), std::io::Error> {
     match std::env::var("OPENAI_API_KEY") {
         Ok(openai_api_key) => {
             init_prompt_templates();
-        },
+        }
         Err(e) => {
             let err = format!("Failed to get OPENAI_API_KEY: {}, so we will skip initializing the prompt templates.", e);
             warn!("{}", err);
@@ -345,6 +344,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     let route = route
         .nest_no_strip("/api/v1", api_service)
+        // Proxy website. such as /proxy/sanger_cosmic?gene_symbol=TP53. if you want to know more about the proxy website and query parameters, please check the website module.
+        .nest_no_strip("/proxy", get(proxy_website))
         .with(shared_rb)
         .with(shared_graph_pool);
 

@@ -53,8 +53,8 @@ const GTexTranscriptViewer: React.FC<TranscriptViewerProps> = (props) => {
     <div className="gtex-transcript-viewer">
       {title && <h3>{title}</h3>}
       <div id={rootId} style={{ width: '1250px' }} ref={ref} />
-      <div id={`${rootId}-isoformToolbar`}></div>
-      <div id={`${rootId}-isoformClone`} ></div>
+      {/* <div id={`${rootId}-isoformToolbar`}></div> */}
+      {/* <div id={`${rootId}-isoformClone`} ></div> */}
     </div>
   );
 };

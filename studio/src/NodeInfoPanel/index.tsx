@@ -101,13 +101,27 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       {
         label: "Gene Expression",
         key: "gene",
-        children: <GTexViewer ensemblId={ensemblId} type="gene" />
+        children: <GTexViewer ensemblId={ensemblId} type="gene" description={
+          <span>
+            <span>
+              <b>Data Source:</b> GTEx Analysis Release V8 (dbGaP Accession phs000424.v8.p2), Data processing and normalization. <a href={`https://gtexportal.org/home/gene/${ensemblId}`} target="_blank">More information</a>
+            </span>
+            <br />
+            <span>
+              <b>Method:</b> Expression values are shown in TPM (Transcripts Per Million), calculated from a gene model with isoforms collapsed to a single gene. No other normalization steps have been applied. Box plots are shown as median and 25th and 75th percentiles; points are displayed as outliers if they are above or below 1.5 times the interquartile range.
+            </span>
+          </span>
+        } />
         // children: <Empty description="Comming soon..." />
       },
       {
         label: "Transcript Expression",
         key: "transcript",
-        children: <GTexViewer ensemblId={ensemblId} type="transcript" />
+        children: <GTexViewer ensemblId={ensemblId} type="transcript" description={
+          <span>
+            Data Source: GTEx Analysis Release V8 (dbGaP Accession phs000424.v8.p2). <a href={`https://gtexportal.org/home/gene/${ensemblId}`} target="_blank">More information</a>
+          </span>
+        } />
         // children: <Empty description="Comming soon..." />
       },
       // {

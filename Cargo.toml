@@ -46,6 +46,8 @@ tempfile = "3.2.0"
 neo4rs = "0.6.2"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["raw_value"] }
+serde_urlencoded = "0.7.0"
+lol_html = "1.2.1"
 validator = { version = "0.16.1", features = ["derive"] }
 structopt = { version = "0.3.26", default-features = false }
 tokio = { version = "1.28.2", features = [

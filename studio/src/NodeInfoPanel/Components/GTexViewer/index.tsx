@@ -9,7 +9,7 @@ type GTexViewerProps = {
   type: string, // gene or transcript
   title?: string,
   ensemblId: string, // e.g. 'ENSG00000141510'
-  description?: string,
+  description?: string | React.ReactNode
 }
 
 const links = [
