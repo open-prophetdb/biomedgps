@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
+import { Spin } from 'antd'
 
 type SangerCosmicProps = {
   rootId?: string,
@@ -11,10 +12,17 @@ type SangerCosmicProps = {
 const SangerCosmic: React.FC<SangerCosmicProps> = (props) => {
   const [rootId, setRootId] = useState<string>("");
   const [src, setSrc] = useState<string>("");
+  const ref = useRef(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (props.geneSymbol) {
-      setSrc(`https://omics-data.3steps.cn/fetch/sanger_cosmic?geneSymbol=${props.geneSymbol}&taxId=${props.taxId || 9606}`)
+      let host = window.location.host;
+      if (host.startsWith('localhost')) {
+        host = "drugs.3steps.cn"
+      }
+
+      setSrc(`https://${host}/proxy/sanger_cosmic?geneSymbol=${props.geneSymbol}&taxId=${props.taxId || 9606}`)
     }
   }, [props.geneSymbol]);
 
@@ -27,8 +35,17 @@ const SangerCosmic: React.FC<SangerCosmicProps> = (props) => {
   }, []);
 
   return (
-    <iframe id={rootId} title="Cosmic Mutations" src={src}
-      style={{ width: '100%', height: '100%', border: 'none', minHeight: '1000px' }} />
+    <div id="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <iframe id={rootId} title="Cosmic Mutations" src={src}
+        style={{ width: '100%', height: '100%', border: 'none', minHeight: '1000px' }} onLoad={() => {
+          setLoading(false)
+        }} ref={ref} />
+      {
+        loading ? <Spin spinning={loading} style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '1000px'
+        }}></Spin> : null
+      }
+    </div>
   )
 }
 

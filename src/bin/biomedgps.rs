@@ -9,7 +9,7 @@ use biomedgps::model::core::EntityMetadata;
 use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::llm::init_prompt_templates;
 use biomedgps::model::util::update_existing_colors;
-use biomedgps::proxy::website::proxy_website;
+use biomedgps::proxy::website::{proxy_website, proxy_website_data};
 use biomedgps::{check_db_version, connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
 use itertools::Itertools;
@@ -342,10 +342,16 @@ async fn main() -> Result<(), std::io::Error> {
         route
     };
 
+    // Proxy website. such as /proxy/sanger_cosmic?gene_symbol=TP53. if you want to know more about the proxy website and query parameters, please check the website module.
+    let route = route.at("/proxy/*", get(proxy_website));
+    // All other requests related to the proxy website will be transferred to the proxy-data route.
+    let route = route.at(
+        "/proxy-data/*",
+        get(proxy_website_data).post(proxy_website_data),
+    );
+
     let route = route
         .nest_no_strip("/api/v1", api_service)
-        // Proxy website. such as /proxy/sanger_cosmic?gene_symbol=TP53. if you want to know more about the proxy website and query parameters, please check the website module.
-        .nest_no_strip("/proxy", get(proxy_website))
         .with(shared_rb)
         .with(shared_graph_pool);
 

@@ -332,7 +332,7 @@ const HomePage: React.FC = () => {
                     <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
                         NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
                         <br />
-                        Please give us feedback or check the <a href="https://drugs.3steps.cn/#/about">About</a> page for more information.
+                        Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
@@ -348,7 +348,7 @@ const HomePage: React.FC = () => {
                             Its unique integration enables precise prediction of drug efficacy and discovery of novel drug indications, offering a faster, cost-effective alternative to traditional drug development. By harnessing the power of graph neural networks and large language models, BioMedGPS provides deep insights into the complex biological networks underlying diseases, facilitating breakthroughs in personalized medicine and therapeutic strategies. This platform stands out by allowing customization across data sources, models, and omics datasets, ensuring versatility and applicability across a wide range of biomedical research areas.
                             <br />
                             <br />
-                            More resources about the platform can be found in the <a href="https://drugs.3steps.cn/#/about">About</a> page.
+                            More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
                         </p>
                     </Col>
                     <Col sm={0} md={1} xs={1} xxl={1}></Col>
