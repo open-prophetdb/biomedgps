@@ -91,7 +91,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
     //   icon: <UserOutlined />,
     // },
     {
-      label: 'v0.3.1',
+      label: 'v20240406',
       key: 'version',
       icon: <FieldTimeOutlined />
     },

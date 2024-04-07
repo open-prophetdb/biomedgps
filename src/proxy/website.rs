@@ -49,7 +49,9 @@ fn get_protein_atlas_redirect_url(
     upstream_host: &str,
 ) -> String {
     let host = Url::parse(upstream_host).unwrap();
-    let raw_redirect_url = host.join(&format!("{}/protein_atlas", PROXY_DATA_PREFIX)).unwrap();
+    let raw_redirect_url = host
+        .join(&format!("{}/protein_atlas", PROXY_DATA_PREFIX))
+        .unwrap();
 
     // We want to open the link same as the proxy link, not a proxy-data link. So we can load it in the same iframe.
     // Such as <a href="/ENSG00000130234-ACE2/tissue" title="Tissue - Enhanced">
@@ -105,10 +107,10 @@ lazy_static::lazy_static! {
             name: "protein_atlas",
             base_url: "https://www.proteinatlas.org",
             get_redirect_url: get_protein_atlas_redirect_url,
-            which_tags: vec!["a", "link", "script", "img", "li[style]", "a[style]", "object[data]"],
-            additional_css: Some(".tabrow { padding-inline-start: unset !important; width: revert !important; } .page_header { visibility: hidden; display: none; } div.atlas_header, div.atlas_border { top: 0px !important; } table.main_table { top: 0px !important; margin: 0 0px 0 200px !important; }div.celltype_detail { width: unset !important; } table.menu_margin, div.menu_margin { margin: 0 !important; } div.page_footer { display: none; } div#cookie_statement { display: none; } div.atlas_header div.atlas_nav.show_small { top: 0px !important; } div.menu { top: 100px !important; left: 0px !important }"),
+            which_tags: vec!["a", "link", "script", "img", "li[style]", "a[style]", "object[data]", "iframe"],
+            additional_css: Some(".tabrow { padding-inline-start: unset !important; width: revert !important; } .page_header { visibility: hidden; display: none; } div.atlas_header, div.atlas_border { top: 0px !important; } table.main_table { top: 0px !important; margin: 0 0px 0 200px !important; }div.celltype_detail { width: unset !important; } table.menu_margin, div.menu_margin { margin: 0 !important; } div.page_footer { display: none; } div#cookie_statement { display: none; } div.atlas_header div.atlas_nav.show_small { top: 0px !important; } div.menu { top: 100px !important; left: 0px !important } div.atlas_header div.gene_name, div.page_header div.gene_name { left: -180px !important; width: 80px !important; } div.atlas_header div.atlas_nav { left: 180px !important; width: 1000px !important; margin: unset !important; padding-top: 0px !important; top: 0px !important; } #NGLViewer { display: none !important; } table.main_table td { padding: 5px !important; }"),
             additional_js: None,
-            enable_redirect: vec!["a[href]", "img[src]", "link[src]", "li[style]", "a[style]", "object[data]"],
+            enable_redirect: vec!["a[href]", "img[src]", "link[src]", "li[style]", "a[style]", "object[data]", "iframe"],
             open_at_new_tab: false,
         });
 
@@ -238,6 +240,21 @@ impl Website {
                             upstream_host,
                         );
                         el.set_attribute("title", &modified_url)?;
+                        Ok(())
+                    }));
+                }
+                "iframe" => {
+                    handlers.push(element!("iframe", |el| {
+                        let src = el
+                            .get_attribute("src")
+                            .ok_or_else(|| anyhow::Error::msg("Missing src attribute"))?;
+                        let modified_url = (self.get_redirect_url)(
+                            &src,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"iframe"),
+                            upstream_host,
+                        );
+                        el.set_attribute("src", &modified_url)?;
                         Ok(())
                     }));
                 }

@@ -36,12 +36,12 @@ const ProteinAtlas: React.FC<ProteinAtlasProps> = (props) => {
   return (
     <div id="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
       <iframe id={rootId} title="Protein Atlas" src={src}
-        style={{ width: '100%', height: '100%', border: 'none', minHeight: '1000px' }} onLoad={() => {
+        style={{ width: '100%', border: 'none', height: 'calc(100vh - 120px)' }} onLoad={() => {
           setLoading(false)
         }} ref={ref} />
       {
         loading ? <Spin spinning={loading} style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '1000px'
+          position: 'absolute', top: 0, left: 0, width: '100%', height: 'calc(100vh - 120px)', minHeight: '1000px'
         }}></Spin> : null
       }
     </div>

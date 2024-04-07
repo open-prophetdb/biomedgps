@@ -131,7 +131,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       //   children: <ExpressionAtlas geneSymbol={geneSymbol} />
       // },
       {
-        label: "Mutation (Cosmic)",
+        label: "Mutation - SangerCosmic",
         key: "mutation",
         children: <SangerCosmic geneSymbol={geneSymbol} />
         // children: <Empty description="Comming soon..." />
