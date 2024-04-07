@@ -5,6 +5,7 @@ import GTexViewer from "./Components/GTexViewer";
 import MolStarViewer from "./Components/MolStarViewer";
 import MutationViewer from "./Components/MutationViewer";
 import SangerCosmic from "./Components/SangerCosmic";
+import ProteinAtlas from "./Components/ProteinAtlas";
 import SgrnaSelector from "./Components/SgrnaSelector";
 import type { GeneInfo } from "./index.t";
 import { fetchEntityAttributes } from "@/services/swagger/KnowledgeGraph";
@@ -130,9 +131,15 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       //   children: <ExpressionAtlas geneSymbol={geneSymbol} />
       // },
       {
-        label: "Mutation",
+        label: "Mutation (Cosmic)",
         key: "mutation",
         children: <SangerCosmic geneSymbol={geneSymbol} />
+        // children: <Empty description="Comming soon..." />
+      },
+      {
+        label: "Protein Atlas",
+        key: "protein-atlas",
+        children: <ProteinAtlas geneSymbol={geneSymbol} ensemblId={ensemblId} />,
         // children: <Empty description="Comming soon..." />
       },
       {

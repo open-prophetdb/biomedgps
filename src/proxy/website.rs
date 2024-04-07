@@ -1,11 +1,12 @@
 use anyhow;
 use log::{debug, info, warn};
-use lol_html::element;
 use lol_html::html_content::ContentType;
+use lol_html::{element, Selector};
 use lol_html::{rewrite_str, RewriteStrSettings};
 use poem::http::header::{HeaderName as PoemHeaderName, HeaderValue as PoemHeaderValue};
 use poem::http::Method;
 use poem::{handler, http::StatusCode, web, IntoResponse, Request, Response, Result};
+use regex::Regex;
 use reqwest::header::{
     HeaderMap as ReqwestHeaderMap, HeaderName as ReqwestHeaderName,
     HeaderValue as ReqwestHeaderValue, CONTENT_ENCODING, CONTENT_TYPE, HOST, TRANSFER_ENCODING,
@@ -13,37 +14,77 @@ use reqwest::header::{
 use reqwest::Client;
 use serde_json::Value as JsonValue;
 use serde_urlencoded;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use url::Url;
 
-/// Format the target URL for the Sanger COSMIC website.
-///
-/// # Arguments
-///
-/// * `target_url` - The target URL template.
-/// * `value` - The query parameters. We use the gene_symbol to format the target URL.
-///
-/// # Returns
-///
-/// * The formatted target URL.
-/// * An error if the gene_symbol is missing.
-///
-pub fn format_sanger_cosmic_target_url(
-    target_url: &str,
-    value: &JsonValue,
-) -> Result<String, anyhow::Error> {
-    let gene_symbol = match value.get("gene_symbol").map(|v| v.as_str()) {
-        Some(Some(gene_symbol)) => gene_symbol,
-        _ => {
-            return Err(anyhow::anyhow!("Missing gene_symbol"));
-        }
+pub const PROXY_PREFIX: &str = "/proxy";
+pub const PROXY_DATA_PREFIX: &str = "/proxy-data";
+
+fn get_sanger_cosmic_redirect_url(
+    raw_url: &str,
+    base_url: &str,
+    enable_redirect: bool,
+    upstream_host: &str,
+) -> String {
+    let raw_redirect_url = format!("{}/{}/sanger_cosmic", upstream_host, PROXY_DATA_PREFIX);
+
+    let url = Url::parse(base_url).unwrap();
+    let resolved_url = url.join(raw_url).unwrap();
+    let modified_url = if enable_redirect {
+        resolved_url
+            .to_string()
+            .replace(base_url, &raw_redirect_url)
+    } else {
+        resolved_url.to_string()
     };
 
-    Ok(format!(
-        "{target_url}{gene_symbol}",
-        target_url = target_url,
-        gene_symbol = gene_symbol
-    ))
+    modified_url
+}
+
+fn get_protein_atlas_redirect_url(
+    raw_url: &str,
+    base_url: &str,
+    enable_redirect: bool,
+    upstream_host: &str,
+) -> String {
+    let host = Url::parse(upstream_host).unwrap();
+    let raw_redirect_url = host.join(&format!("{}/protein_atlas", PROXY_DATA_PREFIX)).unwrap();
+
+    // We want to open the link same as the proxy link, not a proxy-data link. So we can load it in the same iframe.
+    // Such as <a href="/ENSG00000130234-ACE2/tissue" title="Tissue - Enhanced">
+    if raw_url.starts_with("/ENSG") {
+        let path = format!(
+            "{}/protein_atlas/{}",
+            PROXY_PREFIX,
+            raw_url.strip_prefix("/").unwrap()
+        );
+
+        let resolved_url = host.join(&path).unwrap();
+        return resolved_url.to_string();
+    } else if raw_url.contains("images.proteinatlas.org") {
+        let raw_url = raw_url
+            .trim_start_matches("https://images.proteinatlas.org")
+            .trim_start_matches("//images.proteinatlas.org")
+            .strip_prefix("/")
+            .unwrap();
+        let url = format!("{}/protein_atlas/{}", PROXY_DATA_PREFIX, raw_url);
+        let resolved_url = host.join(&url).unwrap();
+        return format!(
+            "{}?raw_base_url={}",
+            resolved_url, "https://images.proteinatlas.org"
+        );
+    } else {
+        let url = Url::parse(base_url).unwrap();
+        let resolved_url = url.join(raw_url).unwrap();
+        if enable_redirect {
+            return resolved_url
+                .to_string()
+                .replace(base_url, &raw_redirect_url.to_string());
+        } else {
+            return resolved_url.to_string();
+        }
+    }
 }
 
 lazy_static::lazy_static! {
@@ -52,12 +93,23 @@ lazy_static::lazy_static! {
         map.insert("sanger_cosmic", Website {
             name: "sanger_cosmic",
             base_url: "https://cancer.sanger.ac.uk",
-            redirect_url: "http://localhost:3000/proxy-data/sanger_cosmic",
-            // redirect_url: "https://drugs.3steps.cn/proxy-data/sanger_cosmic",
-            target_url: "https://cancer.sanger.ac.uk/cosmic/gene/analysis?ln=",
-            format_target_url: format_sanger_cosmic_target_url,
+            get_redirect_url: get_sanger_cosmic_redirect_url,
             which_tags: vec!["a", "link", "script", "img", "[data-url]", "table[title]"],
-            additional_css: Some(".body { background-color: #fff; } #ccc { visibility: hidden; display: none; } .external > img { visibility: hidden; display: none; } #sidebar { visibility: hidden; display: none; } #section-list { margin-left: 0px; padding-top: 0px; } .dataTable { width: 100%; } .cosmic, .logo_grch38, .subhead, footer { visibility: hidden; display: none; } #section-genome-browser { visibility: hidden; display: none !important; }")
+            additional_css: Some("body { background-color: #fff !important; } #ccc { visibility: hidden; display: none; } .external > img { visibility: hidden; display: none; } #sidebar { visibility: hidden; display: none; } #section-list { margin-left: 0px; padding-top: 0px; } .dataTable { width: 100%; } .cosmic, .logo_grch38, .subhead, footer { visibility: hidden; display: none; } #section-genome-browser { visibility: hidden; display: none !important; }"),
+            additional_js: Some("function addTargetAttribute() { const links = document.querySelectorAll('a'); links.forEach(link => { link.setAttribute('target', '_blank'); }); }; document.addEventListener('DOMContentLoaded', (event) => { addTargetAttribute(); }); setInterval(addTargetAttribute, 10000);"),
+            enable_redirect: vec!["img[src]", "link[src]", "[data-url]", "table[title]"],
+            open_at_new_tab: true,
+        });
+
+        map.insert("protein_atlas", Website {
+            name: "protein_atlas",
+            base_url: "https://www.proteinatlas.org",
+            get_redirect_url: get_protein_atlas_redirect_url,
+            which_tags: vec!["a", "link", "script", "img", "li[style]", "a[style]", "object[data]"],
+            additional_css: Some(".tabrow { padding-inline-start: unset !important; width: revert !important; } .page_header { visibility: hidden; display: none; } div.atlas_header, div.atlas_border { top: 0px !important; } table.main_table { top: 0px !important; margin: 0 0px 0 200px !important; }div.celltype_detail { width: unset !important; } table.menu_margin, div.menu_margin { margin: 0 !important; } div.page_footer { display: none; } div#cookie_statement { display: none; } div.atlas_header div.atlas_nav.show_small { top: 0px !important; } div.menu { top: 100px !important; left: 0px !important }"),
+            additional_js: None,
+            enable_redirect: vec!["a[href]", "img[src]", "link[src]", "li[style]", "a[style]", "object[data]"],
+            open_at_new_tab: false,
         });
 
         map
@@ -68,14 +120,22 @@ lazy_static::lazy_static! {
 pub struct Website {
     pub name: &'static str,     // Name of the website, such as "sanger_cosmic".
     pub base_url: &'static str, // Base URL, such as "https://cancer.sanger.ac.uk". We use this URL to replace with the redirect URL.
-    pub redirect_url: &'static str, // Redirect URL, such as "https://omics-data.3steps.cn/sanger_cosmic". The last part of the URL is the same as the name.
-    pub target_url: &'static str, // Target URL, such as ""https://cancer.sanger.ac.uk/cosmic/gene/analysis?ln="". We use this URL to fetch the content that we want to proxy.
-    pub format_target_url: fn(target_url: &str, value: &JsonValue) -> Result<String, anyhow::Error>, // Function to format the target URL. We use this function to format the target URL with the query parameters. NOTE: At most times, we only need a url and get method to fetch the content.
+    pub get_redirect_url: fn(&str, &str, bool, &str) -> String, // Get the redirect URL. The first parameter is the raw URL (It might be a relative URL or an absolute URL), the second parameter is the base URL, the third parameter is whether to enable the redirect for the specific URL, the fourth parameter is the upstream host.
     pub which_tags: Vec<&'static str>, // Which tag to modify. Such as ["a", "link", "script", "img", "[data-url]", "table[title]"]. If you want to know which tags are supported, you can check the modify_html function in the Website struct.
     pub additional_css: Option<&'static str>, // Additional CSS content that we want to append to the head tag.
+    pub additional_js: Option<&'static str>, // Additional JS content that we want to append to the body tag.
+    pub enable_redirect: Vec<&'static str>, // Enable redirect for the specific URL. Such as "https://cancer.sanger.ac.uk" => "https://omics-data.3steps.cn/sanger_cosmic". It supports the a[href], link[href], script[src], img[src], [data-url], table[title] attributes. Some links are not necessary to redirect, such as the css, js, and other static files.
+    pub open_at_new_tab: bool,              // Open the link at a new tab.
 }
 
 impl Website {
+    pub fn format_target_url(&self, path: &str) -> String {
+        let target_url = self.base_url.to_string();
+        let target_url = Url::parse(&target_url).unwrap();
+        let target_url = target_url.join(path).unwrap();
+        target_url.to_string()
+    }
+
     /// Modify the HTML content.
     ///
     /// # Arguments
@@ -89,9 +149,13 @@ impl Website {
     /// * The modified HTML content.
     /// * An error if the content cannot be modified.
     ///
-    pub fn modify_html(&self, input: &str, tags: Vec<&str>) -> Result<String, anyhow::Error> {
+    pub fn modify_html(
+        &self,
+        input: &str,
+        tags: Vec<&str>,
+        upstream_host: &str,
+    ) -> Result<String, anyhow::Error> {
         let website_baseurl = self.base_url;
-        let redirect_url = self.redirect_url;
         let mut handlers = Vec::new();
 
         for tag in tags {
@@ -101,13 +165,18 @@ impl Website {
                         let href = el
                             .get_attribute("href")
                             .ok_or_else(|| anyhow::Error::msg("Missing href attribute"))?;
-                        let base_url = Url::parse(website_baseurl)?;
-                        let resolved_url = base_url.join(&href)?;
-                        let modified_href = resolved_url
-                            .to_string()
-                            .replace(website_baseurl, redirect_url);
+                        let modified_href = (self.get_redirect_url)(
+                            &href,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"a[href]"),
+                            upstream_host,
+                        );
                         el.set_attribute("href", &modified_href)?;
-                        el.set_attribute("target", "_blank")?;
+
+                        if self.open_at_new_tab {
+                            el.set_attribute("target", "_blank")?;
+                        }
+
                         Ok(())
                     }));
                 }
@@ -116,9 +185,13 @@ impl Website {
                         let href = el
                             .get_attribute("href")
                             .ok_or_else(|| anyhow::Error::msg("Missing href attribute"))?;
-                        let base_url = Url::parse(website_baseurl)?;
-                        let resolved_url = base_url.join(&href)?;
-                        el.set_attribute("href", &resolved_url.to_string())?;
+                        let modified_url = (self.get_redirect_url)(
+                            &href,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"link[href]"),
+                            upstream_host,
+                        );
+                        el.set_attribute("href", &modified_url)?;
                         Ok(())
                     }));
                 }
@@ -127,9 +200,14 @@ impl Website {
                         let src = el
                             .get_attribute("src")
                             .ok_or_else(|| anyhow::Error::msg("Missing src attribute"))?;
-                        let base_url = Url::parse(website_baseurl)?;
-                        let resolved_url = base_url.join(&src)?;
-                        el.set_attribute("src", &resolved_url.to_string())?;
+                        let tag_attr = format!("{}[src]", tag.to_string());
+                        let modified_url = (self.get_redirect_url)(
+                            &src,
+                            website_baseurl,
+                            self.enable_redirect.contains(&tag_attr.as_str()),
+                            upstream_host,
+                        );
+                        el.set_attribute("src", &modified_url)?;
                         Ok(())
                     }));
                 }
@@ -138,11 +216,12 @@ impl Website {
                         let data_url = el
                             .get_attribute("data-url")
                             .ok_or_else(|| anyhow::Error::msg("Missing data-url attribute"))?;
-                        let base_url = Url::parse(website_baseurl)?;
-                        let resolved_url = base_url.join(&data_url)?;
-                        let modified_url = resolved_url
-                            .to_string()
-                            .replace(website_baseurl, redirect_url);
+                        let modified_url = (self.get_redirect_url)(
+                            &data_url,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"[data-url]"),
+                            upstream_host,
+                        );
                         el.set_attribute("data-url", &modified_url)?;
                         Ok(())
                     }));
@@ -152,15 +231,69 @@ impl Website {
                         let title = el
                             .get_attribute("title")
                             .ok_or_else(|| anyhow::Error::msg("Missing title attribute"))?;
-                        let base_url = Url::parse(website_baseurl)?;
-                        let resolved_url = base_url.join(&title)?;
-                        let modified_url = resolved_url
-                            .to_string()
-                            .replace(website_baseurl, redirect_url);
+                        let modified_url = (self.get_redirect_url)(
+                            &title,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"table[title]"),
+                            upstream_host,
+                        );
                         el.set_attribute("title", &modified_url)?;
                         Ok(())
                     }));
                 }
+                "object[data]" => {
+                    handlers.push(element!("object[data]", |el| {
+                        let object = el
+                            .get_attribute("data")
+                            .ok_or_else(|| anyhow::Error::msg("Missing data attribute"))?;
+                        let modified_url = (self.get_redirect_url)(
+                            &object,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"object[data]"),
+                            upstream_host,
+                        );
+                        el.set_attribute("data", &modified_url)?;
+                        Ok(())
+                    }));
+                }
+                "li[style]" | "a[style]" => handlers.push(element!(tag, |el| {
+                    let tag = tag.to_owned();
+                    if let Some(style_attr) = el.get_attribute("style") {
+                        info!("li/a Style: {}", style_attr);
+                        let new_style = style_attr
+                            .split(";")
+                            .map(|style| {
+                                // Remove the leading and trailing whitespace and quotes.
+                                let style = style.trim();
+                                if style.starts_with("background-image:url(") {
+                                    let re = Regex::new(r"url\([']?(.*?)[']?\)").unwrap();
+
+                                    let modified_style =
+                                        re.replace_all(style, |caps: &regex::Captures| {
+                                            let url = &caps[1];
+
+                                            let modified_url = (self.get_redirect_url)(
+                                                url,
+                                                website_baseurl,
+                                                self.enable_redirect.contains(&tag.as_str()),
+                                                upstream_host,
+                                            );
+                                            format!("url('{}')", modified_url)
+                                        });
+
+                                    Cow::Owned(modified_style.to_string())
+                                } else {
+                                    Cow::Borrowed(style)
+                                }
+                            })
+                            .collect::<Vec<Cow<'_, str>>>()
+                            .join(";");
+
+                        info!("New style: {}", new_style);
+                        el.set_attribute("style", &new_style)?;
+                    }
+                    Ok(())
+                })),
                 _ => {
                     warn!("Unknown tag: {}", tag);
                 }
@@ -171,6 +304,15 @@ impl Website {
             Some(css_str) => handlers.push(element!("head", move |el| {
                 let style = &format!("<style>{}</style>", css_str);
                 el.append(style, ContentType::Html);
+                Ok(())
+            })),
+            _ => {}
+        }
+
+        match self.additional_js {
+            Some(js_str) => handlers.push(element!("body", move |el| {
+                let script = &format!("<script>{}</script>", js_str);
+                el.append(script, ContentType::Html);
                 Ok(())
             })),
             _ => {}
@@ -227,8 +369,41 @@ impl Website {
 /// ```
 #[handler]
 pub async fn proxy_website(req: &Request) -> Result<Response> {
-    debug!("Proxy website: {:?}", req);
+    debug!("Proxy website - req: {:?}", req);
     let url = req.uri().path().to_string();
+    let headers = req.headers();
+    info!("Proxy website - headers: {:?}", headers);
+    let proto_header = match headers.get("x-forwarded-proto") {
+        Some(proto) => proto,
+        None => {
+            return Err(poem::Error::from_string(
+                "X-Forwarded-Proto not found, please set the X-Forwarded-Proto header.",
+                StatusCode::BAD_REQUEST,
+            ))
+        }
+    };
+    let upstream_host = match headers.get("host") {
+        Some(host) => match host.to_str() {
+            Ok(host) => {
+                let proto = proto_header.to_str().unwrap_or("http");
+                format!("{}://{}", proto, host)
+            }
+            Err(_) => {
+                return Err(poem::Error::from_string(
+                    "Invalid host, please set or check the host header.",
+                    StatusCode::BAD_REQUEST,
+                ))
+            }
+        },
+        None => {
+            return Err(poem::Error::from_string(
+                "Host not found, please set the host header.",
+                StatusCode::BAD_REQUEST,
+            ))
+        }
+    };
+    info!("Proxy website - upstream_host: {}", upstream_host);
+
     let client = reqwest::Client::new();
     // Whether the url starts with "/proxy/".
     if !url.starts_with("/proxy/") {
@@ -249,7 +424,9 @@ pub async fn proxy_website(req: &Request) -> Result<Response> {
         }
     };
 
-    info!("Proxy website: {}", website_name);
+    let remaing_path = url.split('/').skip(3).collect::<Vec<&str>>().join("/");
+
+    info!("Proxy website: {}, {}, {}", url, website_name, remaing_path);
     let website = match WEBSITES.get(website_name) {
         Some(website) => website,
         None => {
@@ -266,18 +443,11 @@ pub async fn proxy_website(req: &Request) -> Result<Response> {
         .map(|query| serde_urlencoded::from_str(query).unwrap_or_default())
         .unwrap_or_default();
 
-    let target_url = match (website.format_target_url)(website.target_url, &query_params) {
-        Ok(target_url) => target_url,
-        Err(e) => {
-            return Err(poem::Error::from_string(
-                e.to_string(),
-                StatusCode::BAD_REQUEST,
-            ))
-        }
-    };
+    let target_url = website.format_target_url(&remaing_path);
 
     let response = client
         .get(target_url)
+        .query(&query_params)
         .send()
         .await
         .map_err(|e| poem::Error::from_string(e.to_string(), StatusCode::BAD_GATEWAY))?;
@@ -304,15 +474,16 @@ pub async fn proxy_website(req: &Request) -> Result<Response> {
                 .text()
                 .await
                 .map_err(|e| poem::Error::from_string(e.to_string(), StatusCode::BAD_GATEWAY))?;
-            let modified_html = match website.modify_html(&html, website.which_tags.clone()) {
-                Ok(modified_html) => modified_html,
-                Err(e) => {
-                    return Err(poem::Error::from_string(
-                        e.to_string(),
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                    ))
-                }
-            };
+            let modified_html =
+                match website.modify_html(&html, website.which_tags.clone(), &upstream_host) {
+                    Ok(modified_html) => modified_html,
+                    Err(e) => {
+                        return Err(poem::Error::from_string(
+                            e.to_string(),
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
+                    }
+                };
 
             Ok(Response::builder()
                 .status(StatusCode::OK)
@@ -361,13 +532,12 @@ pub async fn proxy_website_data(
 
     let uri = req.uri().clone();
     let path = uri.path().to_string();
-    debug!("Proxy website data: {:?}", path);
+    info!("Proxy website data: {}, {:?}", uri, path);
 
-    let proxy_prefix = "/proxy-data";
-    let first_segment = get_first_segment(&path, Some(proxy_prefix));
+    let first_segment = get_first_segment(&path, Some(PROXY_DATA_PREFIX));
     // Please note that the prefix must match the setting in the biomedgps router.
-    let new_path = remove_prefix(&path, &format!("{}/{}", proxy_prefix, first_segment));
-    debug!(
+    let new_path = remove_prefix(&path, &format!("{}/{}", PROXY_DATA_PREFIX, first_segment));
+    info!(
         "Transfer request to {} with method: {}",
         new_path, reqwest_method
     );
@@ -405,17 +575,19 @@ pub async fn proxy_website_data(
     let url = if query.is_empty() {
         url
     } else {
+        let query_obj = serde_urlencoded::from_str::<HashMap<String, String>>(query).unwrap();
+        let raw_base_url = match query_obj.get("raw_base_url") {
+            Some(raw_base_url) => raw_base_url.to_string(),
+            None => website.base_url.to_string(),
+        };
+        let base_url = Url::parse(&raw_base_url).unwrap();
+        let url = base_url.join(&new_path).unwrap().to_string();
         format!("{}?{}", url, query)
     };
-    debug!(
+    info!(
         "Transfer request to {} with body and headers: {:?}",
         url, headers
     );
-    // debug!("Transfer request to {} with body and headers: {:?} {:?}", url, body, headers);
-    // let body_bytes = match body.0 {
-    //     Some(body) => body.to_string().into_bytes(),
-    //     None => Vec::new(),
-    // };
 
     let res = client
         .request(reqwest_method, &url)
@@ -469,14 +641,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_modify_html() {
+        let host = Url::parse("https://drugs.3steps.cn").unwrap();
+        let raw_url = "https://images.proteinatlas.org/123456/789012.png"
+            .trim_start_matches("https://images.proteinatlas.org")
+            .trim_start_matches("//images.proteinatlas.org");
+        assert_eq!(raw_url, "/123456/789012.png");
+        let url = format!("{}/protein_atlas/{}", PROXY_PREFIX, raw_url);
+        let resolved_url = host.join(&url).unwrap();
+        assert_eq!(
+            resolved_url.to_string(),
+            "https://drugs.3steps.cn/proxy/protein_atlas/123456/789012.png"
+        );
+
         let website = Website {
             name: "sanger_cosmic",
             base_url: "https://cancer.sanger.ac.uk",
-            redirect_url: "https://omics-data.3steps.cn/sanger_cosmic",
-            target_url: "https://cancer.sanger.ac.uk/cosmic/gene/analysis?ln=",
-            format_target_url: format_sanger_cosmic_target_url,
+            get_redirect_url: get_sanger_cosmic_redirect_url,
             which_tags: vec!["a", "link", "script", "img", "[data-url]", "table[title]"],
             additional_css: Some(".test { color: red; }"),
+            additional_js: None,
+            enable_redirect: vec![
+                "a[href]",
+                // "img[src]",
+                // "script[src]",
+                "link[src]",
+                "[data-url]",
+                "table[title]",
+            ],
+            open_at_new_tab: true,
         };
         let input = r#"<html>
 <head>
@@ -497,13 +689,14 @@ mod tests {
 </html>
 "#;
 
-        let modified_html_v1 = match website.modify_html(input, website.which_tags.clone()) {
-            Ok(modified_html) => modified_html,
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                return;
-            }
-        };
+        let modified_html_v1 =
+            match website.modify_html(input, website.which_tags.clone(), "localhost:3000") {
+                Ok(modified_html) => modified_html,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return;
+                }
+            };
 
         assert_eq!(
             modified_html_v1,
@@ -512,15 +705,15 @@ mod tests {
 <link rel="stylesheet" href="https://cancer.sanger.ac.uk/style.css">
 <style>.test { color: red; }</style></head>
 <div>
-<a href="https://omics-data.3steps.cn/sanger_cosmic/about" target="_blank">About</a>
-<a href="https://omics-data.3steps.cn/sanger_cosmic/contact" target="_blank">Contact</a>
+<a href="/proxy-data/sanger_cosmic/about" target="_blank">About</a>
+<a href="/proxy-data/sanger_cosmic/contact" target="_blank">Contact</a>
 <link rel="stylesheet" href="https://cancer.sanger.ac.uk/style.css">
 <script src="https://cancer.sanger.ac.uk/script.js"></script>
 <img src="https://cancer.sanger.ac.uk/logo.png">
 <img src="https://cancer.sanger.ac.uk/banner.jpg">
-<div data-url="https://omics-data.3steps.cn/sanger_cosmic/page"></div>
+<div data-url="/proxy-data/sanger_cosmic/page"></div>
 <div data-url="https://example.com/page"></div>
-<table title="https://omics-data.3steps.cn/sanger_cosmic/table-page"></table>
+<table title="/proxy-data/sanger_cosmic/table-page"></table>
 <table title="https://example.com/table-page"></table>
 </div>
 </html>
