@@ -1,8 +1,113 @@
 ## BioMedGPS
 
+- 2024-04-06
+  - 22:08:58 -0400 Improve the styles. ([21b663f](https://github.com/open-prophetdb/biomedgps/commit/21b663f))
+  - 20:03:22 -0400  Improve the styles and proxy codes. ([46a586e](https://github.com/open-prophetdb/biomedgps/commit/46a586e))
+  - 11:58:21 -0400  Improve the proxy function. ([4a7aff7](https://github.com/open-prophetdb/biomedgps/commit/4a7aff7))
+
+- 2024-04-05
+  - 21:26:05 -0400  Add a proxy endpoint. ([8dfa813](https://github.com/open-prophetdb/biomedgps/commit/8dfa813))
+  - 05:15:13 -0400  Remove all css files related with GTEx component. ([9ee8430](https://github.com/open-prophetdb/biomedgps/commit/9ee8430))
+  - 04:23:27 -0400  Add the GTExViewer component. ([d588534](https://github.com/open-prophetdb/biomedgps/commit/d588534))
+
+- 2024-04-03
+  - 23:36:49 -0400  Improve the CompoundInfoPanel component. ([2d3fd27](https://github.com/open-prophetdb/biomedgps/commit/2d3fd27))
+  - 02:01:16 -0400  Add a panel for showing compound information. ([72dc854](https://github.com/open-prophetdb/biomedgps/commit/72dc854))
+  - 00:10:21 -0400  Improve the data structure of the compound. ([6dea823](https://github.com/open-prophetdb/biomedgps/commit/6dea823))
+
+- 2024-04-02
+  - 19:25:13 -0400  Improve the importing scripts for the compound metadata table. ([9eb125d](https://github.com/open-prophetdb/biomedgps/commit/9eb125d))
+  - 12:27:11 -0400  Improve the drugbank id. ([42b80ef](https://github.com/open-prophetdb/biomedgps/commit/42b80ef))
+  - 00:29:01 -0400  Add a new table for managing metadata. ([bea2f0c](https://github.com/open-prophetdb/biomedgps/commit/bea2f0c))
+
+- 2024-04-01
+  - 13:02:36 -0400  Add a new page for ME/CFS & LongCOVID. ([91a0dce](https://github.com/open-prophetdb/biomedgps/commit/91a0dce))
+
+- 2024-03-31
+  - 23:59:50 -0400  Improve the menu for nodes & edges. ([603a4d0](https://github.com/open-prophetdb/biomedgps/commit/603a4d0))
+  - 22:35:39 -0400  Improve the setting of the revolvermaps. ([b73e8b5](https://github.com/open-prophetdb/biomedgps/commit/b73e8b5))
+  - 20:56:26 -0400  Improve the showing of the node info. ([4ceb073](https://github.com/open-prophetdb/biomedgps/commit/4ceb073))
+  - 19:22:29 -0400  Improve the setting panel of the knowledge graph studio. ([77bb4ab](https://github.com/open-prophetdb/biomedgps/commit/77bb4ab))
+  - 10:59:38 -0400  Improve the search results. ([5813639](https://github.com/open-prophetdb/biomedgps/commit/5813639))
+
+- 2024-03-30
+  - 23:25:04 -0400  Fix some bugs. ([5a0bc8f](https://github.com/open-prophetdb/biomedgps/commit/5a0bc8f))
+  - 21:50:01 -0400  Improve the performance of the importing script. ([ec75464](https://github.com/open-prophetdb/biomedgps/commit/ec75464))
+
+- 2024-03-29
+  - 01:27:24 -0400  Improve the styles. ([61a3c63](https://github.com/open-prophetdb/biomedgps/commit/61a3c63))
+  - 00:40:17 -0400  Improve the styles. ([5cf3163](https://github.com/open-prophetdb/biomedgps/commit/5cf3163))
+
+- 2024-03-28
+  - 21:02:43 -0400  [Fix Bug] Cannot convert a xml to a parquet file. ([4b8a4b1](https://github.com/open-prophetdb/biomedgps/commit/4b8a4b1))
+  - 12:39:00 -0400  Improve the auth process. ([6369383](https://github.com/open-prophetdb/biomedgps/commit/6369383))
+
+- 2024-03-26
+  - 20:47:47 -0400  Improve the showing of the msa viewer. ([4f1cd17](https://github.com/open-prophetdb/biomedgps/commit/4f1cd17))
+  - 19:12:12 -0400  Add a msa library for aligning multiple sequences. ([8c3c695](https://github.com/open-prophetdb/biomedgps/commit/8c3c695))
+  - 00:10:30 -0400  Improve the styles for the KnowledgeTable component. ([d08f4f0](https://github.com/open-prophetdb/biomedgps/commit/d08f4f0))
+
+- 2024-03-25
+  - 12:41:27 -0400  Improve the styles for the KnowledgeTable component. ([00daf8a](https://github.com/open-prophetdb/biomedgps/commit/00daf8a))
+  - 12:13:38 -0400  Improve the knowledge table. ([ea299e7](https://github.com/open-prophetdb/biomedgps/commit/ea299e7))
+  - 01:57:34 -0400  Improve the knowledge table. ([68c6887](https://github.com/open-prophetdb/biomedgps/commit/68c6887))
+
+- 2024-03-24
+  - 18:31:38 -0400  Improve the proteinInfoPanel for multiple species. ([ebb8955](https://github.com/open-prophetdb/biomedgps/commit/ebb8955))
+  - 17:11:31 -0400  Add the proteinInfoPanel for multiple species. ([7c52b9f](https://github.com/open-prophetdb/biomedgps/commit/7c52b9f))
+  - 11:30:29 -0400  Add the EdgeInfoPanel for each knowledge. ([28942b0](https://github.com/open-prophetdb/biomedgps/commit/28942b0))
+  - 02:11:47 -0400  Cannot load pdb files from AlphafoldDB. ([e9c54ec](https://github.com/open-prophetdb/biomedgps/commit/e9c54ec))
+
+- 2024-03-23
+  - 22:53:41 -0400  Add a panel for showing protein information. ([b93487b](https://github.com/open-prophetdb/biomedgps/commit/b93487b))
+  - 13:27:25 -0400  Add the EdgeInfoPanel for each knowledge. ([7528437](https://github.com/open-prophetdb/biomedgps/commit/7528437))
+  - 11:58:02 -0400  Improve the home page. ([ad42899](https://github.com/open-prophetdb/biomedgps/commit/ad42899))
+  - 09:31:21 -0400  Add a new home page. ([5fcce91](https://github.com/open-prophetdb/biomedgps/commit/5fcce91))
+
+- 2024-03-22
+  - 23:58:03 -0400  Improve the performance. ([d179879](https://github.com/open-prophetdb/biomedgps/commit/d179879))
+
+- 2024-03-18
+  - 13:22:35 -0400  Merge branch 'dev' of https://github.com/yjcyxky/biomedgps into dev ([5e6b914](https://github.com/open-prophetdb/biomedgps/commit/5e6b914))
+  - 13:21:15 -0400  Improve the updating function for the token. ([960f2a9](https://github.com/open-prophetdb/biomedgps/commit/960f2a9))
+  - 13:21:15 -0400  Improve the updating function for the token. ([52fae98](https://github.com/open-prophetdb/biomedgps/commit/52fae98))
+  - 13:08:53 -0400  Improve the updating function for the token. ([b3ab37f](https://github.com/open-prophetdb/biomedgps/commit/b3ab37f))
+  - 00:00:36 -0400  Add a link for viewing the publication. ([4c44d80](https://github.com/open-prophetdb/biomedgps/commit/4c44d80))
+
+- 2024-03-17
+  - 19:59:13 -0400  Use the guide-scoper service instead of the consensus apis. ([d45427a](https://github.com/open-prophetdb/biomedgps/commit/d45427a))
+  - 17:22:25 -0400  Add a publication panel for each edge. ([44541a4](https://github.com/open-prophetdb/biomedgps/commit/44541a4))
+
+- 2024-03-15
+  - 19:51:20 -0400  [Fix Bug] Cannot compute score correctly when the source_type is equal with the target_type. ([e85eaf4](https://github.com/open-prophetdb/biomedgps/commit/e85eaf4))
+  - 19:10:00 -0400  Add a page for ME/CFS & LongCOVID. ([f2e4d9a](https://github.com/open-prophetdb/biomedgps/commit/f2e4d9a))
+  - 15:31:32 -0400  Improve the docs. ([1514b37](https://github.com/open-prophetdb/biomedgps/commit/1514b37))
+
+- 2024-03-13
+  - 20:50:34 -0400  Improve the query string of fetching linked nodes. ([847ed94](https://github.com/open-prophetdb/biomedgps/commit/847ed94))
+  - 16:57:49 -0400  [Fix Bug] Improve the performance of the importer. ([4fba06b](https://github.com/open-prophetdb/biomedgps/commit/4fba06b))
+
+- 2024-03-12
+  - 12:14:18 -0400  [Fix Bug] Wrong context string. ([496fb4f](https://github.com/open-prophetdb/biomedgps/commit/496fb4f))
+  - 09:03:32 -0400  Allow to explain a path with an attention subgraph. ([1df4959](https://github.com/open-prophetdb/biomedgps/commit/1df4959))
+
+- 2024-03-10
+  - 20:19:50 -0400  Improve the styles for the ShowPaths component. ([2ed14ed](https://github.com/open-prophetdb/biomedgps/commit/2ed14ed))
+  - 19:37:49 -0400  To support to explain a path generated by the ShowPaths component. ([ca5c9f4](https://github.com/open-prophetdb/biomedgps/commit/ca5c9f4))
+  - 17:38:04 -0400  Add a new prompt for explaining the importance of nodes within a disease context. ([495405e](https://github.com/open-prophetdb/biomedgps/commit/495405e))
+  - 00:37:40 -0500  Update the docs. ([ebeb8d7](https://github.com/open-prophetdb/biomedgps/commit/ebeb8d7))
+  - 00:33:59 -0500  Update the docs. ([ebf7520](https://github.com/open-prophetdb/biomedgps/commit/ebf7520))
+  - 00:27:47 -0500  Update the docs. ([1729a00](https://github.com/open-prophetdb/biomedgps/commit/1729a00))
+  - 00:24:00 -0500  [Fix Bug] Cannot clear the graph correctly. ([7d03fe3](https://github.com/open-prophetdb/biomedgps/commit/7d03fe3))
+  - 00:18:36 -0500  Update the docs. ([169ca19](https://github.com/open-prophetdb/biomedgps/commit/169ca19))
+
+- 2024-03-09
+  - 15:10:48 -0500  [Fix Bug] Cannot show markdown correctly for the upgrading of the react-markdown. ([effd69e](https://github.com/open-prophetdb/biomedgps/commit/effd69e))
+  - 00:07:30 -0500  Support to save manually and automaticlly. ([1d2cb7e](https://github.com/open-prophetdb/biomedgps/commit/1d2cb7e))
+
 - 2024-03-08
-  - 17:57:11 -0500 Update the changelog. ([e411537](https://github.com/open-prophetdb/biomedgps/commit/e411537))
-  - 17:56:34 -0500 Improve the docs & save the component's state before leaving. ([bb552f1](https://github.com/open-prophetdb/biomedgps/commit/bb552f1))
+  - 17:57:11 -0500  Update the changelog. ([9c52218](https://github.com/open-prophetdb/biomedgps/commit/9c52218))
+  - 17:56:34 -0500  Improve the docs & save the component's state before leaving. ([bb552f1](https://github.com/open-prophetdb/biomedgps/commit/bb552f1))
 
 - 2024-03-07
   - 21:28:32 -0500  [Fix Bug] Improve the layout and position settings for keeping the position of all nodes. ([8b15bcc](https://github.com/open-prophetdb/biomedgps/commit/8b15bcc))
@@ -315,9 +420,41 @@
 
 ## BioMedGPS UI
 
+- 2024-03-31
+  - 23:42:20 -0400 Improve the menu for nodes & edges. ([2f33259](https://github.com/open-prophetdb/biominer-components/commit/2f33259))
+  - 19:21:12 -0400  Improve the setting panel. ([e4b90e7](https://github.com/open-prophetdb/biominer-components/commit/e4b90e7))
+
+- 2024-03-23
+  - 20:42:45 -0400  Move the EdgeInfoPanel to the parent component. ([549963b](https://github.com/open-prophetdb/biominer-components/commit/549963b))
+
+- 2024-03-17
+  - 23:56:51 -0400  Add a link for viewing the publication. ([618c24b](https://github.com/open-prophetdb/biominer-components/commit/618c24b))
+  - 19:58:16 -0400  [Fix Bug] Cannot redirect to the provider of a publication. ([e956896](https://github.com/open-prophetdb/biominer-components/commit/e956896))
+  - 17:21:14 -0400  [Fix Bug] Cannot show highlighted text correctly. ([bab9035](https://github.com/open-prophetdb/biominer-components/commit/bab9035))
+  - 16:58:14 -0400  Add a publication panel for each edge. ([c007089](https://github.com/open-prophetdb/biominer-components/commit/c007089))
+
+- 2024-03-12
+  - 12:11:45 -0400  [Fix Bug] Wrong context string. ([c0f2613](https://github.com/open-prophetdb/biominer-components/commit/c0f2613))
+  - 08:50:06 -0400  Allow to explain a path with an attention subgraph. ([212f3b3](https://github.com/open-prophetdb/biominer-components/commit/212f3b3))
+
+- 2024-03-10
+  - 20:16:52 -0400  Improve the styles for the ShowPaths component. ([addea5a](https://github.com/open-prophetdb/biominer-components/commit/addea5a))
+  - 19:43:43 -0400  Use the cleanGraphData to clear the unused attributes. ([93919e6](https://github.com/open-prophetdb/biominer-components/commit/93919e6))
+  - 19:36:20 -0400  To support to explain a path generated by the ShowPaths component. ([ab20349](https://github.com/open-prophetdb/biominer-components/commit/ab20349))
+  - 00:22:04 -0500  [Fix Bug] Cannot clear the graph correctly. ([6cafc53](https://github.com/open-prophetdb/biominer-components/commit/6cafc53))
+
+- 2024-03-09
+  - 15:09:34 -0500  [Fix Bug] Cannot show markdown correctly for the upgrading of the react-markdown. ([ea160f8](https://github.com/open-prophetdb/biominer-components/commit/ea160f8))
+  - 00:10:13 -0500  Allow to save graph data by ctrl + s. ([0ddf6d1](https://github.com/open-prophetdb/biominer-components/commit/0ddf6d1))
+
 - 2024-03-08
-  - 14:11:27 -0500 Add a animination for distinguishing edges. ([4e6fd17](https://github.com/open-prophetdb/biominer-components/commit/4e6fd17))
-  - 12:03:13 -0500 Improve the docs & save the component's state before leaving. ([da7e5ff](https://github.com/open-prophetdb/biominer-components/commit/da7e5ff))
+  - 23:53:05 -0500  Support to save manually and automaticlly. ([59b75a3](https://github.com/open-prophetdb/biominer-components/commit/59b75a3))
+  - 23:05:41 -0500  Make the first graph center. ([ecf7b60](https://github.com/open-prophetdb/biominer-components/commit/ecf7b60))
+  - 22:38:59 -0500  Improve the setting for making the layout correctly. ([0a3feed](https://github.com/open-prophetdb/biominer-components/commit/0a3feed))
+  - 21:46:38 -0500  Improve the undo actions. ([d36f6ab](https://github.com/open-prophetdb/biominer-components/commit/d36f6ab))
+  - 18:33:01 -0500  Allow to support a undo stack. ([3e97907](https://github.com/open-prophetdb/biominer-components/commit/3e97907))
+  - 14:11:27 -0500  Add a animination for distinguishing edges. ([4e6fd17](https://github.com/open-prophetdb/biominer-components/commit/4e6fd17))
+  - 12:03:13 -0500  Improve the docs & save the component's state before leaving. ([da7e5ff](https://github.com/open-prophetdb/biominer-components/commit/da7e5ff))
   - 12:01:32 -0500  Improve the docs. ([55b8ab5](https://github.com/open-prophetdb/biominer-components/commit/55b8ab5))
   - 10:53:27 -0500  Release v0.3.0. ([8623a9e](https://github.com/open-prophetdb/biominer-components/commit/8623a9e))
   - 10:52:31 -0500  Upgrade all libraries. ([6af10dd](https://github.com/open-prophetdb/biominer-components/commit/6af10dd))
