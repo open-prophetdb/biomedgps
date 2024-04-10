@@ -1213,6 +1213,34 @@ impl Graph {
                 source_type = source_type,
                 topk = topk
             )
+        } else if relation_type == "GNBR::J::Gene:Symptom" {
+            // source_id might be a symptom, so we need to check the target_id
+            // GNBR::J::Gene:Disease,HSDN::has_symptom::Disease:Symptom
+            format!(
+                "
+                    SELECT
+                        COALESCE(target_type, '') || '::' || COALESCE(target_id, '') AS query_node_id,
+                        COALESCE(source_type, '') || '::' || COALESCE(source_id, '') AS node_id,
+                        percentile_cont(0.5) WITHIN GROUP (ORDER BY score)::FLOAT4 AS score
+                    FROM
+                        {table_name} ee1
+                    WHERE
+                        target_id IN ('{source_id}') AND target_type = '{source_type}'
+                    GROUP BY
+                        target_id, target_type, source_id, source_type
+                    ORDER BY score DESC, node_id ASC
+                    LIMIT {topk};
+                ",
+                table_name = get_triple_entity_score_table_name(
+                    &embedding_metadata.table_name,
+                    "Gene",
+                    "Disease",
+                    "Symptom"
+                ),
+                source_id = source_id,
+                source_type = source_type,
+                topk = topk
+            )
         } else {
             // Example SQL:
             // SELECT

@@ -151,7 +151,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
                 label: geneInfoMap.abbr,
                 key: geneInfoMap.taxid,
                 children: isProteinCoding(geneInfoMap.geneInfo) ?
-                    < ProteinInfoPanel geneInfo={geneInfoMap.geneInfo} proteinInfo={proteinInfo} /> :
+                    <ProteinInfoPanel geneInfo={geneInfoMap.geneInfo} proteinInfo={proteinInfo} /> :
                     <GeneInfoPanel geneSymbol={geneInfoMap.geneInfo.symbol} />
             }
         });
@@ -181,9 +181,9 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
             });
             oItems.push({
                 // @ts-ignore, we don't care about the warning. We need it to be a Tag component.
-                label: <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>Alignment</Tag>,
+                label: <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }} key={oItems.length + 1}>Alignment</Tag>,
                 key: oItems.length + 1,
-                children: <AlignmentViewer data={alignmentData} />
+                children: <AlignmentViewer data={alignmentData} key={oItems.length + 1} />
             })
         }
 

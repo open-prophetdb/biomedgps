@@ -568,6 +568,7 @@ const ModelConfig: React.FC = (props) => {
       options: [
         { label: 'Predicted Drugs', value: 'Compound' },
         { label: 'Predicted Diseases', value: 'Disease' },
+        { label: 'Predicted Genes', value: 'Gene' }
       ],
       // defaultValue: 'Disease'
     },
@@ -683,6 +684,7 @@ const ModelConfig: React.FC = (props) => {
       // TODO: the relation type is non-standard
       'Symptom:Disease': 'HSDN::has_symptom::Disease:Symptom',
       'Symptom:Compound': 'DrugBank::treats::Compound:Symptom',
+      'Symptom:Gene': 'GNBR::J::Gene:Symptom',
     };
 
     const entityPair = `${entityType}:${predictionType}`;

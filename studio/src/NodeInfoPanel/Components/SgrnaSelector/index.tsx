@@ -72,7 +72,7 @@ const GuideScoperViewer: React.FC<GuideScoperViewerProps> = (props) => {
     }, [id]);
 
     return (
-        <div id="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div className="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
             <iframe id={rootId} title="Guide Scoper" src={src}
                 onLoad={() => setLoading(false)} ref={ref}
                 className='guide-scoper-viewer'

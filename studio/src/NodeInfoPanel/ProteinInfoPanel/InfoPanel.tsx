@@ -1,11 +1,11 @@
-import { Empty, Row, Col, Badge, Descriptions, Table, Spin } from "antd";
+import { Empty, Row, Col, Badge, Descriptions, Table, Spin, Tooltip } from "antd";
 import React, { useEffect, useState } from "react";
 import type { GeneInfo, UniProtEntry } from "../index.t";
 import { isProteinCoding, fetchProteinInfo } from "./utils";
 import type { DescriptionsProps } from 'antd';
 import { MolStarViewer } from "..";
 import { guessSpecies } from "@/components/util";
-import { isEmpty } from "lodash";
+import { isEmpty, filter } from "lodash";
 
 import './index.less';
 
@@ -13,6 +13,92 @@ export interface ProteinInfoPanelProps {
     geneInfo: GeneInfo;
     proteinInfo: UniProtEntry;
 }
+
+function getPtmProcessing(proteinInfo: UniProtEntry): React.ReactNode {
+    const formatLocation = (location: any) => {
+        if (location.start.modifier === location.end.modifier) {
+            if (location.start.value === location.end.value) {
+                return `${location.start.modifier}: ${location.start.value}`;
+            } else if (location.start.value !== location.end.value) {
+                return `${location.start.modifier}: ${location.start.value}-${location.end.value}`;
+            }
+        } else {
+            return `${location.start.modifier}: ${location.start.value} - ${location.end.modifier}: ${location.end.value}`;
+        }
+    };
+
+    const formatSequence = (location: any, sequence: string) => {
+        return sequence.slice(location.start.value - 1, location.end.value);
+    };
+
+    const sequence = proteinInfo.sequence.value;
+    if (proteinInfo.features && proteinInfo.features.length > 0) {
+        const expectedTypes = ['Signal', 'Chain', 'Disulfide bond', 'Glycosylation', 'Modified residue'];
+        const ptmProcessing = filter(proteinInfo.features, (feature) => expectedTypes.includes(feature.type));
+        const formattedPtmProcessing = ptmProcessing.map((feature) => {
+            return {
+                type: feature.type,
+                description: feature.description,
+                location: formatLocation(feature.location),
+                sequence: formatSequence(feature.location, sequence),
+                pubmedIds: feature.evidences ? feature.evidences.map((evidence) => evidence.source === 'PubMed' ? evidence.id : null).filter((id) => id !== null) : [],
+            };
+        });
+
+        console.log("PtM Processing: ", proteinInfo.features, ptmProcessing);
+        console.log("Formatted PtM Processing: ", formattedPtmProcessing);
+
+        return (
+            <Table dataSource={formattedPtmProcessing}
+                rowKey={(record) => record.type + record.location}
+                columns={[
+                    {
+                        title: 'Type',
+                        dataIndex: 'type',
+                        width: '150px',
+                        key: 'type',
+                    },
+                    {
+                        title: 'Description',
+                        dataIndex: 'description',
+                        key: 'description',
+                        width: '300px',
+                    },
+                    {
+                        title: 'Location',
+                        dataIndex: 'location',
+                        width: '150px',
+                        key: 'location',
+                    },
+                    {
+                        title: 'Sequence',
+                        dataIndex: 'sequence',
+                        key: 'sequence',
+                        render: (sequence: string) => {
+                            return <Tooltip title={sequence}>
+                                {sequence.length > 50 ? `${sequence.slice(0, 50)}...` : sequence}
+                            </Tooltip>
+                        }
+                    },
+                    {
+                        title: 'PubMed IDs',
+                        dataIndex: 'pubmedIds',
+                        key: 'pubmedIds',
+                        width: '300px',
+                        render: (pubmedIds: string[]) => {
+                            return pubmedIds.map((id) => (
+                                <a href={`https://www.ncbi.nlm.nih.gov/pubmed/${id}`} target="_blank" key={id}
+                                    style={{ marginRight: '5px' }}>{id}</a>
+                            ));
+                        }
+                    }
+                ]} pagination={{
+                    pageSize: 10,
+                }} scroll={{ y: 1000 }} />
+        );
+    }
+}
+
 
 function PubMedLinks(text: string) {
     const parts = text.split(/(PubMed:\d+)/);
@@ -120,41 +206,43 @@ export const PdbInfo: React.FC<{ proteinInfo: UniProtEntry }> = ({ proteinInfo }
                 <MolStarViewer pdbId={currentPdbId} dimensions={['80%', '600px']}
                     className="molstar-viewer" useInterface showControls showAxes
                 />
-                <Table dataSource={pdbData} columns={[
-                    {
-                        title: 'Database',
-                        dataIndex: 'category',
-                        key: 'category',
-                    },
-                    {
-                        title: 'ID',
-                        dataIndex: 'id',
-                        key: 'id',
-                    },
-                    {
-                        title: 'Method',
-                        dataIndex: 'method',
-                        key: 'method',
-                    },
-                    {
-                        title: 'Resolution',
-                        dataIndex: 'resolution',
-                        key: 'resolution',
-                    },
-                    {
-                        title: 'Chain',
-                        dataIndex: 'chain',
-                        key: 'chain',
-                    }
-                ]} onRow={(row) => {
-                    return {
-                        onClick: (event) => {
-                            setCurrentPdbId(row.id);
+                <Table dataSource={pdbData}
+                    rowKey={(record) => record.id}
+                    columns={[
+                        {
+                            title: 'Database',
+                            dataIndex: 'category',
+                            key: 'category',
+                        },
+                        {
+                            title: 'ID',
+                            dataIndex: 'id',
+                            key: 'id',
+                        },
+                        {
+                            title: 'Method',
+                            dataIndex: 'method',
+                            key: 'method',
+                        },
+                        {
+                            title: 'Resolution',
+                            dataIndex: 'resolution',
+                            key: 'resolution',
+                        },
+                        {
+                            title: 'Chain',
+                            dataIndex: 'chain',
+                            key: 'chain',
                         }
-                    };
-                }} pagination={{
-                    pageSize: 5,
-                }} />
+                    ]} onRow={(row) => {
+                        return {
+                            onClick: (event) => {
+                                setCurrentPdbId(row.id);
+                            }
+                        };
+                    }} pagination={{
+                        pageSize: 5,
+                    }} />
             </Row>
     );
 }
@@ -238,6 +326,12 @@ export const ProteinInfoPanel: React.FC<ProteinInfoPanelProps> = (props) => {
                         <p>{proteinInfo.sequence.value}</p>
                         <PdbInfo proteinInfo={proteinInfo} />
                     </>
+                }
+            </Col>
+            <Col className="protein-ptm-processing">
+                <h2>PTM & Processing</h2>
+                {isEmpty(proteinInfo) ? <Empty description="No PTM & Processing found" /> :
+                    getPtmProcessing(proteinInfo)
                 }
             </Col>
         </Row>

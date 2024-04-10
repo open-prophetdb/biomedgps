@@ -1,6 +1,7 @@
 import { GeneInfo, UniProtEntry } from '../index.t';
 
 export const fetchMyGeneInfo = async (entrezId: string): Promise<GeneInfo> => {
+    // e.g https://mygene.info/v3/gene/7157?fields=all&dotfield=false&size=10
     const response = await fetch(`https://mygene.info/v3/gene/${entrezId}?fields=all&dotfield=false&size=10`);
     if (!response.ok) {
         throw new Error("Failed to fetch gene information");

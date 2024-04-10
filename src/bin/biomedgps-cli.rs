@@ -1,8 +1,8 @@
 extern crate log;
 
+use biomedgps::model::entity_attr::CompoundAttr;
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
-use biomedgps::model::entity_attr::CompoundAttr;
 use biomedgps::model::{
     init_db::{
         create_score_table, get_kg_score_table_name, kg_entity_table2graphdb,
@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
 
-/// NOTE: In the first time, you need to follow the order to run the commands: initdb -> importdb (entity + entity_metadata + relation + relation_metadata etc.) -> importkge (embeddings) -> cachetable (compound-disease-symptom, knowledge-score). In the current stage, we don't have a mechanism to check the format of entity ids and relation_types and keep the consistent of the data, such as whether all entities in the relation table exist in the entity table. But we provide a script for this purpose, you can follow this link to check the data consistency: https://github.com/open-prophetdb/biomedgps-data/blob/main/graph_data/scripts/correct_graph_data.py
+/// NOTE: In the first time, you need to follow the order to run the commands: initdb -> importdb (entity + entity_metadata + relation + relation_metadata etc.) -> importkge (embeddings) -> cachetable (compound-disease-symptom, gene-disease-symptom, knowledge-score). In the current stage, we don't have a mechanism to check the format of entity ids and relation_types and keep the consistent of the data, such as whether all entities in the relation table exist in the entity table. But we provide a script for this purpose, you can follow this link to check the data consistency: https://github.com/open-prophetdb/biomedgps-data/blob/main/graph_data/scripts/correct_graph_data.py
 ///
 #[derive(StructOpt, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name = "A cli for biomedgps service.", author="Jingcheng Yang <yjcyxky@163.com>;")]
@@ -61,7 +61,7 @@ pub struct InitDbArguments {
 }
 
 /// Output the statistics of the database, such as the number of entities, relations, metadata etc.
-/// The statistics include the number of entities, relations, metadata, subgraph, knowledge_curation, entity2d, compound-disease-symptom, knowledge-score, embedding, graph etc.
+/// The statistics include the number of entities, relations, metadata, subgraph, knowledge_curation, entity2d, compound-disease-symptom, gene-disease-symptom, knowledge-score, embedding, graph etc.
 #[derive(StructOpt, PartialEq, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="BioMedGPS - statdb", author="Jingcheng Yang <yjcyxky@163.com>")]
 pub struct StatDBArguments {
@@ -78,8 +78,8 @@ pub struct CleanDBArguments {
     #[structopt(name = "database_url", short = "d", long = "database-url")]
     database_url: Option<String>,
 
-    /// Which table to clean. e.g. entity, relation, entity_metadata, relation_metadata, knowledge_curation, subgraph, entity2d, compound-disease-symptom, knowledge-score, embedding, graph etc.
-    #[structopt(name = "table", short = "t", long = "table", possible_values = &["entity", "entity2d", "relation", "relation_metadata", "entity_metadata", "knowledge_curation", "subgraph", "compound-disease-symptom", "knowledge-score", "embedding", "graph"])]
+    /// Which table to clean. e.g. entity, relation, entity_metadata, relation_metadata, knowledge_curation, subgraph, entity2d, compound-disease-symptom, gene-disease-symptom, knowledge-score, embedding, graph etc.
+    #[structopt(name = "table", short = "t", long = "table", possible_values = &["entity", "entity2d", "relation", "relation_metadata", "entity_metadata", "knowledge_curation", "subgraph", "compound-disease-symptom", "gene-disease-symptom", "knowledge-score", "embedding", "graph"])]
     table: String,
 }
 
@@ -173,7 +173,7 @@ pub struct CacheTableArguments {
     #[structopt(name = "db_host", short = "D", long = "db-host")]
     db_host: Option<String>,
 
-    /// [Required] The table name to init. supports compound-disease-symptom, knowledge-score etc.
+    /// [Required] The table name to init. supports compound-disease-symptom, gene-disease-symptom, knowledge-score etc.
     #[structopt(name = "table", short = "t", long = "table")]
     table: String,
 
@@ -390,6 +390,48 @@ async fn main() {
                     {
                         Ok(_) => info!("Init compound-disease-symptom table successfully."),
                         Err(e) => error!("Init compound-disease-symptom table failed: {}", e),
+                    }
+                }
+                "gene-disease-symptom" => {
+                    let default_relation_types =
+                        "GNBR::J::Gene:Disease,HSDN::has_symptom::Disease:Symptom";
+                    let relation_types = arguments.relation_types.unwrap_or(
+                        // TODO: the HSDN::has_symptom::Disease:Symptom is non-standard relation type. We need to change it to the standard format.
+                        default_relation_types.to_string(),
+                    );
+                    let relation_types = relation_types.split(",").collect::<Vec<&str>>();
+
+                    if relation_types.len() != 2 {
+                        error!("The number of relation types should be 2 and the order should be consistent with the pairs of table name. e.g. gene-disease-symptom table should have two relation types for gene-disease and disease-symptom.");
+                        std::process::exit(1);
+                    }
+
+                    let compound_disease_relation_type = relation_types.get(0).unwrap();
+                    let disease_symptom_relation_type = relation_types.get(1).unwrap();
+
+                    if !compound_disease_relation_type.contains("Gene:Disease") {
+                        error!("The first relation type should be for compound-disease. e.g. GNBR::J::Gene:Disease.");
+                        std::process::exit(1);
+                    }
+
+                    if !disease_symptom_relation_type.contains("Disease:Symptom") {
+                        error!("The second relation type should be for disease-symptom. e.g. HSDN::has_symptom::Disease:Symptom");
+                        std::process::exit(1);
+                    }
+
+                    match create_score_table(
+                        &pool,
+                        "Gene",
+                        "Disease",
+                        "Symptom",
+                        compound_disease_relation_type,
+                        disease_symptom_relation_type,
+                        Some(&arguments.table_prefix),
+                    )
+                    .await
+                    {
+                        Ok(_) => info!("Init gene-disease-symptom table successfully."),
+                        Err(e) => error!("Init gene-disease-symptom table failed: {}", e),
                     }
                 }
                 "knowledge-score" => {

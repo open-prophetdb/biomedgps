@@ -5,27 +5,25 @@ import './index.less'
 
 type ProteinAtlasProps = {
   rootId?: string,
-  ensemblId: string,
-  // Only support official gene symbol for now
-  geneSymbol: string,
+  uniprotId: string,
 }
 
-const ProteinAtlas: React.FC<ProteinAtlasProps> = (props) => {
+const ProteinProduct: React.FC<ProteinAtlasProps> = (props) => {
   const [rootId, setRootId] = useState<string>("");
   const [src, setSrc] = useState<string>("");
   const ref = useRef(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (props.geneSymbol && props.ensemblId) {
+    if (props.uniprotId) {
       let host = window.location.host;
       if (host.startsWith('localhost')) {
         host = "drugs.3steps.cn"
       }
 
-      setSrc(`https://${host}/proxy/protein_atlas/${props.ensemblId}-${props.geneSymbol}`)
+      setSrc(`https://${host}/proxy/rndsystems/cn/search?keywords=${props.uniprotId}&numResults=100`)
     }
-  }, [props.geneSymbol, props.ensemblId]);
+  }, [props.uniprotId]);
 
   useEffect(() => {
     if (!props.rootId) {
@@ -51,7 +49,7 @@ const ProteinAtlas: React.FC<ProteinAtlasProps> = (props) => {
 
   return (
     <div className="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <iframe id={rootId} title="Protein Atlas" src={src} className={loading ? 'hidden' : ''}
+      <iframe id={rootId} title="R&D Systems" src={src} className={loading ? 'hidden' : ''}
         style={{ width: '100%', border: 'none', height: 'calc(100vh - 120px)' }} onLoad={() => {
           setLoading(false)
         }} ref={ref} />
@@ -64,4 +62,4 @@ const ProteinAtlas: React.FC<ProteinAtlasProps> = (props) => {
   )
 }
 
-export default ProteinAtlas;
+export default ProteinProduct;

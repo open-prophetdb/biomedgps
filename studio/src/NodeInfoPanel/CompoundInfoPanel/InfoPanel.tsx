@@ -73,6 +73,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = (props) => {
         metabolism: 'Metabolism',
         absorption: 'Absorption',
         half_life: 'Half Life',
+        protein_binding: 'Protein Binding',
+        route_of_elimination: 'Route of Elimination',
+        volume_of_distribution: 'Volume of Distribution',
+        clearance: 'Clearance',
     };
 
     useEffect(() => {

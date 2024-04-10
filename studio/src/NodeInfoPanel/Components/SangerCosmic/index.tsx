@@ -35,7 +35,7 @@ const SangerCosmic: React.FC<SangerCosmicProps> = (props) => {
   }, []);
 
   return (
-    <div id="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div className="iframe-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
       <iframe id={rootId} title="Cosmic Mutations" src={src}
         style={{ width: '100%', height: '100%', border: 'none', minHeight: '1000px' }} onLoad={() => {
           setLoading(false)

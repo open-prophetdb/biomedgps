@@ -19,27 +19,33 @@ export const Reference: React.FC<InfoPanelProps> = (props) => {
         compoundInfo ?
             <Row className="compound-info-panel">
                 <Col className="article">
-                    {
-                        compoundInfo.general_references?.articles ? (compoundInfo.general_references?.articles.map((article, index) => {
-                            return (
-                                <div key={index}>
-                                    <span>{article.citation}</span>
-                                    <a href={formatPubmedId(article.pubmed_id)} target="_blank">PubMed</a>
-                                </div>
-                            )
-                        })) : null
-                    }
+                    <h2 className="title">Articles</h2>
+                    <ol>
+                        {
+                            compoundInfo.general_references?.articles ? (compoundInfo.general_references?.articles.map((article, index) => {
+                                return (
+                                    <li key={index}>
+                                        <span>{article.citation}</span>
+                                        <a href={formatPubmedId(article.pubmed_id)} target="_blank">PubMed</a>
+                                    </li>
+                                )
+                            })) : null
+                        }
+                    </ol>
                 </Col>
                 <Col className="link">
-                    {
-                        compoundInfo.general_references?.links ? (compoundInfo.general_references?.links.map((link, index) => {
-                            return (
-                                <div key={index}>
-                                    <a href={link.url} target="_blank">{link.title}</a>
-                                </div>
-                            )
-                        })) : null
-                    }
+                    <h2 className="title">Links</h2>
+                    <ol>
+                        {
+                            compoundInfo.general_references?.links ? (compoundInfo.general_references?.links.map((link, index) => {
+                                return (
+                                    <li key={index}>
+                                        <a href={link.url} target="_blank">{link.title}</a>
+                                    </li>
+                                )
+                            })) : null
+                        }
+                    </ol>
                 </Col>
             </Row>
             : null

@@ -7,6 +7,7 @@ import MutationViewer from "./Components/MutationViewer";
 import SangerCosmic from "./Components/SangerCosmic";
 import ProteinAtlas from "./Components/ProteinAtlas";
 import SgrnaSelector from "./Components/SgrnaSelector";
+import ProteinProduct from "./Components/ProteinProduct";
 import type { GeneInfo } from "./index.t";
 import { fetchEntityAttributes } from "@/services/swagger/KnowledgeGraph";
 import { fetchMyGeneInfo } from "./ProteinInfoPanel/utils";
@@ -93,6 +94,8 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
     const entrezId = geneInfo.entrezgene;
     // TODO: We might get several ensembl ids, how to handle this?
     const ensemblId = geneInfo?.ensembl?.gene;
+    const species = geneInfo.taxid;
+    const uniportId = geneInfo.uniprot ? geneInfo.uniprot["Swiss-Prot"] : null;
     const geneItems = [
       {
         label: "Summary",
@@ -102,6 +105,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       {
         label: "Gene Expression",
         key: "gene",
+        disabled: species != 9606,
         children: <GTexViewer ensemblId={ensemblId} type="gene" description={
           <span>
             <span>
@@ -113,17 +117,16 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
             </span>
           </span>
         } />
-        // children: <Empty description="Comming soon..." />
       },
       {
         label: "Transcript Expression",
         key: "transcript",
+        disabled: species != 9606,
         children: <GTexViewer ensemblId={ensemblId} type="transcript" description={
           <span>
             Data Source: GTEx Analysis Release V8 (dbGaP Accession phs000424.v8.p2). <a href={`https://gtexportal.org/home/gene/${ensemblId}`} target="_blank">More information</a>
           </span>
         } />
-        // children: <Empty description="Comming soon..." />
       },
       // {
       //   label: "Expression Atlas",
@@ -133,13 +136,22 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
       {
         label: "Mutation - SangerCosmic",
         key: "mutation",
+        disabled: species != 9606,
         children: <SangerCosmic geneSymbol={geneSymbol} />
         // children: <Empty description="Comming soon..." />
       },
       {
         label: "Protein Atlas",
         key: "protein-atlas",
+        disabled: species != 9606,
         children: <ProteinAtlas geneSymbol={geneSymbol} ensemblId={ensemblId} />,
+        // children: <Empty description="Comming soon..." />
+      },
+      {
+        label: "R&D Systems",
+        key: "rnd-systems",
+        disabled: species != 9606 || !uniportId,
+        children: <ProteinProduct uniprotId={uniportId || ""} />,
         // children: <Empty description="Comming soon..." />
       },
       {

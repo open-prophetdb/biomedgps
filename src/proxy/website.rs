@@ -1,7 +1,7 @@
 use anyhow;
 use log::{debug, info, warn};
 use lol_html::html_content::ContentType;
-use lol_html::{element, Selector};
+use lol_html::{element, text, Selector};
 use lol_html::{rewrite_str, RewriteStrSettings};
 use poem::http::header::{HeaderName as PoemHeaderName, HeaderValue as PoemHeaderValue};
 use poem::http::Method;
@@ -26,6 +26,7 @@ fn get_sanger_cosmic_redirect_url(
     base_url: &str,
     enable_redirect: bool,
     upstream_host: &str,
+    _tag_name: &str,
 ) -> String {
     let raw_redirect_url = format!("{}/{}/sanger_cosmic", upstream_host, PROXY_DATA_PREFIX);
 
@@ -47,6 +48,7 @@ fn get_protein_atlas_redirect_url(
     base_url: &str,
     enable_redirect: bool,
     upstream_host: &str,
+    _tag_name: &str,
 ) -> String {
     let host = Url::parse(upstream_host).unwrap();
     let raw_redirect_url = host
@@ -76,6 +78,15 @@ fn get_protein_atlas_redirect_url(
             "{}?raw_base_url={}",
             resolved_url, "https://images.proteinatlas.org"
         );
+    } else if raw_url.contains("humanproteome/proteinevidence") {
+        let redirect_url = host
+            .join(&format!(
+                "{}/protein_atlas/{}",
+                PROXY_PREFIX,
+                raw_url.strip_prefix("/").unwrap()
+            ))
+            .unwrap();
+        return redirect_url.to_string();
     } else {
         let url = Url::parse(base_url).unwrap();
         let resolved_url = url.join(raw_url).unwrap();
@@ -87,6 +98,33 @@ fn get_protein_atlas_redirect_url(
             return resolved_url.to_string();
         }
     }
+}
+
+fn get_rndsystems_redirect_url(
+    raw_url: &str,
+    base_url: &str,
+    enable_redirect: bool,
+    upstream_host: &str,
+    tag_name: &str,
+) -> String {
+    if raw_url.starts_with("#") && tag_name == "a" {
+        return raw_url.to_string();
+    }
+
+    let host = Url::parse(upstream_host).unwrap();
+    let raw_redirect_url = host.join(&format!("{}/rndsystems", PROXY_PREFIX)).unwrap();
+
+    let url = Url::parse(base_url).unwrap();
+    let resolved_url = url.join(raw_url).unwrap();
+    let modified_url = if enable_redirect {
+        resolved_url
+            .to_string()
+            .replace(base_url, &raw_redirect_url.to_string())
+    } else {
+        resolved_url.to_string()
+    };
+
+    return modified_url;
 }
 
 lazy_static::lazy_static! {
@@ -108,8 +146,19 @@ lazy_static::lazy_static! {
             base_url: "https://www.proteinatlas.org",
             get_redirect_url: get_protein_atlas_redirect_url,
             which_tags: vec!["a", "link", "script", "img", "li[style]", "a[style]", "object[data]", "iframe"],
-            additional_css: Some(".tabrow { padding-inline-start: unset !important; width: revert !important; } .page_header { visibility: hidden; display: none; } div.atlas_header, div.atlas_border { top: 0px !important; } table.main_table { top: 0px !important; margin: 0 0px 0 200px !important; }div.celltype_detail { width: unset !important; } table.menu_margin, div.menu_margin { margin: 0 !important; } div.page_footer { display: none; } div#cookie_statement { display: none; } div.atlas_header div.atlas_nav.show_small { top: 0px !important; } div.menu { top: 100px !important; left: 0px !important } div.atlas_header div.gene_name, div.page_header div.gene_name { left: -180px !important; width: 80px !important; } div.atlas_header div.atlas_nav { left: 180px !important; width: 1000px !important; margin: unset !important; padding-top: 0px !important; top: 0px !important; } #NGLViewer { display: none !important; } table.main_table td { padding: 5px !important; }"),
-            additional_js: None,
+            additional_css: Some(".tabrow { padding-inline-start: unset !important; width: revert !important; } .page_header { visibility: hidden; display: none; } div.atlas_header, div.atlas_border { top: 0px !important; } table.main_table { top: 0px !important; margin: 0 0px 0 200px !important; }div.celltype_detail { width: unset !important; } table.menu_margin, div.menu_margin { margin: 0 !important; } div.page_footer { display: none; } div#cookie_statement { display: none; } div.atlas_header div.atlas_nav.show_small { top: 0px !important; } div.menu { top: 100px !important; left: 0px !important } div.atlas_header div.gene_name, div.page_header div.gene_name { left: -180px !important; width: 80px !important; } div.atlas_header div.atlas_nav { left: 180px !important; width: 1000px !important; margin: unset !important; padding-top: 0px !important; top: 0px !important; } #NGLViewer { display: none !important; } table.main_table td { padding: 5px !important; } body.general_body { background-image: none !important; } a { cursor: pointer !important; }"),
+            additional_js: Some("const matchLists = { text: ['all genes', '特定文本2'], href: ['https://example.com', 'http://example.net'] }; function addTargetAttribute() { const links = document.querySelectorAll('a'); links.forEach(link => { if (matchLists.text.some(text => link.textContent.includes(text))) { link.setAttribute('target', '_blank'); } else if (matchLists.href.some(href => link.href === href)) { link.setAttribute('target', '_blank'); } }); }; document.addEventListener('DOMContentLoaded', (event) => { addTargetAttribute(); }); setInterval(addTargetAttribute, 10000); document.addEventListener('click', function(e) { const link = e.target.closest('a'); if (link) { window.parent.postMessage({ type: 'linkClicked', href: e.target.href }, '*');  } });"),
+            enable_redirect: vec!["a[href]", "img[src]", "link[src]", "li[style]", "a[style]", "object[data]", "iframe"],
+            open_at_new_tab: false,
+        });
+
+        map.insert("rndsystems", Website {
+            name: "rndsystems",
+            base_url: "https://www.rndsystems.com",
+            get_redirect_url: get_rndsystems_redirect_url,
+            which_tags: vec!["a", "link", "script", "img", "li[style]", "a[style]", "object[data]", "iframe"],
+            additional_css: Some("#header, .breadcrumbs_wrapper, #search_facets, #footer_wrapper, #copyright_wrapper, .compare_tool_select, .search_products_area, #content_column, #sidebar, .search_results_top, .search_results_bottom, .helpButton { visibility: hidden !important; display: none !important; } #search_results { width: 100% !important; left: 0 !important; padding: 0 !important; } .main-container { width: auto !important; margin: 0px !important; }"),
+            additional_js: Some("function addTargetAttribute() { const links = document.querySelectorAll('a'); links.forEach(link => { link.setAttribute('target', '_blank'); }); }; document.addEventListener('DOMContentLoaded', (event) => { addTargetAttribute(); }); setInterval(addTargetAttribute, 10000);"),
             enable_redirect: vec!["a[href]", "img[src]", "link[src]", "li[style]", "a[style]", "object[data]", "iframe"],
             open_at_new_tab: false,
         });
@@ -122,7 +171,7 @@ lazy_static::lazy_static! {
 pub struct Website {
     pub name: &'static str,     // Name of the website, such as "sanger_cosmic".
     pub base_url: &'static str, // Base URL, such as "https://cancer.sanger.ac.uk". We use this URL to replace with the redirect URL.
-    pub get_redirect_url: fn(&str, &str, bool, &str) -> String, // Get the redirect URL. The first parameter is the raw URL (It might be a relative URL or an absolute URL), the second parameter is the base URL, the third parameter is whether to enable the redirect for the specific URL, the fourth parameter is the upstream host.
+    pub get_redirect_url: fn(&str, &str, bool, &str, &str) -> String, // Get the redirect URL. The first parameter is the raw URL (It might be a relative URL or an absolute URL), the second parameter is the base URL, the third parameter is whether to enable the redirect for the specific URL, the fourth parameter is the upstream host, and the fifth parameter is the tag name.
     pub which_tags: Vec<&'static str>, // Which tag to modify. Such as ["a", "link", "script", "img", "[data-url]", "table[title]"]. If you want to know which tags are supported, you can check the modify_html function in the Website struct.
     pub additional_css: Option<&'static str>, // Additional CSS content that we want to append to the head tag.
     pub additional_js: Option<&'static str>, // Additional JS content that we want to append to the body tag.
@@ -172,6 +221,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"a[href]"),
                             upstream_host,
+                            "a"
                         );
                         el.set_attribute("href", &modified_href)?;
 
@@ -192,6 +242,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"link[href]"),
                             upstream_host,
+                            "link"
                         );
                         el.set_attribute("href", &modified_url)?;
                         Ok(())
@@ -208,8 +259,23 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&tag_attr.as_str()),
                             upstream_host,
+                            tag
                         );
                         el.set_attribute("src", &modified_url)?;
+                        Ok(())
+                    }));
+                }
+                "script[content]" => {
+                    handlers.push(text!("script", |text| {
+                        let script_content = text.as_str().to_string();
+                        let modified_content = (self.get_redirect_url)(
+                            &script_content,
+                            website_baseurl,
+                            self.enable_redirect.contains(&"script[content]"),
+                            upstream_host,
+                            "script[content]"
+                        );
+                        text.replace(&modified_content, ContentType::Html);
                         Ok(())
                     }));
                 }
@@ -223,6 +289,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"[data-url]"),
                             upstream_host,
+                            "[data-url]"
                         );
                         el.set_attribute("data-url", &modified_url)?;
                         Ok(())
@@ -238,6 +305,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"table[title]"),
                             upstream_host,
+                            "table[title]"
                         );
                         el.set_attribute("title", &modified_url)?;
                         Ok(())
@@ -253,6 +321,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"iframe"),
                             upstream_host,
+                            "iframe"
                         );
                         el.set_attribute("src", &modified_url)?;
                         Ok(())
@@ -268,6 +337,7 @@ impl Website {
                             website_baseurl,
                             self.enable_redirect.contains(&"object[data]"),
                             upstream_host,
+                            "object[data]"
                         );
                         el.set_attribute("data", &modified_url)?;
                         Ok(())
@@ -294,6 +364,7 @@ impl Website {
                                                 website_baseurl,
                                                 self.enable_redirect.contains(&tag.as_str()),
                                                 upstream_host,
+                                                &tag
                                             );
                                             format!("url('{}')", modified_url)
                                         });
