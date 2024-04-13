@@ -92,15 +92,20 @@ export const logout = () => {
 export const logoutWithRedirect = () => {
     logout();
     // Save the current hash as the redirect url
-    let redirectUrl = window.location.hash.split("#").pop();
-    if (redirectUrl) {
-        redirectUrl = redirectUrl.replaceAll('/', '')
+    let currentUrl = window.location.hash.split("#").pop();
+    const baseUrl = '/not-authorized';
+
+    if (currentUrl && !currentUrl.startsWith(baseUrl)) {
+        let redirectUrl = currentUrl;
+
+        // 只对非 not-authorized 页面的 URL 进行编码
+        redirectUrl = encodeURIComponent(redirectUrl);
         localStorage.setItem('redirectUrl', redirectUrl);
-        // Redirect to a warning page that its route name is 'not-authorized'.
-        history.push('/not-authorized?redirectUrl=' + redirectUrl);
+        history.push(`${baseUrl}?redirectUrl=${redirectUrl}`);
     } else {
+        // 已在 not-authorized 页面，不再重定向或添加新的 redirectUrl
         localStorage.setItem('redirectUrl', '');
-        history.push('/not-authorized');
+        history.push(baseUrl);
     }
 }
 
@@ -113,5 +118,26 @@ export const truncateString = (str: string, num?: number) => {
         return str.substring(0, num) + '...';
     } else {
         return str;
+    }
+}
+
+export const getUsername = (): string | undefined => {
+    const accessToken = getJwtAccessToken();
+    if (accessToken) {
+        try {
+            const payload = accessToken.split('.')[1];
+            const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+            const padLength = 4 - (base64.length % 4);
+            const paddedBase64 = padLength < 4 ? base64 + "=".repeat(padLength) : base64;
+            const payloadJson = JSON.parse(atob(paddedBase64));
+            console.log('payloadJson: ', payloadJson);
+            return payloadJson?.name || payloadJson?.email || payloadJson?.nickname 
+        } catch (error) {
+            logout();
+            console.log('Error in getUsername: ', error);
+            return undefined;
+        }
+    } else {
+        return undefined;
     }
 }

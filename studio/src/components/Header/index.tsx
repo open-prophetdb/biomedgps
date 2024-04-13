@@ -69,7 +69,10 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       // Get the redirectUrl from the query string.
       const redirectUrl = localStorage.getItem('redirectUrl');
       if (redirectUrl) {
-        history.push('/' + redirectUrl);
+        // Decode the URL component before using it
+        const decodedUrl = decodeURIComponent(redirectUrl);
+        console.log('decodedUrl: ', decodedUrl);
+        history.push(decodedUrl);
       } else {
         history.push('/');
       }

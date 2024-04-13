@@ -12,7 +12,7 @@ import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy, groupBy, map, sumBy, set } from 'lodash';
-import { guessColor, truncateString } from '@/components/util';
+import { guessColor, truncateString, getUsername, logoutWithRedirect } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
 import './index.less';
@@ -128,43 +128,53 @@ const KnowledgeTable: React.FC = (props) => {
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [username, setUsername] = useState<string | undefined>(undefined);
 
     useEffect(() => {
-        if (queriedNodeId || queriedNodeIds) {
-            if (queriedNodeId) {
-                setNodeIds([queriedNodeId]);
-            } else {
-                setNodeIds(undefined);
-            }
+        const username = getUsername();
+        console.log('Username: ', username);
+        setUsername(username);
 
-            if (queriedNodeIds) {
-                const ids = queriedNodeIds.split(',');
-                if (ids.length > 0) {
-                    setNodeIds(ids);
+        if (!username) {
+            logoutWithRedirect();
+        } else {
+
+            if (queriedNodeId || queriedNodeIds) {
+                if (queriedNodeId) {
+                    setNodeIds([queriedNodeId]);
                 } else {
                     setNodeIds(undefined);
                 }
-            }
 
-            fetchRelationMetadata().then((relationStat) => {
-                const o = makeRelationTypes(relationStat)
-                let descs = {} as Record<string, string>;
-                o.forEach((item) => {
-                    descs[item.value] = item.description || 'Unknown';
-                });
-                setRelationTypeDescs(descs);
+                if (queriedNodeIds) {
+                    const ids = queriedNodeIds.split(',');
+                    if (ids.length > 0) {
+                        setNodeIds(ids);
+                    } else {
+                        setNodeIds(undefined);
+                    }
+                }
 
-                let res = [] as OptionType[];
-                relationStat.forEach((item, index) => {
-                    res.push({
-                        order: 0,
-                        label: item.resource,
-                        value: item.resource,
+                fetchRelationMetadata().then((relationStat) => {
+                    const o = makeRelationTypes(relationStat)
+                    let descs = {} as Record<string, string>;
+                    o.forEach((item) => {
+                        descs[item.value] = item.description || 'Unknown';
                     });
-                });
+                    setRelationTypeDescs(descs);
 
-                setResources(uniqBy(res, 'value'));
-            });
+                    let res = [] as OptionType[];
+                    relationStat.forEach((item, index) => {
+                        res.push({
+                            order: 0,
+                            label: item.resource,
+                            value: item.resource,
+                        });
+                    });
+
+                    setResources(uniqBy(res, 'value'));
+                });
+            }
         }
     }, [])
 
@@ -592,7 +602,7 @@ const KnowledgeTable: React.FC = (props) => {
         return record.relid || `${JSON.stringify(record)}`;
     };
 
-    return (total == 0) ? (
+    return username && (total == 0 ? (
         <Row className='knowledge-table-container'>
             <Spin spinning={loading}>
                 <Empty description={
@@ -798,7 +808,7 @@ const KnowledgeTable: React.FC = (props) => {
                     : <Empty description="No publication data for this knowledge." />}
             </Drawer>
         </Row>
-    );
+    ));
 };
 
 export default KnowledgeTable;

@@ -15,7 +15,7 @@ import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
 import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import EntityCard from '@/components/EntityCard';
-import { truncateString } from '@/components/util';
+import { truncateString, getUsername, logoutWithRedirect } from '@/components/util';
 
 import './index.less';
 
@@ -248,15 +248,23 @@ const ModelConfig: React.FC = (props) => {
   const [nodeDataSources, setNodeDataSources] = useState<NodeAttribute[]>([]);
   const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
   const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
+  const [username, setUsername] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    fetchStatistics().then((data) => {
-      const relationStats = data.relation_stat;
-      setRelationStat(relationStats);
+    const username = getUsername();
+    setUsername(username);
 
-      const relationTypes = makeRelationTypes(relationStats);
-      setRelationTypeOptions(relationTypes);
-    });
+    if (!username) {
+      logoutWithRedirect();
+    } else {
+      fetchStatistics().then((data) => {
+        const relationStats = data.relation_stat;
+        setRelationStat(relationStats);
+
+        const relationTypes = makeRelationTypes(relationStats);
+        setRelationTypeOptions(relationTypes);
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -873,7 +881,7 @@ const ModelConfig: React.FC = (props) => {
   }
 
   return (
-    <Layout className='model-panel' key={currentModel}>
+    username && <Layout className='model-panel' key={currentModel}>
       <Sider width={100}>
         <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
           {models.map((model, index) => (
