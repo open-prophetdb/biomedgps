@@ -23,8 +23,8 @@ export default (api: IApi) => {
     // For GTEx Components
     api.addHTMLHeadScripts(() => {
         return [
-            "https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js",
-            "https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js",
+            "https://drugs.3steps.cn/assets/js/jquery-1.11.2.min.js",
+            "https://drugs.3steps.cn/assets/js/popper-1.11.0.min.js",
             "https://gtexportal.org/external/jquery-ui-1.11.4.custom/jquery-ui.min.js",
             "https://gtexportal.org/external/bootstrap/3.3.7/bootstrap.min.js"
         ]
