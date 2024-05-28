@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataTables Example</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+    <style>
+        table {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>WebAssembly Centrality Calculation</h1>
+    <table id="example" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>Entity ID</th>
+                <th>Entity Type</th>
+                <th>Entity Name</th>
+                <th>Betweenness Score</th>
+                <th>Degree Score</th>
+                <th>Closeness Score</th>
+                <th>Eigenvector Score</th>
+                <th>PageRank Score</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+
+    <script type="module">
+        import init, * as wasm from './pkg/biomedgps_graph.js';
+
+        async function run() {
+            await init();
+            const relations = await fetch('./mecfs_subgraph.json').then(response => response.json());
+            // Filter the data to only include relationships where both nodes are genes
+            const filteredRelations = relations.filter(rel =>
+                rel.source_type === "Gene" || rel.target_type === "Gene"
+            );
+            const result = wasm.calculate_centrality(filteredRelations);
+            const genes = result.filter(entity => entity.entity_type === "Gene");
+
+            // Populate DataTable with data
+            $('#example').DataTable({
+                data: genes,
+                columns: [
+                    { data: 'entity_id' },
+                    { data: 'entity_type' },
+                    { data: 'entity_name' },
+                    { data: 'betweenness_score' },
+                    { data: 'degree_score' },
+                    { data: 'closeness_score' },
+                    { data: 'eigenvector_score' },
+                    { data: 'pagerank_score' }
+                ],
+                total: genes.length
+            });
+        }
+
+        run();
+
+        /**
+            WebAssembly Centrality Calculation
+            [
+                {
+                    "entity_id": "B",
+                    "entity_type": "Person",
+                    "betweenness_score": 2,
+                    "degree_score": 0,
+                    "closeness_score": 1,
+                    "eigenvector_score": 0,
+                    "pagerank_score": 0
+                },
+                {
+                    "entity_id": "A",
+                    "entity_type": "Person",
+                    "betweenness_score": 2,
+                    "degree_score": 0,
+                    "closeness_score": 0,
+                    "eigenvector_score": 0,
+                    "pagerank_score": 0
+                },
+                {
+                    "entity_id": "C",
+                    "entity_type": "unknown",
+                    "betweenness_score": 2,
+                    "degree_score": 0,
+                    "closeness_score": 1,
+                    "eigenvector_score": 0,
+                    "pagerank_score": 0
+                }
+            ] 
+        */
+    </script>
+</body>
+
+</html>

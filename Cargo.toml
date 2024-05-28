@@ -1,3 +1,8 @@
+[workspace]
+members = [
+    "wasm"
+]
+
 [package]
 authors = ["Jingcheng Yang <yjcyxky@163.com>"]
 documentation = "https://github.com/yjcyxky/biomedgps/blob/master/README.md"
