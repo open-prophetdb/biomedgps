@@ -48,6 +48,8 @@
             const result = wasm.calculate_centrality(filteredRelations);
             const genes = result.filter(entity => entity.entity_type === "Gene");
 
+            console.log(genes);
+
             // Populate DataTable with data
             $('#example').DataTable({
                 data: genes,

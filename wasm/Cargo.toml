@@ -1,7 +1,7 @@
 [package]
 name = "biomedgps-graph"
-description = ""
-version = "0.1.0"
+description = "A bunch of graph algorithms for biomedgps."
+version = "0.2.0"
 authors = ["Jingcheng Yang <yjcyxky@163.com>"]
 edition = "2021"
 

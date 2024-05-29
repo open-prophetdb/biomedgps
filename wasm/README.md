@@ -33,3 +33,9 @@ Ensure you have the following tools installed:
    ```
 
    Open `http://localhost:8000` in your browser and see the output.
+
+4. Publish the package:
+
+   ```sh
+   wasm-pack publish
+   ```

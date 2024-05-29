@@ -5518,16 +5518,22 @@ bio.io@^1.0.6:
     xhr "^2.2.0"
     xmldoc "^0.5.1"
 
-biominer-components@0.3.20:
-  version "0.3.20"
-  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.20.tgz#f907ebe9463687b007033aa48bf49dd6abe16106"
-  integrity sha512-uWqleFUY5igsCWRgc5E9RbTVFtZY+eLlwUdIzoOIE3egJ3L47XysnpsCVI+pokcyf4BOLGVFc2M7RcW/2xIt4w==
+biomedgps-graph@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/biomedgps-graph/-/biomedgps-graph-0.1.0.tgz#bb864f0f4154fb2ea2b3627e839afd9647bdcc67"
+  integrity sha512-wS1F738hXdSCFP8eqBrw0NPHtIKl24GPv9uPPmJ2OEWBYymj5XR5zgGwwJt40aEa59S7GpRURCP7XsbAmct8Sg==
+
+biominer-components@0.3.21:
+  version "0.3.21"
+  resolved "https://registry.yarnpkg.com/biominer-components/-/biominer-components-0.3.21.tgz#392d66f0ae7629945a5625c92588e299cf93b00f"
+  integrity sha512-JwSGFNVuolHW5PfWsu6cyagwgGkZ2gxWOdvZoqwmJlDV4BKjqB6yzT9dnRRV7Gv0MztDHQ2GqZo+Qr2+eTEy7w==
   dependencies:
     "@fingerprintjs/fingerprintjs" "^4.2.2"
     ag-grid-community "^31.0.1"
     ag-grid-enterprise "^31.0.1"
     ag-grid-react "^31.0.1"
     axios "^1.6.7"
+    biomedgps-graph "^0.1.0"
     html-react-parser "^5.1.8"
     lodash "^4.17.21"
     moment "^2.30.1"

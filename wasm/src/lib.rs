@@ -33,7 +33,66 @@ struct CentralityResult {
     pagerank_score: f64,
 }
 
-fn calculate_centralities(relations: Vec<Relation>) -> Vec<CentralityResult> {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Options {
+    undirected: bool,
+    betweenness_normalized: bool,
+    betweenness_endpoints: bool,
+    betweenness_parallel_threshold: usize,
+    closeness_wf_improved: bool,
+    eigenvector_weight_enabled: bool,
+    eigenvector_max_iter: usize,
+    eigenvector_tol: f64,
+}
+
+impl Options {
+    fn new() -> Options {
+        Options {
+            undirected: true,
+            betweenness_normalized: true,
+            betweenness_endpoints: false,
+            betweenness_parallel_threshold: 100,
+            closeness_wf_improved: false,
+            eigenvector_weight_enabled: true,
+            eigenvector_max_iter: 100,
+            eigenvector_tol: 0.000001,
+        }
+    }
+
+    fn update_undirected(&mut self, value: bool) {
+        self.undirected = value;
+    }
+
+    fn update_betweenness_normalized(&mut self, value: bool) {
+        self.betweenness_normalized = value;
+    }
+
+    fn update_betweenness_endpoints(&mut self, value: bool) {
+        self.betweenness_endpoints = value;
+    }
+
+    fn update_betweenness_parallel_threshold(&mut self, value: usize) {
+        self.betweenness_parallel_threshold = value;
+    }
+
+    fn update_closeness_wf_improved(&mut self, value: bool) {
+        self.closeness_wf_improved = value;
+    }
+
+    fn update_eigenvector_weight_enabled(&mut self, value: bool) {
+        self.eigenvector_weight_enabled = value;
+    }
+
+    fn update_eigenvector_max_iter(&mut self, value: usize) {
+        self.eigenvector_max_iter = value;
+    }
+
+    fn update_eigenvector_tol(&mut self, value: f64) {
+        self.eigenvector_tol = value;
+    }
+}
+
+fn calculate_centralities(relations: Vec<Relation>, options: Options) -> Vec<CentralityResult> {
     // let mut graph = DiGraph::<String, f64>::new();
     let mut graph = UnGraph::<String, f64>::new_undirected();
     let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
@@ -54,14 +113,25 @@ fn calculate_centralities(relations: Vec<Relation>) -> Vec<CentralityResult> {
         graph.add_edge(source_index, target_index, rel.score);
     }
 
-    let betweenness_scores = betweenness_centrality(&graph, false, true, 100);
-    let closeness_scores = closeness_centrality(&graph, false);
+    let betweenness_scores = betweenness_centrality(
+        &graph,
+        options.betweenness_endpoints,
+        options.betweenness_normalized,
+        options.betweenness_parallel_threshold,
+    );
+    let closeness_scores = closeness_centrality(&graph, options.closeness_wf_improved);
     // More details on the parameters for eigenvector_centrality can be found at https://docs.rs/rustworkx-core/latest/rustworkx_core/centrality/fn.eigenvector_centrality.html
     let eigenvector_scores = match eigenvector_centrality(
         &graph,
-        |edge: EdgeReference<f64>| -> Result<f64, ()> { Ok(*edge.weight()) },
-        None,
-        None,
+        |edge: EdgeReference<f64>| -> Result<f64, ()> {
+            if options.eigenvector_weight_enabled {
+                Ok(*edge.weight())
+            } else {
+                Ok(1.0)
+            }
+        },
+        Some(options.eigenvector_max_iter),
+        Some(options.eigenvector_tol),
     ) {
         Ok(scores) => scores.unwrap_or(vec![]),
         Err(_) => vec![],
@@ -119,9 +189,14 @@ fn calculate_centralities(relations: Vec<Relation>) -> Vec<CentralityResult> {
 }
 
 #[wasm_bindgen]
-pub fn calculate_centrality(relations: JsValue) -> JsValue {
+pub fn calculate_centrality(relations: JsValue, options: JsValue) -> JsValue {
     let relations: Vec<Relation> = from_value(relations).unwrap();
-    let results = calculate_centralities(relations);
+    let options: Options = if options.is_undefined() {
+        Options::new()
+    } else {
+        from_value(options).unwrap()
+    };
+    let results = calculate_centralities(relations, options);
     to_value(&results).unwrap()
 }
 
@@ -164,7 +239,10 @@ mod tests {
             },
         ];
 
-        let results = calculate_centralities(relations);
+        let options = Options::new();
+        println!("options: {:?}", &options);
+
+        let results = calculate_centralities(relations, options);
         for result in &results {
             println!(
                 "entity_id: {}, entity_type: {}, betweenness_score: {}, closeness_score: {}, eigenvector_score: {}, degree_score: {}, pagerank_score: {}",
@@ -182,9 +260,9 @@ mod tests {
 
         let a_node = results.iter().find(|r| r.entity_id == "A").unwrap();
         assert_eq!(a_node.entity_type, "Person");
-        assert_eq!(a_node.betweenness_score, 2.0);
-        assert_eq!(a_node.closeness_score, 0.0);
-        assert_eq!(a_node.eigenvector_score, 0.0);
+        assert_eq!(a_node.betweenness_score, 0.0);
+        assert_eq!(a_node.closeness_score, 1.0);
+        assert_eq!(a_node.eigenvector_score, 0.5773502691896258);
         assert_eq!(a_node.degree_score, 0.0);
         assert_eq!(a_node.pagerank_score, 0.0);
     }
