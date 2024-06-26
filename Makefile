@@ -36,22 +36,24 @@ clean-studio:
 build-biomedgps-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
-	@cp studio/logo/biomedgps.png studio/public/assets/logo-white.png 
-	@cp studio/logo/biomedgps.png studio/src/assets/logo-white.png
-	@cp studio/logo/biomedgps.png studio/public/logo.png
+	@rm -rf frontend && cp -r studio frontend
+	@cp studio/logo/biomedgps.png frontend/public/assets/logo-white.png 
+	@cp studio/logo/biomedgps.png frontend/src/assets/logo-white.png
+	@cp studio/logo/biomedgps.png frontend/public/logo.png
 	# @cd studio && yarn && yarn openapi || true
-	@cd studio && yarn
-	@cd studio && yarn build:biomedgps-embed && cd ..
+	@cd frontend && yarn
+	@cd frontend && yarn build:biomedgps-embed && cd ..
 
 build-rapex-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
-	@cp studio/logo/rapex.png studio/public/assets/logo-white.png 
-	@cp studio/logo/rapex.png studio/src/assets/logo-white.png
-	@cp studio/logo/rapex.png studio/public/logo.png
+	@rm -rf frontend && cp -r studio frontend && rm -rf frontend/node_modules
+	@cp studio/logo/rapex.png frontend/public/assets/logo-white.png 
+	@cp studio/logo/rapex.png frontend/src/assets/logo-white.png
+	@cp studio/logo/rapex.png frontend/public/logo.png
 	# @cd studio && yarn && yarn openapi || true
-	@cd studio && yarn
-	@cd studio && yarn build:rapex-embed && cd ..
+	@cd frontend && yarn
+	@cd frontend && yarn build:rapex-embed && cd ..
 
 build-biomedgps:
 	@cargo build --release
