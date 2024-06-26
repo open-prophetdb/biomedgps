@@ -1,4 +1,4 @@
-﻿import { createElement } from "react";
+﻿import { Children, createElement } from "react";
 import * as icons from "@ant-design/icons";
 import type { MenuDataItem } from '@ant-design/pro-components';
 
@@ -10,26 +10,40 @@ export const routes = [
     component: './Home',
   },
   {
-    path: '/knowledge-table',
-    name: 'Knowledge Table',
-    icon: 'table',
-    hideInMenu: true,
-    component: './KnowledgeTable',
-    category: 'knowledge-graph'
+    path: '/analyze-omics-data',
+    name: 'Analyze Omics Data',
+    icon: 'LineChartOutlined',
+    disabled: true,
+    component: './Home',
   },
   {
-    path: '/predict-model',
-    name: 'Predict Drugs/Targets',
-    icon: 'history',
-    component: './ModelConfig',
-    category: 'predict-model'
-  },
-  {
-    path: '/knowledge-graph',
-    name: 'Explain Your Results',
-    icon: 'comment',
-    component: './KnowledgeGraph',
-    category: 'knowledge-graph'
+    path: '/predict-explain',
+    name: 'Predict & Explain',
+    icon: 'link',
+    routes: [
+      {
+        path: '/predict-explain/knowledge-table',
+        name: 'Knowledge Table',
+        icon: 'table',
+        hideInMenu: true,
+        component: './KnowledgeTable',
+        category: 'knowledge-graph'
+      },
+      {
+        path: '/predict-explain/predict-model',
+        name: 'Predict Drugs/Targets',
+        icon: 'history',
+        component: './ModelConfig',
+        category: 'predict-model'
+      },
+      {
+        path: '/predict-explain/knowledge-graph',
+        name: 'Explain Your Results',
+        icon: 'comment',
+        component: './KnowledgeGraph',
+        category: 'knowledge-graph'
+      },
+    ]
   },
   {
     path: '/mecfs-longcovid',

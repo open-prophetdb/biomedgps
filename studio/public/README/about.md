@@ -16,7 +16,7 @@ Construct and integrate <b>knowledge graph</b>, <b>multi-omics data</b> and <b>d
 
 ## Features
 
-### <a href="https://drugs.3steps.cn/#/predict-model">Predict Drug/Target</a> Module
+### <a href="https://drugs.3steps.cn/#/predict-explain/predict-model">Predict Drug/Target</a> Module
 
 - [x] Predict known drugs for your queried disease (Drug Repurposing).
 - [x] Predict new indications for your queried drug.
@@ -26,7 +26,7 @@ Construct and integrate <b>knowledge graph</b>, <b>multi-omics data</b> and <b>d
 
 <p></p>
 
-### <a href="https://drugs.3steps.cn/#/knowledge-graph">Explain Your Results</a> Module
+### <a href="https://drugs.3steps.cn/#/predict-explain/knowledge-graph">Explain Your Results</a> Module
 
 - [x] Knowledge graph studio for graph query, visualization and analysis.
 - [x] Graph neural network for drug discovery, disease mechanism, biomarker screening and discovering response to toxicant exposure.

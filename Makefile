@@ -33,12 +33,25 @@ clean-studio:
 	@printf "Clean studio...\n"
 	@cd studio && rm -rf node_modules && rm -rf dist && yarn cache clean && cd ..
 
-build-studio:
+build-biomedgps-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
+	@cp studio/logo/biomedgps.png studio/public/assets/logo-white.png 
+	@cp studio/logo/biomedgps.png studio/src/assets/logo-white.png
+	@cp studio/logo/biomedgps.png studio/public/logo.png
 	# @cd studio && yarn && yarn openapi || true
 	@cd studio && yarn
-	@cd studio && yarn build:embed && cd ..
+	@cd studio && yarn build:biomedgps-embed && cd ..
+
+build-rapex-studio:
+	@printf "Building studio based on openapi...\n"
+	@mkdir -p assets
+	@cp studio/logo/rapex.png studio/public/assets/logo-white.png 
+	@cp studio/logo/rapex.png studio/src/assets/logo-white.png
+	@cp studio/logo/rapex.png studio/public/logo.png
+	# @cd studio && yarn && yarn openapi || true
+	@cd studio && yarn
+	@cd studio && yarn build:rapex-embed && cd ..
 
 build-biomedgps:
 	@cargo build --release
@@ -46,13 +59,13 @@ build-biomedgps:
 build-biomedgps-linux:
 	@cargo build --release --target=x86_64-unknown-linux-musl
 
-build-mac: build-studio build-biomedgps
+build-mac: build-biomedgps-studio build-biomedgps
 	@printf "\nDone!\n"
 
-build-linux: build-studio build-biomedgps
+build-linux: build-biomedgps-studio build-biomedgps
 	@printf "\nDone!\n"
 
-build-linux-on-mac: build-studio build-biomedgps-linux
+build-linux-on-mac: build-biomedgps-studio build-biomedgps-linux
 	@printf "\nDone!\n"
 
 # You must run `make build-service` to build new api spec for studio when you change the api spec
@@ -66,8 +79,16 @@ changelog:
 	@python build/build_changelog.py --repo ../biominer-components --output-file ./studio/public/README/changelog.md --repo-name 'BioMedGPS UI'
 	@python build/build_changelog.py --repo . --output-file ./studio/public/README/changelog.md --repo-name BioMedGPS
 
-deploy: build-studio
+deploy: deploy-biomedgps
+
+deploy-biomedgps: build-biomedgps-studio
 	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
 	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@drugs.3steps.cn:/data/biomedgps/bin
 	@rsync -avP --delete assets/index.html root@drugs.3steps.cn:/var/www/html/biomedgps/index.html
 	@rsync -avP --delete assets root@drugs.3steps.cn:/var/www/html/biomedgps/
+
+deploy-rapex: build-rapex-studio
+	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
+	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@rapex.prophetdb.org:/data/rapex/bin
+	@rsync -avP --delete assets/index.html root@rapex.prophetdb.org:/var/www/html/rapex/index.html
+	@rsync -avP --delete assets root@rapex.prophetdb.org:/var/www/html/rapex/

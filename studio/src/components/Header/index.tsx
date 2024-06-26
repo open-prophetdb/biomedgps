@@ -1,7 +1,7 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { getJwtAccessToken, logoutWithRedirect } from '@/components/util';
+import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
@@ -160,14 +160,17 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
       </Dropdown>
       {
-        !isAuthenticated ? (
+        isAuthEnabled() &&
+          !isAuthenticated ? (
           <Button type={isAuthenticated ? 'default' : 'primary'} onClick={() => loginWithRedirect()}>
             Sign In / Sign Up
           </Button>
         ) : (
-          <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
+          isAuthEnabled() ?
+            <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
               <Button type="primary" icon={<UserOutlined />}>{username}</Button>
-          </Dropdown>
+            </Dropdown>
+            : <Button type="primary" icon={<UserOutlined />}>{username}</Button>
         )
       }
     </Space>

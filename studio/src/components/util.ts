@@ -89,7 +89,28 @@ export const logout = () => {
     localStorage.removeItem('redirectUrl');
 }
 
+export const isAuthEnabled = () => {
+    console.log("isAuthEnabled: ", process.env.UMI_APP_AUTH0_CLIENT_ID);
+    return process.env.UMI_APP_AUTH0_CLIENT_ID ? true : false
+}
+
+export const isAuthenticated = () => {
+    if (getUsername()) {
+        return true
+    }
+
+    if (!isAuthEnabled()) {
+        return true
+    }
+
+    return false
+}
+
 export const logoutWithRedirect = () => {
+    if (!isAuthEnabled()) {
+        return
+    }
+
     logout();
     // Save the current hash as the redirect url
     let currentUrl = window.location.hash.split("#").pop();

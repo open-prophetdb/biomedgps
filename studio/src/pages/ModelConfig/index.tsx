@@ -15,7 +15,7 @@ import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
 import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import EntityCard from '@/components/EntityCard';
-import { truncateString, getUsername, logoutWithRedirect } from '@/components/util';
+import { truncateString, getUsername, logoutWithRedirect, isAuthenticated } from '@/components/util';
 
 import './index.less';
 
@@ -248,13 +248,10 @@ const ModelConfig: React.FC = (props) => {
   const [nodeDataSources, setNodeDataSources] = useState<NodeAttribute[]>([]);
   const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
   const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
-  const [username, setUsername] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const username = getUsername();
-    setUsername(username);
-
-    if (!username) {
+    console.log("isAuthenticated in ModelConfig: ", isAuthenticated());
+    if (!isAuthenticated()) {
       logoutWithRedirect();
     } else {
       fetchStatistics().then((data) => {
@@ -881,7 +878,7 @@ const ModelConfig: React.FC = (props) => {
   }
 
   return (
-    username && <Layout className='model-panel' key={currentModel}>
+    isAuthenticated() && <Layout className='model-panel' key={currentModel}>
       <Sider width={100}>
         <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
           {models.map((model, index) => (
@@ -956,7 +953,7 @@ const ModelConfig: React.FC = (props) => {
                   setLoading(false);
                   if (d && d.nodes && d.nodes.length > 0) {
                     pushGraphDataToLocalStorage(d);
-                    history.push('/knowledge-graph');
+                    history.push('/predict-explain/knowledge-graph');
                   } else {
                     message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
                   }
@@ -970,7 +967,7 @@ const ModelConfig: React.FC = (props) => {
                 console.log('onLoadGraph: ', graph);
                 if (graph && graph.nodes && graph.nodes.length > 0) {
                   pushGraphDataToLocalStorage(graph);
-                  history.push('/knowledge-graph');
+                  history.push('/predict-explain/knowledge-graph');
                 } else {
                   message.warning("You need to generate some predicted result and pick up the interested rows first.", 5)
                 }

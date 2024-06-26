@@ -184,16 +184,16 @@ const HomePage: React.FC = () => {
         console.log('Search:', value);
 
         if (value && name) {
-            history.push(`/knowledge-table?nodeId=${value}&nodeName=${name}`);
+            history.push(`/predict-explain/knowledge-table?nodeId=${value}&nodeName=${name}`);
             return;
         }
 
         const filtered = filter(nodeOptions, (item) => item.value === value);
         if (filtered.length === 0 || !filtered[0]?.metadata) {
-            history.push(`/knowledge-table?nodeId=${value}`);
+            history.push(`/predict-explain/knowledge-table?nodeId=${value}`);
         } else {
             const metadata = filtered[0].metadata;
-            history.push(`/knowledge-table?nodeId=${value}&nodeName=${metadata.name}`);
+            history.push(`/predict-explain/knowledge-table?nodeId=${value}&nodeName=${metadata.name}`);
         }
     };
 
@@ -236,7 +236,7 @@ const HomePage: React.FC = () => {
                     <h4 style={{ textAlign: 'center', fontSize: '16px', lineHeight: '24px' }}>
                         Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
                         <br />
-                        If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-model'); }}>Predict Drug/Target</a> page.
+                        If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Drug/Target</a> page.
                         <br />
                         Please click the following examples to see the results.
                     </h4>

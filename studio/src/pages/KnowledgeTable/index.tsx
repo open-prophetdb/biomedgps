@@ -12,7 +12,7 @@ import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy, groupBy, map, sumBy, set } from 'lodash';
-import { guessColor, truncateString, getUsername, logoutWithRedirect } from '@/components/util';
+import { guessColor, truncateString, getUsername, logoutWithRedirect, isAuthEnabled, isAuthenticated } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
 import './index.less';
@@ -134,14 +134,9 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [username, setUsername] = useState<string | undefined>(undefined);
 
     useEffect(() => {
-        const username = getUsername();
-        console.log('Username: ', username);
-        setUsername(username);
-
-        if (!username) {
+        if (!isAuthenticated()) {
             logoutWithRedirect();
         } else {
 
@@ -211,7 +206,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
             edges: selectedEdges,
         };
         pushGraphDataToLocalStorage(selectedGraphData);
-        history.push('/knowledge-graph');
+        history.push('/predict-explain/knowledge-graph');
     }
 
     const getKnowledgesData = (
@@ -652,16 +647,16 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
 
     const getTitle = (node: GraphNode) => {
         return <span>
-            {node?.nlabel} Card - {node?.data.name}
-            <Tooltip title="Click the panel header or `Expand` button to show more details">
+            {node?.nlabel} Card - {node?.data.name} [Click to show more details]
+            {/* <Tooltip title="Click the panel header or `Expand` button to show more details">
                 <Button type="link" style={{ marginLeft: '5px', padding: '4px 0' }}>
                     <QuestionCircleOutlined />Help
                 </Button>
-            </Tooltip>
+            </Tooltip> */}
         </span>;
     }
 
-    return username && (total == 0 ? (
+    return (isAuthenticated()) && (total == 0 ? (
         <Row className='knowledge-table-container'>
             <Spin spinning={loading}>
                 <Empty description={
@@ -696,7 +691,8 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
             <Collapse activeKey={activeKeys} ghost onChange={switchCollapsePanel}>
                 {currentNodes.length > 0 && currentNodes.map((node, index) => {
                     return node?.nlabel == 'Gene' ? <Collapse.Panel header={getTitle(node)} key={index} showArrow={false}
-                        extra={getExtraButton(index.toString())}>
+                        extra={getExtraButton(index.toString())}
+                    >
                         <NodeInfoPanel node={node} key={`${index}`} />
                     </Collapse.Panel> : null;
                 })}

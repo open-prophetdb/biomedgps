@@ -4,7 +4,7 @@ import { RequestConfig, history, RuntimeConfig, request as UmiRequest } from 'um
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
-import { getJwtAccessToken, logout, logoutWithRedirect, getUsername } from '@/components/util';
+import { getJwtAccessToken, logout, logoutWithRedirect, getUsername, isAuthEnabled } from '@/components/util';
 
 // import * as Sentry from "@sentry/react";
 
@@ -141,6 +141,10 @@ export async function getInitialState(): Promise<{
 }
 
 export function rootContainer(container: React.ReactNode): React.ReactNode {
+  if (!isAuthEnabled()) {
+    return container;
+  }
+
   return (
     <Auth0Provider
       domain={AUTH0_DOMAIN}
@@ -177,7 +181,9 @@ export const layout: RuntimeConfig = (initialState: any) => {
 
       // You can modify the css style of the menu item at the global.less file.
       var spans = document.querySelectorAll('span.ant-pro-base-menu-horizontal-item-text');
+      console.log("Add new-tag to ME/CFS: ", spans);
       spans.forEach(function (span) {
+        console.log("span.innerHTML: ", span.innerHTML);
         if (span.innerHTML.startsWith("ME/CFS")) {
           span.classList.add('new-tag');
         }

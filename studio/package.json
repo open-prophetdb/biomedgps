@@ -7,14 +7,16 @@
   "scripts": {
     "dev": "max dev",
     "build": "max build",
-    "build:embed": "cross-env UMI_APP_IS_STATIC=true UMI_ENV=embed UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max build",
+    "build:biomedgps-embed": "cross-env UMI_APP_IS_STATIC=true UMI_ENV=embed UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max build",
+    "build:rapex-embed": "cross-env UMI_APP_IS_STATIC=true UMI_ENV=embed max build",
     "build:analyze": "cross-env ANALYZE=true max build",
     "format": "prettier --cache --write .",
     "postinstall": "max setup",
     "setup": "max setup",
     "start": "npm run dev",
     "start:local-dev": "cross-env UMI_APP_API_PREFIX=http://localhost:3000 max dev",
-    "start:remote-dev": "cross-env UMI_APP_API_PREFIX=https://drugs.3steps.cn UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max dev",
+    "start:biomedgps-remote-dev": "cross-env UMI_APP_API_PREFIX=https://drugs.3steps.cn UMI_APP_AUTH0_CLIENT_ID=Y08FauV1dAEiocNIZt5LiOifzNgXr6Uo UMI_APP_AUTH0_DOMAIN=biomedgps.jp.auth0.com max dev",
+    "start:rapex-remote-dev": "cross-env UMI_APP_API_PREFIX=https://rapex.prophetdb.org max dev",
     "openapi": "max openapi"
   },
   "dependencies": {
