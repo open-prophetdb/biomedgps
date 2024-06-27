@@ -56,6 +56,13 @@ export const routes = [
     ],
   },
   {
+    path: '/statistics',
+    name: 'Statistics',
+    icon: 'table',
+    component: './Statistics',
+    category: 'knowledge-graph'
+  },
+  {
     path: '/knowledge-graph-editor',
     name: 'knowledge-graph-editor',
     icon: 'link',

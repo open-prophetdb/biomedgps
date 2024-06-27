@@ -14,6 +14,7 @@ export const routes = [
     name: 'Analyze Omics Data',
     icon: 'LineChartOutlined',
     disabled: true,
+    hideInMenu: true,
     component: './Home',
   },
   {
@@ -44,6 +45,13 @@ export const routes = [
         category: 'knowledge-graph'
       },
     ]
+  },
+  {
+    path: '/statistics',
+    name: 'Statistics',
+    icon: 'table',
+    component: './Statistics',
+    category: 'knowledge-graph'
   },
   {
     path: '/knowledge-graph-editor',
