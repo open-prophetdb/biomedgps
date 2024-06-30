@@ -14,7 +14,7 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import './index.less';
 
 const IconFont = createFromIconfontCN({
-    scriptUrl: '//at.alicdn.com/t/c/font_4435889_2sgb9f98fdw.js',
+    scriptUrl: '//at.alicdn.com/t/c/font_4435889_bcnudpqk18l.js',
 });
 
 export function makeQueryEntityStr(params: Partial<Entity>, order?: string[]): string {
@@ -165,16 +165,23 @@ const HomePage: React.FC = () => {
             description: '',
         },
         {
-            key: 'compound',
-            icon: 'biomedgps-drug',
-            title: 'Compound',
-            stat: '261,905',
+            key: 'symptom',
+            icon: 'biomedgps-symptom',
+            title: 'Symptom',
+            stat: '23,100',
             description: '',
         },
+        // {
+        //     key: 'compound',
+        //     icon: 'biomedgps-drug',
+        //     title: 'Compound',
+        //     stat: '261,905',
+        //     description: '',
+        // },
         {
             key: 'knowledges',
             icon: 'biomedgps-knowledge',
-            title: 'Knowledges',
+            title: 'Knowledge',
             stat: '12,857,601',
             description: '',
         },
@@ -233,12 +240,9 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
+                    <h1>RAPEX - Response to Air Pollution EXposure (RAPEX)</h1>
                     <h4 style={{ textAlign: 'center', fontSize: '16px', lineHeight: '24px' }}>
-                        Enter a air pollutant, gene/protein, disease, drug or symptom name to find and explain related known knowledges in RAPEX platform.
-                        <br />
-                        If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Diseases/Targets</a> page.
-                        <br />
-                        Please click the following examples to see the results.
+                        Enter a air pollutant, gene/protein, disease, drug or symptom name to find and explain related known knowledges in RAPEX platform. If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Diseases/Targets</a> page. Please click the following examples to see the results.
                     </h4>
                     <Select
                         showSearch
@@ -330,23 +334,25 @@ const HomePage: React.FC = () => {
                         </a>
                     </span>
                     <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
-                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
-                        <br />
-                        Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
+                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform. Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
                     <Col sm={0} md={1} xs={1} xxl={1}></Col>
                     <Col className="data-stat" sm={24} md={11} xs={11} xxl={11}>
                         <p className="desc" style={{ textAlign: 'justify' }}>
+                            <span>
                             Air pollution emerged as the leading contributor to the global disease burden in 2021 and the second most significant risk factor for premature death worldwide. It is linked to severe health issues, including cancer and cardiovascular diseases. Traditional studies often isolate health outcomes without a broader, multidimensional approach, focusing solely on specific diseases. This deficiency underscores the importance of conducting integrated analyses of air pollution health impacts. Unfortunately, there is a notable absence of a comprehensive, integrated knowledge graph for detailed analysis, to better understand and mitigate the effects of air pollution.
-                            <br />
+                            </span>
+                            <span>
                             To bridge this gap, we have developed a knowledge graph-based RAPEX database to systematically explore the toxicological mechanisms and health effects of air pollutants. RAPEX integrates a diverse array of air pollutants and links them with genes, proteins, pathway, diseases, and other multi-omics data, marking the first comprehensive resource exploring the intricate associations between air pollution, genes, and diseases. To enhance user engagement and understanding, we have created a user-friendly web portal (https://rapex.prophetdb.org). This portal allows users to effortlessly query, compare, analyze, or predict the potential relationships between air pollution and various biological and environmental entities. It has two uniq features:
-                            <br />
+                            </span>
+                            <span>
                             1. Comprehensive data coverage. We implement ontology mapping and leverage large language models and semantic similarity techniques to integrate 10 published databases, enhancing the quality of the knowledge graph.  This approach aligns entity and relationship types, reducing entity ambiguity and relationship type fragmentation. These cleaned knowledges are incorporated into the system to establish a comprehensive knowledge graph. RAPEX houses an extensive array of biomedical knowledge, encompassing 12,857,601 knowledges that link air pollution with symptoms, genes, diseases, proteins, pathways, and metabolites etc. The resulting knowledge graph features a more balanced and diverse distribution of relationships between entities and includes phenotype databases, making the dataset suitable for representing pollutant-gene-phenotype/disease relationships. This profound integration offers deep and wide-ranging insights into the intricate interactions between air pollution and biological systems, aiding in the understanding of air pollution exposure, gene, and phenotype/disease relationships.
-                            <br />
+                            </span>
+                            <span>
                             2. Database Uniqueness and Innovation. Meticulously curated and annotated knowledge from 865 rigorously selected publications, categorized into 13 entity types and 12 relationship types. Each of the 1,134 distinct knowledge points in this dataset has been annotated and reviewed by at least two independent experts, ensuring high quality and reliability.This dataset is a significant contribution to the field, offering rapid access to original research on air pollutants. It serves as an invaluable resource for validating the knowledge extraction capabilities of large language models and the predictive capabilities of air pollution exposure mechanism models. This comprehensive and expertly vetted dataset is poised to advance research and understanding in the intricate interactions between air pollution and biological systems.
-                            <br />
+                            </span>
                             More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
                         </p>
                     </Col>
