@@ -54,6 +54,13 @@ export const routes = [
     category: 'knowledge-graph'
   },
   {
+    path: '/download',
+    name: 'Download',
+    icon: 'CloudDownloadOutlined',
+    component: './Download',
+    category: 'knowledge-graph'
+  },
+  {
     path: '/knowledge-graph-editor',
     name: 'knowledge-graph-editor',
     icon: 'link',
@@ -79,7 +86,7 @@ export const routes = [
     name: 'help',
     icon: 'question-circle',
     path: '/help',
-    hideInMenu: true,
+    // hideInMenu: true,
     component: './Help',
   },
   {

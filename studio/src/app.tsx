@@ -34,6 +34,7 @@ const defaultCustomSettings = {
   changeLogUrl: `${publicPath}README/changelog.md`,
   aboutUrl: `${publicPath}README/about.md`,
   helpUrl: `${publicPath}README/help.md`,
+  downloadUrl: `${publicPath}README/download.md`,
   websiteTitle: '',
   websiteLogo: `${publicPath}logo-white.png`,
   websiteDescription: 'Network Medicine for Disease Mechanism and Treatment Based on AI and knowledge graph.',

@@ -25,6 +25,7 @@ export default Settings;
 export type CustomSettings = {
   aboutUrl?: string;
   helpUrl?: string;
+  downloadUrl?: string;
   websiteTitle?: string;
   websiteLogo?: string;
   websiteDescription?: string;

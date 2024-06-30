@@ -12,6 +12,7 @@ services:
     volumes:
       # If you got the following error: The cluster is owned by user id 105 which does not exist, Please run: chown -R 101:103 ./data
       # If you got error message: /var/lib/postgresql/15/main is not accessible or does not exist, please delete the data folder and recreate it
+      # If you got error message: pg_ctl: directory "/var/lib/postgresql/15/main" is not a database cluster directory, please delete the data folder, launch the container again, enter the container and run: sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/15/main
       - pg_ml_data:/var/lib/postgresql
       - ./conf/entrypoint.sh:/app/entrypoint.sh
       - ./conf/dashboard.sh:/app/dashboard.sh

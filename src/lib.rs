@@ -8,8 +8,8 @@ pub mod algorithm;
 pub mod api;
 pub mod model;
 pub mod pgvector;
-pub mod query_builder;
 pub mod proxy;
+pub mod query_builder;
 
 use log::{debug, error, info, warn, LevelFilter};
 use log4rs;
@@ -1517,4 +1517,44 @@ pub async fn check_db_version(pool: &sqlx::PgPool) -> Result<(), Box<dyn Error>>
         );
         std::process::exit(1);
     }
+}
+
+pub async fn check_table_is_empty(
+    pool: &sqlx::PgPool,
+    table_name: &str,
+) -> Result<bool, Box<dyn Error>> {
+    let sql_str = format!("SELECT COUNT(*) FROM {};", table_name);
+    let count: i64 = sqlx::query(&sql_str).fetch_one(pool).await?.get("count");
+
+    if count == 0 {
+        return Ok(true);
+    } else {
+        return Ok(false);
+    }
+}
+
+pub async fn change_emb_dimension(
+    database_url: &str,
+    table_name: &str,
+    dimension: usize,
+) -> Result<(), Box<dyn Error>> {
+    let pool = connect_db(database_url, 1).await;
+    match check_table_is_empty(&pool, table_name).await? {
+        true => {
+            info!("The table {} is empty.", table_name);
+        }
+        false => {
+            warn!("The table {} is not empty. we will truncate the table and change the dimension of the embedding column, because you run the command with the --force option.", table_name);
+            let sql_str = format!("TRUNCATE TABLE {};", table_name);
+            sqlx::query(&sql_str).execute(&pool).await?;
+        }
+    }
+
+    let sql_str = format!(
+        "ALTER TABLE {} ALTER COLUMN embedding SET DATA TYPE vector({});",
+        table_name, dimension
+    );
+    sqlx::query(&sql_str).execute(&pool).await?;
+
+    return Ok(());
 }

@@ -11,7 +11,7 @@ use biomedgps::model::{
     util::read_annotation_file,
 };
 use biomedgps::{
-    build_index, connect_graph_db, import_data, import_kge, init_logger, run_migrations,
+    build_index, connect_graph_db, import_data, import_kge, init_logger, run_migrations, change_emb_dimension
 };
 use log::*;
 use regex::Regex;
@@ -250,6 +250,10 @@ pub struct ImportKGEArguments {
     #[structopt(name = "model_type", short = "M", long = "model-type", default_value = "TransE_l2", possible_values = &["TransE_l1", "TransE_l2", "TransH", "TransR", "TransD", "RotatE", "DistMult", "ComplEx"])]
     model_type: String,
 
+    /// [Optional] The dimension of the embedding. The default value is 400. The dimension of the embedding should be 400 or other values, like 768, 1024 etc.
+    #[structopt(name = "dimension", long = "dimension", default_value = "400")]
+    dimension: usize,
+
     /// [Required] Which dataset is the data from. We assume that you have split the data into different datasets. If not, you can treat all data as one dataset. e.g. biomedgps. This feature is used to distinguish different dataset combinations matched with your model.
     ///
     /// If you have multiple datasets, you can use the --dataset option with multiple values. e.g. --dataset biomedgps --dataset mecfs
@@ -269,6 +273,10 @@ pub struct ImportKGEArguments {
     /// [Optional] Don't check the validity of the data files.
     #[structopt(name = "skip_check", short = "s", long = "skip-check")]
     skip_check: bool,
+
+    /// [Optional] Force to import the embedding files.
+    #[structopt(name = "force", short = "F", long = "force")]
+    force: bool,
 
     /// [Optional] Show the first 3 errors when import data.
     #[structopt(name = "show_all_errors", short = "E", long = "show-all-errors")]
@@ -698,6 +706,24 @@ async fn main() {
             let drop = arguments.drop;
             let skip_check = arguments.skip_check;
             let show_all_errors = arguments.show_all_errors;
+
+            if table_name == "biomedgps" && arguments.dimension != 400 {
+                if arguments.force {
+                    warn!("The dimension of the embedding is not 400, but the table name is biomedgps. We will change the dimension of the embedding as you specified.");
+                    match change_emb_dimension(&database_url, table_name.as_str(), arguments.dimension).await {
+                        Ok(_) => {
+                            info!("Change the dimension of the embedding successfully.");
+                        }
+                        Err(e) => {
+                            error!("Change the dimension of the embedding failed: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    warn!("The dimension of the embedding is not 400, but the table name is biomedgps. If you believe that the dimension is correct, you can run the command again with --force option. Then we will change the dimension of the embedding as you specified. If you do that, the table will be dropped and re-imported.");
+                    std::process::exit(1);
+                }
+            }
 
             import_kge(
                 &database_url,
