@@ -32,7 +32,7 @@ export const routes = [
       },
       {
         path: '/predict-explain/predict-model',
-        name: 'Predict Drugs/Targets',
+        name: 'Predict Diseases/Targets',
         icon: 'history',
         component: './ModelConfig',
         category: 'predict-model'
@@ -84,7 +84,7 @@ export const routes = [
   },
   {
     name: 'help',
-    icon: 'question-circle',
+    icon: 'QuestionCircleOutlined',
     path: '/help',
     // hideInMenu: true,
     component: './Help',

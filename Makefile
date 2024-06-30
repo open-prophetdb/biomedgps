@@ -49,6 +49,7 @@ build-rapex-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
 	@rm -rf frontend && cp -r studio frontend && rm -rf frontend/node_modules
+	@cp studio/custom/home/rapex.tsx frontend/src/pages/Home/index.tsx
 	@cp studio/custom/logo/rapex.png frontend/public/assets/logo-white.png 
 	@cp studio/custom/logo/rapex.png frontend/src/assets/logo-white.png
 	@cp studio/custom/logo/rapex.png frontend/public/logo.png

@@ -20,7 +20,7 @@ const Download: React.FC = () => {
   }, []);
 
   return (
-    <Card className="help">
+    <Card className="download-page">
       <MarkdownViewer markdown={markdown} rehypePlugins={[RehypeRaw, RehypeToc]} />
     </Card>
   );
