@@ -209,10 +209,10 @@ const HomePage: React.FC = () => {
             src: 'https://rapex.prophetdb.org/assets/examples/rapex_diagram.png',
             title: 'RAPEX Overview',
         },
-        // {
-        //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/chatbot.png?raw=true',
-        //     title: 'Demo1: Ask questions with chatbot',
-        // },
+        {
+            src: 'https://rapex.prophetdb.org/assets/examples/curated_knowledges.png',
+            title: 'Curated Knowledges',
+        },
         // {
         //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/disease-similarities.png?raw=true',
         //     title:
@@ -338,7 +338,7 @@ const HomePage: React.FC = () => {
                         </a>
                     </span>
                     <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
-                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform. Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
+                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>

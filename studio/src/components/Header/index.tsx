@@ -1,5 +1,5 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined } from '@ant-design/icons';
-import { Space, Menu, Button, message, Dropdown } from 'antd';
+import { Space, Menu, Button, message, Dropdown, Row } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
@@ -157,17 +157,18 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
     <Space className={`${styles.right} ${styles.light} right-content`}>
       {
         isHeaderHidden() ? null : (
-          <Space>
-            <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
-            <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
-              <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
-            </Dropdown>
-          </Space>
+          <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
         )
       }
       {
-        isAuthEnabled() &&
-          !isAuthenticated ? (
+        isHeaderHidden() ? null : (
+          <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
+            <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
+          </Dropdown>
+        )
+      }
+      {
+        (isHeaderHidden() && isAuthEnabled() && !isAuthenticated) ? (
           <Button type={isAuthenticated ? 'default' : 'primary'} onClick={() => loginWithRedirect()}>
             Sign In / Sign Up
           </Button>

@@ -165,5 +165,5 @@ export const getUsername = (): string | undefined => {
 
 // Environmental Variables
 export const isHeaderHidden = () => {
-    return process.env.UMI_APP_HIDE_HEADER ? true : false
+    return process.env.UMI_APP_HEADER_HIDDEN ? true : false
 }
