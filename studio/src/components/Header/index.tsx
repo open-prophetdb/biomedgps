@@ -1,7 +1,7 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled } from '@/components/util';
+import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
@@ -155,10 +155,16 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
 
   return (
     <Space className={`${styles.right} ${styles.light} right-content`}>
-      <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
-      <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
-        <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
-      </Dropdown>
+      {
+        isHeaderHidden() ? null : (
+          <Space>
+            <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
+            <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
+              <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
+            </Dropdown>
+          </Space>
+        )
+      }
       {
         isAuthEnabled() &&
           !isAuthenticated ? (

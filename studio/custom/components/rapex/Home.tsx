@@ -154,20 +154,20 @@ const HomePage: React.FC = () => {
         {
             key: 'disease',
             icon: 'biomedgps-disease',
-            title: 'Disease',
+            title: 'Diseases',
             stat: '45,362',
         },
         {
             key: 'gene',
             icon: 'biomedgps-gene',
-            title: 'Gene',
+            title: 'Genes',
             stat: '95,141',
             description: '',
         },
         {
             key: 'symptom',
             icon: 'biomedgps-symptom',
-            title: 'Symptom',
+            title: 'Symptoms',
             stat: '23,100',
             description: '',
         },
@@ -181,7 +181,7 @@ const HomePage: React.FC = () => {
         {
             key: 'knowledges',
             icon: 'biomedgps-knowledge',
-            title: 'Knowledge',
+            title: 'Knowledges',
             stat: '12,857,601',
             description: '',
         },
@@ -206,34 +206,38 @@ const HomePage: React.FC = () => {
 
     const images: ImageItem[] = [
         {
-            src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/chatbot.png?raw=true',
-            title: 'Demo1: Ask questions with chatbot',
+            src: 'https://rapex.prophetdb.org/assets/examples/rapex_diagram.png',
+            title: 'RAPEX Overview',
         },
-        {
-            src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/disease-similarities.png?raw=true',
-            title:
-                'Demo2: Find similar diseases with your queried disease',
-        },
-        {
-            src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/drug-targets-genes.png?raw=true',
-            title:
-                'Demo3: Predict drugs and related genes for your queried disease',
-        },
-        {
-            src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/path.png?raw=true',
-            title:
-                'Demo4: Find potential paths between two nodes',
-        },
-        {
-            src: 'https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step2-predict-page.png?raw=true',
-            title:
-                'Predict Interactions',
-        },
-        {
-            src: 'https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain.png?raw=true',
-            title:
-                'Explain Your Prediction',
-        },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/chatbot.png?raw=true',
+        //     title: 'Demo1: Ask questions with chatbot',
+        // },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/disease-similarities.png?raw=true',
+        //     title:
+        //         'Demo2: Find similar diseases with your queried disease',
+        // },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/drug-targets-genes.png?raw=true',
+        //     title:
+        //         'Demo3: Predict drugs and related genes for your queried disease',
+        // },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps-studio/blob/master/public/assets/path.png?raw=true',
+        //     title:
+        //         'Demo4: Find potential paths between two nodes',
+        // },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step2-predict-page.png?raw=true',
+        //     title:
+        //         'Predict Interactions',
+        // },
+        // {
+        //     src: 'https://github.com/yjcyxky/biomedgps/blob/dev/studio/public/README/images/step3-explain.png?raw=true',
+        //     title:
+        //         'Explain Your Prediction',
+        // },
     ];
 
     return (
@@ -241,8 +245,8 @@ const HomePage: React.FC = () => {
             <Row className="box">
                 <Col className="header">
                     <h1>RAPEX - Response to Air Pollution EXposure (RAPEX)</h1>
-                    <h4 style={{ textAlign: 'center', fontSize: '16px', lineHeight: '24px' }}>
-                        Enter a air pollutant, gene/protein, disease, drug or symptom name to find and explain related known knowledges in RAPEX platform. If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Diseases/Targets</a> page. Please click the following examples to see the results.
+                    <h4 style={{ textAlign: 'center', fontSize: '1rem', lineHeight: '24px' }}>
+                        Enter an air pollutant, gene/protein, disease, drug or symptom name to find and explain related known knowledges in RAPEX platform. If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Diseases/Targets</a> page. Please click the following examples to see the results.
                     </h4>
                     <Select
                         showSearch

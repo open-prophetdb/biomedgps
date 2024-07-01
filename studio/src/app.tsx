@@ -1,5 +1,6 @@
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
+import { ConfigProvider } from 'antd';
 import { RequestConfig, history, RuntimeConfig, request as UmiRequest } from 'umi';
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
@@ -142,8 +143,16 @@ export async function getInitialState(): Promise<{
 }
 
 export function rootContainer(container: React.ReactNode): React.ReactNode {
+  const component = <ConfigProvider theme={{
+    token: {
+      fontSize: 16
+    }
+  }}>
+    {container}
+  </ConfigProvider>;
+
   if (!isAuthEnabled()) {
-    return container;
+    return component;
   }
 
   return (
@@ -153,7 +162,7 @@ export function rootContainer(container: React.ReactNode): React.ReactNode {
       authorizationParams={{
         redirect_uri: window.location.origin
       }}>
-      {container}
+      {component}
     </Auth0Provider>
   );
 };

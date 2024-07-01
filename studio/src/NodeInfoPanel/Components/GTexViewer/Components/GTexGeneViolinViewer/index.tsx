@@ -115,7 +115,7 @@ const GTexGeneViolinViewer: React.FC<GeneViewerProps> = (props) => {
             <div className="modal-footer">
               <button id="gene-expr-vplot-filter-modal-button" type="button"
                 data-dismiss="modal" className="btn btm-sm btn-default"
-                style={{ fontSize: '11px' }}>
+                style={{ fontSize: '0.9rem' }}>
                 Apply
               </button>
             </div>

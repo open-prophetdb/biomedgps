@@ -67,7 +67,7 @@ const Footer: React.FC = () => {
         cookieName={cookieName}
         style={{ background: '#2B373B' }}
         enableDeclineButton
-        buttonStyle={{ color: '#4e503b', fontSize: '13px' }}
+        buttonStyle={{ color: '#4e503b', fontSize: '0.9rem' }}
         expires={150}
         onAccept={() => {
           allowTrack();

@@ -233,7 +233,7 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
-                    <h4 style={{ textAlign: 'center', fontSize: '16px', lineHeight: '24px' }}>
+                    <h4 style={{ textAlign: 'center', fontSize: '1rem', lineHeight: '24px' }}>
                         Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
                         <br />
                         If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Drug/Target</a> page.

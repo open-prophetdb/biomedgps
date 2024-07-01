@@ -181,7 +181,7 @@ const ComposedProteinPanel: React.FC<ComposedProteinPanel> = (props) => {
             });
             oItems.push({
                 // @ts-ignore, we don't care about the warning. We need it to be a Tag component.
-                label: <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }} key={oItems.length + 1}>Alignment</Tag>,
+                label: <Tag color="blue" style={{ fontSize: '0.9rem', fontWeight: 'bold' }} key={oItems.length + 1}>Alignment</Tag>,
                 key: oItems.length + 1,
                 children: <AlignmentViewer data={alignmentData} key={oItems.length + 1} />
             })
