@@ -51,6 +51,8 @@ build-rapex-studio:
 	@rm -rf frontend && cp -r studio frontend && rm -rf frontend/node_modules
 	@cp studio/custom/components/rapex/Home.tsx frontend/src/pages/Home/index.tsx
 	@cp studio/custom/components/rapex/ModelConfig.tsx frontend/src/pages/ModelConfig/index.tsx
+	@cp studio/custom/doc/rapex/help.md frontend/public/README/help.md
+	@cp studio/custom/doc/rapex/download.md frontend/public/README/download.md
 	@cp studio/custom/logo/rapex.png frontend/public/assets/logo-white.png 
 	@cp studio/custom/logo/rapex.png frontend/src/assets/logo-white.png
 	@cp studio/custom/logo/rapex.png frontend/public/logo.png

@@ -338,7 +338,7 @@ const HomePage: React.FC = () => {
                         </a>
                     </span>
                     <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
-                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
+                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform. Please give us feedback at <a href="https://www.prophetdb.org/contact/">OpenProphetDB</a>.
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
