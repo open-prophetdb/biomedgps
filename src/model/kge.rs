@@ -12,6 +12,7 @@ use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use poem_openapi::Object;
 use serde::{Deserialize, Deserializer, Serialize};
+use sqlx::Row;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
@@ -82,10 +83,9 @@ pub async fn check_default_model_is_valid(pool: &sqlx::PgPool) -> Result<(), Val
 
     match check_table_is_valid(pool, &table_names).await {
         Ok(_) => {
-            let sql_str = "SELECT * FROM biomedgps_embedding_metadata WHERE table_name = $1 AND model_name = $2";
+            let sql_str = "SELECT * FROM biomedgps_embedding_metadata WHERE table_name = $1";
 
             let count = match sqlx::query_as::<_, (i64,)>(&sql_str)
-                .bind(DEFAULT_MODEL_NAME)
                 .bind(DEFAULT_MODEL_NAME)
                 .fetch_one(pool)
                 .await
@@ -129,12 +129,13 @@ pub async fn add_default_model(pool: &sqlx::PgPool) -> Result<(), anyhow::Error>
             let metadata = EmbeddingMetadata {
                 id: 0,
                 table_name: DEFAULT_MODEL_NAME.to_string(),
-                model_name: DEFAULT_MODEL_NAME.to_string(),
+                model_name: EmbeddingMetadata::generate_model_name(DEFAULT_MODEL_NAME, "TransE_l2"),
                 model_type: "TransE_l2".to_string(),
                 description: "The default model of BioMedKG".to_string(),
                 datasets: vec![DEFAULT_DATASET_NAME.to_string()],
                 created_at: Utc::now(),
                 dimension: 400,
+                gamma: Some(12.0),
                 metadata: None,
             };
             match &metadata.insert(pool).await {
@@ -321,7 +322,7 @@ impl<
 }
 
 /// A struct for embedding metadata, it is used for recording the metadata of embedding.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow, Object, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, Validate)]
 pub struct EmbeddingMetadata {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
@@ -336,11 +337,11 @@ pub struct EmbeddingMetadata {
     ))]
     pub table_name: String,
 
-    // The model name, such as transe_mecfs, transe_biomedgps, etc.
+    // The model name, such as mecfs_transe, biomedgps_transe, etc.
     #[validate(length(
         max = "DEFAULT_MAX_LENGTH",
         min = "DEFAULT_MIN_LENGTH",
-        message = "The length of model_name should be between 1 and 64, such as `transe_mecfs`"
+        message = "The length of model_name should be between 1 and 64, such as `mecfs_transe`"
     ))]
     pub model_name: String,
 
@@ -364,10 +365,96 @@ pub struct EmbeddingMetadata {
 
     pub dimension: i32, // The dimension of embedding, such as 400, 768, 1024, etc.
 
+    #[serde(skip_deserializing)]
+    #[serde(skip_serializing)]
+    #[oai(read_only)]
+    pub gamma: Option<f32>, // The margin of the TransE model, it is used for calculating the loss function.
+
     pub metadata: Option<String>, // The metadata of embedding, such as hyperparameters, etc.
 }
 
+impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for EmbeddingMetadata {
+    fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        Ok(EmbeddingMetadata {
+            id: row.try_get("id")?,
+            table_name: row.try_get("table_name")?,
+            model_name: row.try_get("model_name")?,
+            model_type: row.try_get("model_type")?,
+            description: row.try_get("description")?,
+            datasets: row.try_get("datasets")?,
+            created_at: row.try_get("created_at")?,
+            dimension: row.try_get("dimension")?,
+            gamma: None,
+            metadata: row.try_get("metadata")?,
+        })
+    }
+}
+
 impl EmbeddingMetadata {
+    /// New a EmbeddingMetadata instance.
+    ///
+    /// # Arguments
+    /// * `table_name` - The table name of embedding metadata.
+    /// * `model_name` - The model name of embedding metadata.
+    /// * `model_type` - The model type of embedding metadata.
+    /// * `description` - The description of embedding metadata.
+    /// * `datasets` - The datasets of embedding metadata.
+    /// * `dimension` - The dimension of embedding metadata.
+    /// * `metadata` - The metadata of embedding metadata.
+    ///
+    /// # Returns
+    /// * `EmbeddingMetadata` - The EmbeddingMetadata instance.
+    ///
+    pub fn new(
+        table_name: &str,
+        model_type: &str,
+        description: &str,
+        datasets: &Vec<String>,
+        dimension: i32,
+        metadata: Option<String>,
+        id: Option<i64>,
+        created_at: Option<DateTime<Utc>>,
+    ) -> Result<EmbeddingMetadata, Box<dyn Error>> {
+        let gamma = EmbeddingMetadata::get_gamma_from_metadata(metadata.as_ref().unwrap());
+
+        let model_name = EmbeddingMetadata::generate_model_name(table_name, model_type);
+
+        let embedding_metadata = EmbeddingMetadata {
+            id: id.unwrap_or(0),
+            table_name: table_name.to_string(),
+            model_name: model_name,
+            model_type: model_type.to_string(),
+            description: description.to_string(),
+            datasets: datasets.clone(),
+            created_at: created_at.unwrap_or(Utc::now()),
+            dimension: dimension,
+            gamma: gamma,
+            metadata: metadata,
+        };
+
+        if embedding_metadata.is_gamma_needed() && gamma.is_none() {
+            return Err(Box::new(ValidationError::new(
+                "The gamma argument is needed for the model type, but it is None. You need to set the gamma argument in the metadata file.",
+                vec![],
+            )));
+        } else {
+            return Ok(embedding_metadata);
+        }
+    }
+
+    /// Generate a model name from the table name and model type.
+    ///
+    /// # Arguments
+    /// * `table_name` - The table name of embedding metadata.
+    /// * `model_type` - The model type of embedding metadata.
+    ///
+    /// # Returns
+    /// * `String` - The model name.
+    ///
+    pub fn generate_model_name(table_name: &str, model_type: &str) -> String {
+        format!("{}-{}", table_name, model_type)
+    }
+
     /// Get the score function name of the model type.
     ///
     /// # Returns
@@ -378,12 +465,13 @@ impl EmbeddingMetadata {
     /// let metadata = EmbeddingMetadata {
     ///     id: 1,
     ///     table_name: "biomedgps".to_string(),
-    ///     model_name: "biomedgps".to_string(),
-    ///     model_type: "TransE".to_string(),
+    ///     model_name: "biomedgps-TransE_l2".to_string(),
+    ///     model_type: "TransE_l2".to_string(),
     ///     description: "The default model of BiomedGPS".to_string(),
     ///     datasets: vec!["hsdn".to_string()],
     ///     created_at: Utc::now(),
     ///     dimension: 400,
+    ///     gamma: Some(12.0),
     ///     metadata: None,
     /// };
     ///
@@ -406,6 +494,77 @@ impl EmbeddingMetadata {
         };
 
         score_function_name
+    }
+
+    /// Is gamma argument needed for the model type?
+    ///
+    /// # Returns
+    /// * `bool` - Whether the gamma argument is needed.
+    ///
+    /// # Example
+    /// ```
+    /// let metadata = EmbeddingMetadata {
+    ///    id: 1,
+    ///    table_name: "biomedgps".to_string(),
+    ///    model_name: "biomedgps-TransE_l2".to_string(),
+    ///    model_type: "TransE_l2".to_string(),
+    ///    description: "The default model of BiomedGPS".to_string(),
+    ///    datasets: vec!["hsdn".to_string()],
+    ///    created_at: Utc::now(),
+    ///    dimension: 400,
+    ///    metadata: None,
+    /// };
+    ///
+    pub fn is_gamma_needed(&self) -> bool {
+        self.model_type.starts_with("TransE")
+    }
+
+    /// Extract gamma value from the metadata string.
+    ///
+    /// # Arguments
+    /// * `metadata` - The metadata string.
+    ///
+    /// # Returns
+    /// * `Option<f32>` - The gamma value.
+    ///
+    /// # Example
+    /// ```
+    /// let metadata = r#"{"gamma": "12.0"}"#;
+    /// let gamma = EmbeddingMetadata::get_gamma_from_metadata(metadata);
+    /// assert_eq!(gamma, Some(12.0));
+    /// ```
+    ///
+    pub fn get_gamma_from_metadata(metadata: &str) -> Option<f32> {
+        let metadata: HashMap<String, String> = serde_json::from_str(metadata).unwrap();
+        match metadata.get("gamma") {
+            Some(gamma) => Some(gamma.parse::<f32>().unwrap()),
+            None => None,
+        }
+    }
+
+    /// Extract gamma value from the metadata string. Don't get gamma value using gamma field directly, because it may always be None.
+    ///
+    /// # Returns
+    /// * `Option<f32>` - The gamma value.
+    ///
+    pub fn get_gamma(&self) -> Option<f32> {
+        if self.is_gamma_needed() {
+            EmbeddingMetadata::get_gamma_from_metadata(self.metadata.as_ref().unwrap())
+        } else {
+            None
+        }
+    }
+
+    /// Get gamma string for the database query.
+    ///
+    /// # Returns
+    /// * `String` - The gamma string.
+    ///
+    pub fn get_gamma_string(&self) -> String {
+        match self.get_gamma() {
+            Some(gamma) => format!("{},", gamma),
+            None => "".to_string(),
+        }
     }
 
     /// Create an empty table for storing entity embeddings.
@@ -500,7 +659,6 @@ impl EmbeddingMetadata {
         return EmbeddingMetadata::init_embedding_table(
             pool,
             &self.table_name,
-            &self.model_name,
             &self.model_type,
             &self.description,
             &self
@@ -512,6 +670,57 @@ impl EmbeddingMetadata {
             self.metadata.clone(),
         )
         .await;
+    }
+
+    /// Delete the embedding metadata by the table name.
+    ///
+    /// # Arguments
+    /// * `pool` - The database connection pool.
+    /// * `name` - The table name of embedding metadata.
+    ///
+    /// # Returns
+    /// * `Result<(), Box<dyn Error>>` - The result of deleting the embedding metadata.
+    ///
+    pub async fn delete(pool: &sqlx::PgPool, table_name: &str) -> Result<(), Box<dyn Error>> {
+        info!("Delete the metadata of the model {}.", table_name);
+        if table_name == DEFAULT_MODEL_NAME {
+            let sql_str =
+                "DELETE FROM biomedgps_embedding_metadata WHERE table_name = $1";
+
+            match sqlx::query(&sql_str)
+                .bind(table_name)
+                .execute(pool)
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(e) => Err(Box::new(e)),
+            }
+        } else {
+            let entity_emb_table_name = get_entity_emb_table_name(table_name);
+            let relation_emb_table_name = get_relation_emb_table_name(table_name);
+
+            let sql_str = format!(
+                "DROP TABLE IF EXISTS {}, {}",
+                entity_emb_table_name, relation_emb_table_name
+            );
+
+            match sqlx::query(&sql_str).execute(pool).await {
+                Ok(_) => {
+                    let sql_str =
+                        "DELETE FROM biomedgps_embedding_metadata WHERE table_name = $1";
+
+                    match sqlx::query(&sql_str)
+                        .bind(table_name)
+                        .execute(pool)
+                        .await
+                    {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(Box::new(e)),
+                    }
+                }
+                Err(e) => Err(Box::new(e)),
+            }
+        }
     }
 
     /// Initialize the embedding tables, it will create the entity embedding table, relation embedding table and insert a record into the embedding metadata table. If the table name and model name already exists or it can not create the entity embedding table or relation embedding table, it will return an error and rollback the transaction.
@@ -531,7 +740,6 @@ impl EmbeddingMetadata {
     pub async fn init_embedding_table(
         pool: &sqlx::PgPool,
         table_name: &str,
-        model_name: &str,
         model_type: &str,
         description: &str,
         datasets: &Vec<&str>,
@@ -541,18 +749,19 @@ impl EmbeddingMetadata {
         // Begin to transaction
         let mut tx = pool.begin().await?;
 
-        let sql_str = "SELECT COUNT(*) FROM biomedgps_embedding_metadata WHERE table_name = $1 AND model_name = $2";
+        let sql_str = "SELECT COUNT(*) FROM biomedgps_embedding_metadata WHERE table_name = $1";
 
+        let model_name = EmbeddingMetadata::generate_model_name(table_name, model_type);
         let count = sqlx::query_as::<_, (i64,)>(&sql_str)
             .bind(table_name)
-            .bind(model_name)
+            .bind(&model_name)
             .fetch_one(&mut tx)
             .await?;
 
         if count.0 > 0 {
             return Err(Box::new(ValidationError::new(
                 &format!(
-                    "The table {} and model {} already exists.",
+                    "The dataset name {} and related the best model {} already exists. Each dataset can only have one model. If you have more than one model for the same dataset combinations, you need to use another dataset name.",
                     table_name, model_name
                 ),
                 vec![],
@@ -568,7 +777,7 @@ impl EmbeddingMetadata {
 
         let record = sqlx::query_as::<_, (i64, DateTime<Utc>)>(&sql_str)
             .bind(table_name)
-            .bind(model_name)
+            .bind(&model_name)
             .bind(model_type)
             .bind(description)
             .bind(datasets)
@@ -626,22 +835,30 @@ impl EmbeddingMetadata {
             info!("The relation embedding table has been created successfully.");
         }
 
-        tx.commit().await?;
-
-        Ok(EmbeddingMetadata {
-            id: record.0,
-            table_name: table_name.to_string(),
-            model_name: model_name.to_string(),
-            model_type: model_type.to_string(),
-            description: description.to_string(),
-            datasets: datasets
+        let em = match EmbeddingMetadata::new(
+            table_name,
+            model_type,
+            description,
+            &datasets
                 .iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>(),
-            created_at: record.1,
-            dimension: dimension as i32,
-            metadata: Some(m.clone()),
-        })
+            dimension as i32,
+            Some(m.clone()),
+            Some(record.0),
+            Some(record.1),
+        ) {
+            Ok(metadata) => {
+                tx.commit().await?;
+                Ok(metadata)
+            }
+            Err(e) => {
+                tx.rollback().await?;
+                Err(e)
+            }
+        };
+
+        em
     }
 
     /// Get the embedding metadata by the id.

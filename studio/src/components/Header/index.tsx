@@ -168,16 +168,18 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         )
       }
       {
-        (isHeaderHidden() && isAuthEnabled() && !isAuthenticated) ? (
-          <Button type={isAuthenticated ? 'default' : 'primary'} onClick={() => loginWithRedirect()}>
-            Sign In / Sign Up
-          </Button>
-        ) : (
-          isAuthEnabled() ?
-            <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
-              <Button type="primary" icon={<UserOutlined />}>{username}</Button>
-            </Dropdown>
-            : <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+        !isHeaderHidden() && (
+          isAuthEnabled() && !isAuthenticated ? (
+            <Button type={isAuthenticated ? 'default' : 'primary'} onClick={() => loginWithRedirect()}>
+              Sign In / Sign Up
+            </Button>
+          ) : (
+            isAuthEnabled() ?
+              <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
+                <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+              </Dropdown>
+              : <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+          )
         )
       }
     </Space>

@@ -1254,7 +1254,6 @@ pub async fn connect_db(database_url: &str, max_connections: u32) -> sqlx::PgPoo
 pub async fn import_kge(
     database_url: &str,
     table_name: &str,
-    model_name: &str,
     model_type: &str,
     datasets: &Vec<&str>,
     description: Option<&str>,
@@ -1373,7 +1372,6 @@ pub async fn import_kge(
     match EmbeddingMetadata::init_embedding_table(
         &pool,
         table_name,
-        model_name,
         model_type,
         &description,
         datasets,
@@ -1388,8 +1386,17 @@ pub async fn import_kge(
         }
         Err(e) => {
             if drop {
-                info!("The embedding tables already exist, drop their records and reimport the embeddings.");
-                true
+                info!("Existing a same model in the database, we will drop it and re-import the model.");
+                match EmbeddingMetadata::delete(&pool, table_name).await {
+                    Ok(_) => {
+                        info!("Drop the existing model successfully, please rerun the command without the --drop option.");
+                        std::process::exit(0);
+                    }
+                    Err(e) => {
+                        error!("Failed to drop the existing model: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             } else {
                 error!("Failed to init the embedding tables: {}", e);
                 std::process::exit(1);

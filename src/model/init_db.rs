@@ -85,7 +85,6 @@ pub fn init_score_sql(
     first_second_relation_type: &str,
     second_third_relation_type: &str,
     table_prefix: Option<&str>,
-    gamma: f64,
     embedding_metadata: &EmbeddingMetadata,
 ) -> String {
     let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
@@ -159,7 +158,7 @@ pub fn init_score_sql(
                         vector_to_float4(tt.first_embedding, {dimension}, false),
                         vector_to_float4(tt.first_second_embedding, {dimension}, false),
                         vector_to_float4(tt.second_embedding, {dimension}, false),
-                        {gamma},
+                        {gamma_str}
                         true,
                         false
                     ),
@@ -167,7 +166,7 @@ pub fn init_score_sql(
                         vector_to_float4(tt.second_embedding, {dimension}, false),
                         vector_to_float4(tt.second_third_embedding, {dimension}, false),
                         vector_to_float4(tt.third_embedding, {dimension}, false),
-                        {gamma},
+                        {gamma_str}
                         true,
                         false
                     )
@@ -185,6 +184,7 @@ pub fn init_score_sql(
         entity_emb_table = get_entity_emb_table_name(table_prefix),
         score_function_name = score_function_name,
         dimension = embedding_metadata.dimension,
+        gamma_str = embedding_metadata.get_gamma_string(),
     )
 }
 
@@ -278,7 +278,6 @@ pub async fn create_score_table(
         }
     };
 
-    let gamma = 12.0;
     let init_sql = init_score_sql(
         first_entity_type,
         second_entity_type,
@@ -286,7 +285,6 @@ pub async fn create_score_table(
         first_second_relation_type,
         second_third_relation_type,
         table_prefix,
-        gamma,
         &embedding_metadata,
     );
 
@@ -361,7 +359,6 @@ pub fn get_kg_score_table_name(table_prefix: &str) -> String {
 
 pub fn init_kg_score_sql(
     table_prefix: Option<&str>,
-    gamma: f64,
     embedding_metadata: &EmbeddingMetadata,
 ) -> String {
     let table_prefix = table_prefix.unwrap_or(DEFAULT_MODEL_NAME);
@@ -402,7 +399,7 @@ pub fn init_kg_score_sql(
                     vector_to_float4(tt.source_embedding, {dimension}, false),
                     vector_to_float4(tt.relation_type_embedding, {dimension}, false),
                     vector_to_float4(tt.target_embedding, {dimension}, false),
-                    {gamma},
+                    {gamma_str}
                     true,
                     false
                 )::FLOAT8 AS score
@@ -414,7 +411,7 @@ pub fn init_kg_score_sql(
         entity_emb_table = get_entity_emb_table_name(table_prefix),
         score_function_name = score_function_name,
         dimension = embedding_metadata.dimension,
-        gamma = gamma
+        gamma_str = embedding_metadata.get_gamma_string(),
     )
 }
 
@@ -461,8 +458,7 @@ pub async fn create_kg_score_table(
         }
     };
 
-    let gamma = 12.0;
-    let init_sql = init_kg_score_sql(table_prefix, gamma, &embedding_metadata);
+    let init_sql = init_kg_score_sql(table_prefix, &embedding_metadata);
 
     debug!("init_sql: {}", init_sql);
     let mut tx = pool.begin().await.unwrap();
@@ -827,15 +823,15 @@ mod tests {
         let third_entity_type = "Symptom";
         let first_second_relation_type = "treats";
         let second_third_relation_type = "causes";
-        let gamma = 12.0;
         let embedding_metadata = EmbeddingMetadata {
             id: 1,
             metadata: None,
-            model_name: "biomedgps_transe_l2".to_string(),
+            model_name: "biomedgps-TransE_l2".to_string(),
             model_type: "TransE_l2".to_string(),
             dimension: 400,
             table_name: "biomedgps".to_string(),
             created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            gamma: Some(12.0),
             datasets: vec!["STRING".to_string()],
             description: "The entity embedding trained by the TransE_l2 model".to_string(),
         };
@@ -847,7 +843,6 @@ mod tests {
             first_second_relation_type,
             second_third_relation_type,
             Some(table_prefix),
-            gamma,
             &embedding_metadata,
         );
         println!("sql: {}", sql);
@@ -889,15 +884,16 @@ mod tests {
         let embedding_metadata = EmbeddingMetadata {
             id: 1,
             metadata: None,
-            model_name: "biomedgps_transe_l2".to_string(),
+            model_name: "biomedgps-TransE_l2".to_string(),
             model_type: "TransE_l2".to_string(),
             dimension: 400,
+            gamma: Some(12.0),
             table_name: "biomedgps".to_string(),
             created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
             datasets: vec!["STRING".to_string()],
             description: "The entity embedding trained by the TransE_l2 model".to_string(),
         };
-        let sql = init_kg_score_sql(Some(table_prefix), gamma, &embedding_metadata);
+        let sql = init_kg_score_sql(Some(table_prefix), &embedding_metadata);
         println!("sql: {}", sql);
         assert!(sql.contains("biomedgps_relation_with_score"));
     }

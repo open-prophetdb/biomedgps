@@ -145,7 +145,7 @@ export async function getInitialState(): Promise<{
 export function rootContainer(container: React.ReactNode): React.ReactNode {
   const component = <ConfigProvider theme={{
     token: {
-      fontSize: 16
+      fontSize: 15
     }
   }}>
     {container}

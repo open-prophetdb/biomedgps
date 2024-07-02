@@ -19,7 +19,6 @@ use lazy_static::lazy_static;
 use log::{debug, error};
 use neo4rs::{Node as NeoNode, Relation as NeoRelation};
 use poem_openapi::Object;
-use polars::lazy::dsl::Operator;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -667,15 +666,12 @@ impl TargetNode {
             }
         };
 
-        // TODO: We need to allow the user to set the score function, gamma and exp_enabled
-        let gamma = 12.0;
         let sql_str = match Graph::format_score_sql(
             &entity_id,
             &entity_type,
             relation_type,
             &embedding_metadata,
-            topk,
-            gamma,
+            topk
         ) {
             Ok(sql_str) => sql_str,
             Err(err) => {
@@ -1085,17 +1081,17 @@ impl Graph {
     /// let embedding_metadata = EmbeddingMetadata {
     ///    id: 1,
     ///    metadata: None,
-    ///    model_name: "biomedgps_transe_l2".to_string(),
+    ///    model_name: "biomedgps-TransE_l2".to_string(),
     ///    model_type: "TransE_l2".to_string(),
     ///    dimension: 400,
     ///    table_name: "biomedgps".to_string(),
     ///    created_at: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
     ///    datasets: vec!("STRING".to_string()),
+    ///    metadata: Some(r#"{"gamma": 12.0}"#.to_string()),
     ///    description: "The entity embedding trained by the TransE_l2 model".to_string(),
     /// };
     /// let topk = 10;
-    /// let gamma = 12.0;
-    /// let sql_str = Graph::format_score_sql(source_id, source_type, relation_type, &embedding_metadata, topk, gamma).unwrap();
+    /// let sql_str = Graph::format_score_sql(source_id, source_type, relation_type, &embedding_metadata, topk).unwrap();
     /// let expected_sql_str = "
     /// SELECT
     ///     COALESCE(ee2.entity_type, '') || '::' || COALESCE(ee2.entity_id, '') AS node_id,
@@ -1134,8 +1130,7 @@ impl Graph {
         source_type: &str,
         relation_type: &str,
         embedding_metadata: &EmbeddingMetadata,
-        topk: u64,
-        gamma: f64,
+        topk: u64
     ) -> Result<String, ValidationError> {
         let source_id = source_id.split(",").collect::<Vec<&str>>().join("', '");
         let source_type_vec = source_type
@@ -1277,7 +1272,7 @@ impl Graph {
                             vector_to_float4(ee1.embedding, {dimension}, false),
                             vector_to_float4(rte.embedding, {dimension}, false),
                             vector_to_float4(ee2.embedding, {dimension}, false),
-                            {gamma},
+                            {gamma_str}
                             true,
                             {reverse}
                     ) AS score	
@@ -1307,7 +1302,7 @@ impl Graph {
                 relation_type_embedding_table =
                     get_relation_emb_table_name(&embedding_metadata.table_name),
                 score_function_name = score_function_name,
-                gamma = gamma
+                gamma_str = embedding_metadata.get_gamma_string(),
             )
         };
 

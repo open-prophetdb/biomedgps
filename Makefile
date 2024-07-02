@@ -89,14 +89,20 @@ changelog:
 
 deploy: deploy-biomedgps
 
-deploy-biomedgps: build-biomedgps-studio
+build-biomedgps-cross-compile:
 	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
 	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@drugs.3steps.cn:/data/biomedgps/bin
 	@rsync -avP --delete assets/index.html root@drugs.3steps.cn:/var/www/html/biomedgps/index.html
 	@rsync -avP --delete assets root@drugs.3steps.cn:/var/www/html/biomedgps/
 
-deploy-rapex: build-rapex-studio
+deploy-biomedgps: build-biomedgps-studio build-biomedgps-cross-compile
+	@printf "\nDone!\n"
+
+build-rapex-cross-compile:
 	@docker run --rm -it -v "$(CURDIR)":/home/rust/src messense/rust-musl-cross:x86_64-musl cargo build --release
 	@rsync -avP target/x86_64-unknown-linux-musl/release/biomedgps target/x86_64-unknown-linux-musl/release/biomedgps-cli root@rapex.prophetdb.org:/data/rapex/bin
 	@rsync -avP --delete assets/index.html root@rapex.prophetdb.org:/var/www/html/rapex/index.html
 	@rsync -avP --delete assets root@rapex.prophetdb.org:/var/www/html/rapex/
+
+deploy-rapex: build-rapex-studio build-rapex-cross-compile
+	@printf "\nDone!\n"

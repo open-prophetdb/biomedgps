@@ -244,7 +244,7 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
-                    <h1>RAPEX - Response to Air Pollution EXposure (RAPEX)</h1>
+                    <h1>RAPEX - Response to Air Pollution EXposure</h1>
                     <h4 style={{ textAlign: 'center', fontSize: '1rem', lineHeight: '24px' }}>
                         Enter an air pollutant, gene/protein, disease, drug or symptom name to find and explain related known knowledges in RAPEX platform. If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Diseases/Targets</a> page. Please click the following examples to see the results.
                     </h4>
