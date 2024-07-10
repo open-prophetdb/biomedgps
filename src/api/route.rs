@@ -12,8 +12,8 @@ use crate::model::core::{
     Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
     RelationMetadata, Statistics, Subgraph,
 };
-use crate::model::entity_attr::EntityAttr;
-use crate::model::entity_attr::{CompoundAttr, EntityAttrRecordResponse};
+use crate::model::entity::compound::CompoundAttr;
+use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
 use crate::model::graph::Graph;
 use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;

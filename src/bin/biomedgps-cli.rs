@@ -1,6 +1,6 @@
 extern crate log;
 
-use biomedgps::model::entity_attr::CompoundAttr;
+use biomedgps::model::entity::compound::CompoundAttr;
 use biomedgps::model::init_db::create_kg_score_table;
 use biomedgps::model::kge::{init_kge_models, DEFAULT_MODEL_NAME};
 use biomedgps::model::{
@@ -11,7 +11,8 @@ use biomedgps::model::{
     util::read_annotation_file,
 };
 use biomedgps::{
-    build_index, connect_graph_db, import_data, import_kge, init_logger, run_migrations, change_emb_dimension
+    build_index, change_emb_dimension, connect_graph_db, import_data, import_kge, init_logger,
+    run_migrations,
 };
 use log::*;
 use regex::Regex;
@@ -700,7 +701,13 @@ async fn main() {
             if table_name == "biomedgps" && arguments.dimension != 400 {
                 if arguments.force {
                     warn!("The dimension of the embedding is not 400, but the table name is biomedgps. We will change the dimension of the embedding as you specified.");
-                    match change_emb_dimension(&database_url, table_name.as_str(), arguments.dimension).await {
+                    match change_emb_dimension(
+                        &database_url,
+                        table_name.as_str(),
+                        arguments.dimension,
+                    )
+                    .await
+                    {
                         Ok(_) => {
                             info!("Change the dimension of the embedding successfully.");
                         }

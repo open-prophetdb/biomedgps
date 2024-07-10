@@ -30,6 +30,6 @@ assets/*
 .VSCodeCounter
 neo4j-data
 neo4j-import
-data/drugbank/*
-data/aact_*/*
+data/entity_attr/drugbank/*
+data/entity_attr/aact_*/*
 frontend
