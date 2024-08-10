@@ -339,6 +339,7 @@ pub async fn update_entity_metadata(pool: &sqlx::PgPool, drop: bool) -> Result<(
 struct RelationMetadata {
     relation_type: String,
     description: String,
+    prompt_template: String,
 }
 
 pub async fn update_relation_metadata(
@@ -359,7 +360,7 @@ pub async fn update_relation_metadata(
         .from_path(metadata_filepath)?;
 
     let headers = reader.headers().unwrap();
-    for col in ["relation_type", "description"].iter() {
+    for col in ["relation_type", "description", "prompt_template"].iter() {
         if !headers.into_iter().contains(col) {
             return Err(format!(
                 "Column {} not found in the {} file. You should specify a file with the columns 'relation_type' and 'description' for annotating the relation types in the relation table.",
@@ -396,11 +397,12 @@ pub async fn update_relation_metadata(
         sqlx::query(
             "
             UPDATE biomedgps_relation_metadata
-            SET description = $1
-            WHERE relation_type = $2;
+            SET description = $1, prompt_template = $2
+            WHERE relation_type = $3;
         ",
         )
         .bind(record.description)
+        .bind(record.prompt_template)
         .bind(record.relation_type)
         .execute(&mut tx)
         .await?;

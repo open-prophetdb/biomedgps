@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
 
-use super::publication::{PublicationDetail, PublicationRecords};
+use super::publication::{Publication, PublicationRecords, PublicationsSummary, ConsensusResult};
 
 #[derive(Tags)]
 pub enum ApiTags {
@@ -215,9 +215,61 @@ impl<
 }
 
 #[derive(ApiResponse)]
+pub enum GetPublicationsSummaryResponse {
+    #[oai(status = 200)]
+    Ok(Json<PublicationsSummary>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetPublicationsSummaryResponse {
+    pub fn ok(publications_summary: PublicationsSummary) -> Self {
+        Self::Ok(Json(publications_summary))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum GetConsensusResultResponse {
+    #[oai(status = 200)]
+    Ok(Json<ConsensusResult>),
+
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl GetConsensusResultResponse {
+    pub fn ok(consensus_result: ConsensusResult) -> Self {
+        Self::Ok(Json(consensus_result))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
+}
+
+#[derive(ApiResponse)]
 pub enum GetPublicationDetailResponse {
     #[oai(status = 200)]
-    Ok(Json<PublicationDetail>),
+    Ok(Json<Publication>),
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
@@ -227,7 +279,7 @@ pub enum GetPublicationDetailResponse {
 }
 
 impl GetPublicationDetailResponse {
-    pub fn ok(publication_detail: PublicationDetail) -> Self {
+    pub fn ok(publication_detail: Publication) -> Self {
         Self::Ok(Json(publication_detail))
     }
 

@@ -274,6 +274,34 @@ export async function fetchPublications(
   });
 }
 
+/** Call `/api/v1/publications-consensus` with query params to fetch publication consensus. GET /api/v1/publications-consensus/${param0} */
+export async function fetchPublicationsConsensus(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchPublicationsConsensusParams,
+  options?: { [key: string]: any },
+) {
+  const { search_id: param0, ...queryParams } = params;
+  return request<swagger.ConsensusResult>(`/api/v1/publications-consensus/${param0}`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/publications-summary` with query params to fetch publication summary. GET /api/v1/publications-summary/${param0} */
+export async function fetchPublicationsSummary(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchPublicationsSummaryParams,
+  options?: { [key: string]: any },
+) {
+  const { search_id: param0, ...queryParams } = params;
+  return request<swagger.PublicationsSummary>(`/api/v1/publications-summary/${param0}`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/publications/:id` to fetch a publication. GET /api/v1/publications/${param0} */
 export async function fetchPublication(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -281,7 +309,7 @@ export async function fetchPublication(
   options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params;
-  return request<swagger.PublicationDetail>(`/api/v1/publications/${param0}`, {
+  return request<swagger.Publication>(`/api/v1/publications/${param0}`, {
     method: 'GET',
     params: { ...queryParams },
     ...(options || {}),

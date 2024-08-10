@@ -721,6 +721,10 @@ pub struct RelationMetadata {
     // To describe the relation type with a human-readable sentence.
     #[oai(skip_serializing_if_is_none)]
     pub description: Option<String>,
+
+    // Prompt Template
+    #[oai(skip_serializing_if_is_none)]
+    pub prompt_template: Option<String>,
 }
 
 impl CheckData for RelationMetadata {
@@ -749,6 +753,7 @@ impl CheckData for RelationMetadata {
             "start_entity_type".to_string(),
             "end_entity_type".to_string(),
             "description".to_string(),
+            "prompt_template".to_string(),
         ]
     }
 }

@@ -123,6 +123,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
     const [selectedRelationTypes, setSelectedRelationTypes] = useState<string[]>([]);
     const [relationTypeDescs, setRelationTypeDescs] = useState<Record<string, string>>({});
+    const [relationTypePrompts, setRelationTypePrompts] = useState<Record<string, string>>({});
     const [resources, setResources] = useState<OptionType[]>([]);
     const [selectedResources, setSelectedResources] = useState<string[]>([]);
 
@@ -168,6 +169,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     });
                     setRelationTypeDescs(descs);
 
+                    let prompts = {} as Record<string, string>;
                     let res = [] as OptionType[];
                     relationStat.forEach((item, index) => {
                         res.push({
@@ -175,8 +177,11 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                             label: item.resource,
                             value: item.resource,
                         });
+
+                        prompts[item.relation_type] = item.prompt_template || '';
                     });
 
+                    setRelationTypePrompts(prompts);
                     setResources(uniqBy(res, 'value'));
                 });
             }
@@ -593,6 +598,9 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     newItem.source_node = response.nodes.find((node) => node.data.id === item.source_id);
                     newItem.target_name = targetName;
                     newItem.target_node = response.nodes.find((node) => node.data.id === item.target_id);
+                    // Summarizing related publications need the prompt template and description. Prefer the prompt template, if not, use the description.
+                    newItem.prompt_template = relationTypePrompts[item.relation_type] || '';
+                    newItem.description = relationTypeDescs[item.relation_type] || '';
 
                     return newItem;
                 })
@@ -610,8 +618,10 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
             return;
         }
 
-        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, selectedResources);
-    }, [nodeIds, page, pageSize, refreshKey]);
+        if (Object.keys(relationTypePrompts).length > 0) {
+            fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, selectedResources);
+        }
+    }, [nodeIds, page, pageSize, refreshKey, relationTypePrompts]);
 
     const getRowKey = (record: GraphEdge) => {
         return record.relid || `${JSON.stringify(record)}`;
@@ -863,11 +873,11 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                             placement={'right'}
                             onClose={() => {
                                 setDrawerVisible(false);
-                            }
-                            }
+                            }}
+                            destroyOnClose={true}
                             open={drawerVisible}
                         >
-                            {edgeInfo ?
+                            {(drawerVisible && edgeInfo) ?
                                 <EdgeInfoPanel edgeInfo={edgeInfo} />
                                 : <Empty description="No publication data for this knowledge." />}
                         </Drawer>

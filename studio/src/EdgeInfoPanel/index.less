@@ -18,19 +18,31 @@
     height: 100%;
   }
 
-  .publication-panel-header {
-    position: absolute;
-    top: 5px;
-    left: 22px;
-    z-index: 100;
-    
-    h3 {
-      margin: 0;
+  .publication-panel {
+    display: flex;
+    flex-direction: column;
+
+    .publication-tag {
+      font-size: 1rem;
+      margin-left: 10px;
+      padding: 10px;
+    }
+
+    .publication-panel-header {
+      font-size: 1rem;
+      padding: 20px;
+    }
+
+    .publication-panel-content {
+      .ant-list-item {
+        padding: 16px 10px;
+      }
     }
   }
 
   .ant-list {
     .ant-list-pagination {
+      display: none;
       margin-block-start: 0;
     }
   }

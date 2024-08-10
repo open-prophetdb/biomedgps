@@ -1,4 +1,4 @@
-export declare namespace swagger {
+declare namespace swagger {
   type Article = {
     ref_id: string;
     pubmed_id: string;
@@ -33,7 +33,7 @@ export declare namespace swagger {
     subclass: string;
   };
 
-  export type CompoundAttr = {
+  type CompoundAttr = {
     compound_type: string;
     created: string;
     updated: string;
@@ -75,6 +75,18 @@ export declare namespace swagger {
     external_identifiers: ExternalIdentifier[];
     external_links: ExternalLink[];
     targets: Target[];
+  };
+
+  type ConsensusResult = {
+    results_analyzed_count: number;
+    yes_percent: number;
+    no_percent: number;
+    possibly_percent: number;
+    yes_doc_ids: string[];
+    no_doc_ids: string[];
+    possibly_doc_ids: string[];
+    is_incomplete: boolean;
+    is_disputed: boolean;
   };
 
   type Context = {
@@ -284,10 +296,18 @@ export declare namespace swagger {
     id: string;
   };
 
+  type fetchPublicationsConsensusParams = {
+    search_id: string;
+  };
+
   type fetchPublicationsParams = {
     query_str: string;
     page?: number;
     page_size?: number;
+  };
+
+  type fetchPublicationsSummaryParams = {
+    search_id: string;
   };
 
   type fetchRelationCountsParams = {
@@ -519,16 +539,6 @@ export declare namespace swagger {
     title: string;
     year?: number;
     doc_id: string;
-  };
-
-  type PublicationDetail = {
-    authors: string[];
-    citation_count?: number;
-    summary: string;
-    journal: string;
-    title: string;
-    year?: number;
-    doc_id: string;
     article_abstract?: string;
     doi?: string;
     provider_url?: string;
@@ -539,6 +549,15 @@ export declare namespace swagger {
     total: number;
     page: number;
     page_size: number;
+    search_id?: string;
+  };
+
+  type PublicationsSummary = {
+    summary: string;
+    daily_limit_reached: boolean;
+    is_disputed: boolean;
+    is_incomplete: boolean;
+    results_analyzed_count: number;
   };
 
   type putCuratedKnowledgeParams = {
@@ -636,6 +655,7 @@ export declare namespace swagger {
     start_entity_type: string;
     end_entity_type: string;
     description?: string;
+    prompt_template?: string;
   };
 
   type Sequence = {

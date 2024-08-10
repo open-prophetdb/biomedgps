@@ -3,8 +3,9 @@
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::publication::Publication;
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetEntityAttrResponse, GetEntityColorMapResponse, GetGraphResponse,
-    GetPromptResponse, GetPublicationsResponse, GetRecordsResponse, GetRelationCountResponse,
+    ApiTags, DeleteResponse, GetConsensusResultResponse, GetEntityAttrResponse,
+    GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse, GetPublicationsResponse,
+    GetPublicationsSummaryResponse, GetRecordsResponse, GetRelationCountResponse,
     GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
     PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery,
 };
@@ -33,6 +34,52 @@ pub struct BiomedgpsApi;
 
 #[OpenApi(prefix_path = "/api/v1")]
 impl BiomedgpsApi {
+    /// Call `/api/v1/publications-summary` with query params to fetch publication summary.
+    #[oai(
+        path = "/publications-summary/:search_id",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPublicationsSummary"
+    )]
+    async fn fetch_publications_summary(
+        &self,
+        search_id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetPublicationsSummaryResponse {
+        let search_id = search_id.0;
+        match Publication::fetch_summary(&search_id).await {
+            Ok(result) => GetPublicationsSummaryResponse::ok(result),
+            Err(e) => {
+                let err = format!("Failed to fetch publications summary: {}", e);
+                warn!("{}", err);
+                return GetPublicationsSummaryResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/publications-consensus` with query params to fetch publication consensus.
+    #[oai(
+        path = "/publications-consensus/:search_id",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchPublicationsConsensus"
+    )]
+    async fn fetch_publications_consensus(
+        &self,
+        search_id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetConsensusResultResponse {
+        let search_id = search_id.0;
+        match Publication::fetch_consensus(&search_id).await {
+            Ok(result) => GetConsensusResultResponse::ok(result),
+            Err(e) => {
+                let err = format!("Failed to fetch publications consensus: {}", e);
+                warn!("{}", err);
+                return GetConsensusResultResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/publications/:id` to fetch a publication.
     #[oai(
         path = "/publications/:id",
@@ -70,14 +117,6 @@ impl BiomedgpsApi {
         let page_size = page_size.0;
 
         info!("Fetch publications with query: {}", query_str);
-        let pairs = query_str.split("#").collect::<Vec<&str>>();
-        let query_str = if pairs.len() != 2 {
-            let err = format!("Invalid query string: {}", query_str);
-            warn!("{}", err);
-            return GetPublicationsResponse::bad_request(err);
-        } else {
-            format!("what's the relation between {} and {}?", pairs[0], pairs[1])
-        };
 
         match Publication::fetch_publications(&query_str, page, page_size).await {
             Ok(records) => GetPublicationsResponse::ok(records),
@@ -861,7 +900,7 @@ impl BiomedgpsApi {
         )
         .await
         {
-            Ok(entities) => GetRecordsResponse::ok(entities),
+            Ok(records) => GetRecordsResponse::ok(records),
             Err(e) => {
                 let err = format!("Failed to fetch relations: {}", e);
                 warn!("{}", err);
