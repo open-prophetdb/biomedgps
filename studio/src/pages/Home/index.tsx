@@ -336,35 +336,34 @@ const HomePage: React.FC = () => {
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="data-stat" sm={24} md={11} xs={11} xxl={11}>
-                        <p className="desc" style={{ textAlign: 'justify' }}>
-                            A platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.
-                            <br />
-                            <br />
-                            The Network Medicine Platform, BioMedGPS, integrates a biomedical knowledge graph, multi-omics data, and deep learning models, aiming to unravel the molecular mechanisms of diseases and facilitate drug repurposing. It features a predictive module for discovering new drug indications and understanding disease mechanisms, alongside an explanatory module offering a knowledge graph studio and graph neural network analysis. The platform supports custom data sources, models, and omics datasets, enhanced by large language models for dynamic querying. Demonstrations showcase its capabilities in drug prediction, disease similarity analysis, and graphical pathfinding.
-                            <br />
-                            <br />
-                            Its unique integration enables precise prediction of drug efficacy and discovery of novel drug indications, offering a faster, cost-effective alternative to traditional drug development. By harnessing the power of graph neural networks and large language models, BioMedGPS provides deep insights into the complex biological networks underlying diseases, facilitating breakthroughs in personalized medicine and therapeutic strategies. This platform stands out by allowing customization across data sources, models, and omics datasets, ensuring versatility and applicability across a wide range of biomedical research areas.
-                            <br />
-                            <br />
-                            More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
-                        </p>
-                    </Col>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="image-container" sm={24} md={10} xs={10} xxl={10}>
-                        <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
-                            {images.map((item: ImageItem) => {
-                                return (
-                                    <div key={item.title}>
-                                        <img src={item.src} />
-                                        <p className="legend">{item.title}</p>
-                                    </div>
-                                );
-                            })}
-                        </Carousel>
-                    </Col>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
+                    <Row style={{ width: '80%', maxWidth: '1800px', margin: '0 auto' }}>
+                        <Col className="data-stat">
+                            <p className="desc" style={{ textAlign: 'justify' }}>
+                                A platform with biomedical knowledge graph and graph neural network for drug repurposing and disease mechanism.
+                                <br />
+                                <br />
+                                The Network Medicine Platform, BioMedGPS, integrates a biomedical knowledge graph, multi-omics data, and deep learning models, aiming to unravel the molecular mechanisms of diseases and facilitate drug repurposing. It features a predictive module for discovering new drug indications and understanding disease mechanisms, alongside an explanatory module offering a knowledge graph studio and graph neural network analysis. The platform supports custom data sources, models, and omics datasets, enhanced by large language models for dynamic querying. Demonstrations showcase its capabilities in drug prediction, disease similarity analysis, and graphical pathfinding.
+                                <br />
+                                <br />
+                                Its unique integration enables precise prediction of drug efficacy and discovery of novel drug indications, offering a faster, cost-effective alternative to traditional drug development. By harnessing the power of graph neural networks and large language models, BioMedGPS provides deep insights into the complex biological networks underlying diseases, facilitating breakthroughs in personalized medicine and therapeutic strategies. This platform stands out by allowing customization across data sources, models, and omics datasets, ensuring versatility and applicability across a wide range of biomedical research areas.
+                                <br />
+                                <br />
+                                More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
+                            </p>
+                        </Col>
+                        <Col className="image-container">
+                            <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
+                                {images.map((item: ImageItem) => {
+                                    return (
+                                        <div key={item.title}>
+                                            <img src={item.src} />
+                                            <p className="legend">{item.title}</p>
+                                        </div>
+                                    );
+                                })}
+                            </Carousel>
+                        </Col>
+                    </Row>
                 </Row>
                 <Row className="text-statistics">
                     {stats.map((item) => {

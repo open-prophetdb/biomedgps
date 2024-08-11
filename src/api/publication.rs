@@ -248,7 +248,7 @@ impl Publication {
             let json: serde_json::Value = serde_json::from_str(&body)?;
             let summary = match json["summary"].as_str() {
                 Some(s) => s.to_string(),
-                None => "No AI answer for the above question, because not enough relevant results for AI to analyze.".to_string(),
+                None => "No AI answer for the above question, because there aren't enough relevant direct results for analysis. Please carefully read the most relevant references and make your own judgment.".to_string(),
             };
             let daily_limit_reached = json["dailyLimitReached"].as_bool().unwrap();
             let is_disputed = json["isDisputed"].as_bool().unwrap();

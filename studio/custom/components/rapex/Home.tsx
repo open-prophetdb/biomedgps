@@ -342,38 +342,37 @@ const HomePage: React.FC = () => {
                     </span>
                 </Col>
                 <Row className="statistics" gutter={16}>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="data-stat" sm={24} md={11} xs={11} xxl={11}>
-                        <p className="desc" style={{ textAlign: 'justify' }}>
-                            <span>
-                            Air pollution emerged as the leading contributor to the global disease burden in 2021 and the second most significant risk factor for premature death worldwide. It is linked to severe health issues, including cancer and cardiovascular diseases. Traditional studies often isolate health outcomes without a broader, multidimensional approach, focusing solely on specific diseases. This deficiency underscores the importance of conducting integrated analyses of air pollution health impacts. Unfortunately, there is a notable absence of a comprehensive, integrated knowledge graph for detailed analysis, to better understand and mitigate the effects of air pollution.
-                            </span>
-                            <span>
-                            To bridge this gap, we have developed a knowledge graph-based RAPEX database to systematically explore the toxicological mechanisms and health effects of air pollutants. RAPEX integrates a diverse array of air pollutants and links them with genes, proteins, pathway, diseases, and other multi-omics data, marking the first comprehensive resource exploring the intricate associations between air pollution, genes, and diseases. To enhance user engagement and understanding, we have created a user-friendly web portal (https://rapex.prophetdb.org). This portal allows users to effortlessly query, compare, analyze, or predict the potential relationships between air pollution and various biological and environmental entities. It has two uniq features:
-                            </span>
-                            <span>
-                            1. Comprehensive data coverage. We implement ontology mapping and leverage large language models and semantic similarity techniques to integrate 10 published databases, enhancing the quality of the knowledge graph.  This approach aligns entity and relationship types, reducing entity ambiguity and relationship type fragmentation. These cleaned knowledges are incorporated into the system to establish a comprehensive knowledge graph. RAPEX houses an extensive array of biomedical knowledge, encompassing 12,857,601 knowledges that link air pollution with symptoms, genes, diseases, proteins, pathways, and metabolites etc. The resulting knowledge graph features a more balanced and diverse distribution of relationships between entities and includes phenotype databases, making the dataset suitable for representing pollutant-gene-phenotype/disease relationships. This profound integration offers deep and wide-ranging insights into the intricate interactions between air pollution and biological systems, aiding in the understanding of air pollution exposure, gene, and phenotype/disease relationships.
-                            </span>
-                            <span>
-                            2. Database Uniqueness and Innovation. Meticulously curated and annotated knowledge from 865 rigorously selected publications, categorized into 13 entity types and 12 relationship types. Each of the 1,134 distinct knowledge points in this dataset has been annotated and reviewed by at least two independent experts, ensuring high quality and reliability.This dataset is a significant contribution to the field, offering rapid access to original research on air pollutants. It serves as an invaluable resource for validating the knowledge extraction capabilities of large language models and the predictive capabilities of air pollution exposure mechanism models. This comprehensive and expertly vetted dataset is poised to advance research and understanding in the intricate interactions between air pollution and biological systems.
-                            </span>
-                            More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
-                        </p>
-                    </Col>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
-                    <Col className="image-container" sm={24} md={10} xs={10} xxl={10}>
-                        <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
-                            {images.map((item: ImageItem) => {
-                                return (
-                                    <div key={item.title}>
-                                        <img src={item.src} />
-                                        <p className="legend">{item.title}</p>
-                                    </div>
-                                );
-                            })}
-                        </Carousel>
-                    </Col>
-                    <Col sm={0} md={1} xs={1} xxl={1}></Col>
+                    <Row style={{ width: '80%', maxWidth: '1800px', margin: '0 auto' }}>
+                        <Col className="data-stat">
+                            <p className="desc" style={{ textAlign: 'justify' }}>
+                                <span>
+                                    Air pollution emerged as the leading contributor to the global disease burden in 2021 and the second most significant risk factor for premature death worldwide. It is linked to severe health issues, including cancer and cardiovascular diseases. Traditional studies often isolate health outcomes without a broader, multidimensional approach, focusing solely on specific diseases. This deficiency underscores the importance of conducting integrated analyses of air pollution health impacts. Unfortunately, there is a notable absence of a comprehensive, integrated knowledge graph for detailed analysis, to better understand and mitigate the effects of air pollution.
+                                </span>
+                                <span>
+                                    To bridge this gap, we have developed a knowledge graph-based RAPEX database to systematically explore the toxicological mechanisms and health effects of air pollutants. RAPEX integrates a diverse array of air pollutants and links them with genes, proteins, pathway, diseases, and other multi-omics data, marking the first comprehensive resource exploring the intricate associations between air pollution, genes, and diseases. To enhance user engagement and understanding, we have created a user-friendly web portal (https://rapex.prophetdb.org). This portal allows users to effortlessly query, compare, analyze, or predict the potential relationships between air pollution and various biological and environmental entities. It has two uniq features:
+                                </span>
+                                <span>
+                                    1. Comprehensive data coverage. We implement ontology mapping and leverage large language models and semantic similarity techniques to integrate 10 published databases, enhancing the quality of the knowledge graph.  This approach aligns entity and relationship types, reducing entity ambiguity and relationship type fragmentation. These cleaned knowledges are incorporated into the system to establish a comprehensive knowledge graph. RAPEX houses an extensive array of biomedical knowledge, encompassing 12,857,601 knowledges that link air pollution with symptoms, genes, diseases, proteins, pathways, and metabolites etc. The resulting knowledge graph features a more balanced and diverse distribution of relationships between entities and includes phenotype databases, making the dataset suitable for representing pollutant-gene-phenotype/disease relationships. This profound integration offers deep and wide-ranging insights into the intricate interactions between air pollution and biological systems, aiding in the understanding of air pollution exposure, gene, and phenotype/disease relationships.
+                                </span>
+                                <span>
+                                    2. Database Uniqueness and Innovation. Meticulously curated and annotated knowledge from 865 rigorously selected publications, categorized into 13 entity types and 12 relationship types. Each of the 1,134 distinct knowledge points in this dataset has been annotated and reviewed by at least two independent experts, ensuring high quality and reliability.This dataset is a significant contribution to the field, offering rapid access to original research on air pollutants. It serves as an invaluable resource for validating the knowledge extraction capabilities of large language models and the predictive capabilities of air pollution exposure mechanism models. This comprehensive and expertly vetted dataset is poised to advance research and understanding in the intricate interactions between air pollution and biological systems.
+                                </span>
+                                More resources about the platform can be found in the <a href={`https://${window.location.host}/#/about`}>About</a> page.
+                            </p>
+                        </Col>
+                        <Col className="image-container">
+                            <Carousel autoPlay dynamicHeight={false} infiniteLoop showThumbs={false}>
+                                {images.map((item: ImageItem) => {
+                                    return (
+                                        <div key={item.title}>
+                                            <img src={item.src} />
+                                            <p className="legend">{item.title}</p>
+                                        </div>
+                                    );
+                                })}
+                            </Carousel>
+                        </Col>
+                    </Row>
                 </Row>
                 <Row className="text-statistics">
                     {stats.map((item) => {
