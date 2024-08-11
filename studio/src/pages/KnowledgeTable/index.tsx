@@ -673,7 +673,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     <>
                         <p>
                             {
-                                loading ? 'Loading Knowledges' : 'No Knowledges'
+                                loading ? 'Loading Knowledges ' : 'No Knowledges '
                             }
 
                             for Your Query

@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Row } from 'antd';
-import DrugGene from './DrugGenePanel';
-import DrugDisease from './DrugDiseasePanel';
-import GeneDisease from './DiseaseGenePanel';
 import PublicationPanel from './PublicationPanel';
 import CommonPanel from './CommonPanel';
 import type { EdgeInfoPanelProps } from './index.t';
@@ -38,24 +35,9 @@ const EdgeInfoPanel: React.FC<EdgeInfoPanelProps> = (props) => {
       }
 
       if (queryStr) {
-        switch (relationType) {
-          case 'DrugDisease':
-            return <DrugDisease edgeInfo={props.edgeInfo}>
-              <PublicationPanel queryStr={queryStr} />
-            </DrugDisease>;
-          case 'DrugGene':
-            return <DrugGene edgeInfo={props.edgeInfo}>
-              <PublicationPanel queryStr={queryStr} />
-            </DrugGene>;
-          case 'GeneDisease':
-            return <GeneDisease edgeInfo={props.edgeInfo}>
-              <PublicationPanel queryStr={queryStr} />
-            </GeneDisease>;
-          default:
-            return <CommonPanel edgeInfo={props.edgeInfo}>
-              <PublicationPanel queryStr={queryStr} />
-            </CommonPanel>;
-        }
+        return <CommonPanel edgeInfo={props.edgeInfo} relationType={relationType}>
+          <PublicationPanel queryStr={queryStr} />
+        </CommonPanel>;
       }
     }
   };

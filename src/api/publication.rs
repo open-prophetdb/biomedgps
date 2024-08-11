@@ -246,7 +246,10 @@ impl Publication {
         if res.status().is_success() {
             let body = res.text().await?;
             let json: serde_json::Value = serde_json::from_str(&body)?;
-            let summary = json["summary"].as_str().unwrap().to_string();
+            let summary = match json["summary"].as_str() {
+                Some(s) => s.to_string(),
+                None => "No AI answer for the above question, because not enough relevant results for AI to analyze.".to_string(),
+            };
             let daily_limit_reached = json["dailyLimitReached"].as_bool().unwrap();
             let is_disputed = json["isDisputed"].as_bool().unwrap();
             let is_incomplete = json["isIncomplete"].as_bool().unwrap();

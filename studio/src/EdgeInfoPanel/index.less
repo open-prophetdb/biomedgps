@@ -10,6 +10,10 @@
       // TODO: What height should be set here?
       height: calc(100vh - 60px);
       overflow: scroll;
+
+      .ant-tabs-tabpane {
+        height: 100%;
+      }
     }
   }
 
@@ -19,8 +23,10 @@
   }
 
   .publication-panel {
+    height: 100%;
     display: flex;
     flex-direction: column;
+    flex-wrap: nowrap;
 
     .publication-tag {
       font-size: 1rem;
@@ -31,6 +37,7 @@
     .publication-panel-header {
       font-size: 1rem;
       padding: 20px;
+      min-height: unset;
     }
 
     .publication-panel-content {

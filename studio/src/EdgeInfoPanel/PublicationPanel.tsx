@@ -111,9 +111,13 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
         <Row className='publication-panel'>
             <Tag className='publication-tag'>Question</Tag>
             <Col className='publication-panel-header'>
-                <span>Q: {props.queryStr}</span>
+                <span>
+                    <Tag>Question</Tag>
+                    {props.queryStr}
+                </span>
                 <p>
-                    A: {publicationSummary.length > 0 ? publicationSummary : `No AI summary for the above question.`}
+                    <Tag>Answer by AI</Tag>
+                    {publicationSummary.length > 0 ? publicationSummary : `Generating answers for the question above...`}
                 </p>
             </Col>
 
