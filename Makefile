@@ -36,19 +36,22 @@ clean-studio:
 build-biomedgps-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
-	@rm -rf frontend && cp -r studio frontend
+	@cd studio && yarn && cd ..
+	@rm -rf frontend && rsync -av --exclude=node_modules --exclude=dist studio/ frontend
+	@ln -s $(PWD)/studio/node_modules $(PWD)/frontend/node_modules
 	@cp studio/custom/logo/biomedgps.png frontend/public/assets/logo-white.png 
 	@cp studio/custom/logo/biomedgps.png frontend/src/assets/logo-white.png
 	@cp studio/custom/logo/biomedgps.png frontend/public/logo.png
 	@cp studio/custom/route/rapex.ts frontend/config/routes.ts
 	# @cd studio && yarn && yarn openapi || true
-	@cd frontend && yarn
+	# @cd frontend && yarn
 	@cd frontend && yarn build:biomedgps-embed && cd ..
 
 build-rapex-studio:
 	@printf "Building studio based on openapi...\n"
 	@mkdir -p assets
-	@rm -rf frontend && cp -r studio frontend && rm -rf frontend/node_modules
+	@rm -rf frontend && rsync -av --exclude=node_modules --exclude=dist studio/ frontend
+	@ln -s $(PWD)/studio/node_modules $(PWD)/frontend/node_modules
 	@cp studio/custom/components/rapex/Home.tsx frontend/src/pages/Home/index.tsx
 	@cp studio/custom/components/rapex/ModelConfig.tsx frontend/src/pages/ModelConfig/index.tsx
 	@cp studio/custom/doc/rapex/help.md frontend/public/README/help.md
@@ -58,7 +61,7 @@ build-rapex-studio:
 	@cp studio/custom/logo/rapex.png frontend/public/logo.png
 	@cp studio/custom/route/rapex.ts frontend/config/routes.ts
 	# @cd studio && yarn && yarn openapi || true
-	@cd frontend && yarn
+	# @cd frontend && yarn
 	@cd frontend && yarn build:rapex-embed && cd ..
 
 build-biomedgps:
