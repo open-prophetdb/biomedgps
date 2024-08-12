@@ -79,7 +79,7 @@ itertools = "0.13.0"
 urlencoding = "2.1.3"
 
 # Models
-openai-api-rs = "2.1.4"
+openai-api-rs = "5.0.4"
 
 # Algorithms
 kiddo = "4.2.0" # for KNN

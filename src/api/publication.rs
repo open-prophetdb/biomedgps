@@ -1,3 +1,4 @@
+use crate::model::llm::ChatBot;
 use anyhow;
 use log::info;
 use poem_openapi::Object;
@@ -213,6 +214,37 @@ impl Publication {
             page: page,
             page_size: page_size,
             search_id: Some(search_id),
+        })
+    }
+
+    pub async fn fetch_summary_by_chatgpt(
+        question: &str,
+        publications: &Vec<Publication>,
+    ) -> Result<PublicationsSummary, anyhow::Error> {
+        let openai_api_key = std::env::var("OPENAI_API_KEY").unwrap();
+        if openai_api_key.is_empty() {
+            return Err(anyhow::Error::msg("OPENAI_API_KEY not found"));
+        }
+
+        let chatbot = ChatBot::new("GPT4", &openai_api_key);
+
+        let publications = publications.iter().map(|p| {
+            format!("Title: {}\nAuthors: {}\nJournal: {}\nYear: {}\nSummary: {}\nAbstract: {}\nDOI: {}\n", p.title, p.authors.join(", "), p.journal, p.year.unwrap_or(0), p.summary, p.article_abstract.as_ref().unwrap_or(&"".to_string()), p.doi.as_ref().unwrap_or(&"".to_string()))
+        }).collect::<Vec<String>>();
+
+        let prompt = format!(
+            "I have a collection of papers wrappered by the ```:\n```\n{}\n```\n\nPlease carefully analyze these papers to answer the following question: \n{}\n\nIn your response, please provide a well-integrated analysis that directly answers the question. Include citations from specific papers to support your answer, and ensure that the reasoning behind your answer is clearly explained. Reference relevant details from the papers' summaries or abstracts as needed.",
+            publications.join("\n"),
+            question,
+        );
+
+        let response = chatbot.answer(prompt).await?;
+        Ok(PublicationsSummary {
+            summary: response,
+            daily_limit_reached: false,
+            is_disputed: false,
+            is_incomplete: false,
+            results_analyzed_count: 0,
         })
     }
 

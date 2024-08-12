@@ -4,7 +4,7 @@ ALTER TABLE biomedgps_knowledge_curation
 ADD COLUMN payload JSONB DEFAULT '{"project_id": "0", "organization_id": "0"}';
 
 -- Enable intelligent searching for the entity table
-CREATE EXTENSION pg_trgm;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 
 CREATE INDEX IF NOT EXISTS idx_trgm_id_entity_table ON biomedgps_entity USING gin(id gin_trgm_ops);

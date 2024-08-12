@@ -5,9 +5,9 @@ use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::warn;
-use openai_api_rs::v1::api::Client;
-use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, FunctionCall, MessageRole};
-use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4, GPT4_1106_PREVIEW};
+use openai_api_rs::v1::api::OpenAIClient;
+use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, ToolCall};
+use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4_O};
 use openssl::hash::{hash, MessageDigest};
 use poem_openapi::{Enum, Object};
 use regex::Regex;
@@ -474,7 +474,7 @@ where
         if self.message.len() > 0 {
             return Ok(self);
         } else {
-            self.message = match chatbot.answer(prompt) {
+            self.message = match chatbot.answer(prompt).await {
                 Ok(message) => message,
                 Err(e) => {
                     warn!("Failed to answer the question: {}", e.to_string());
@@ -508,9 +508,9 @@ pub struct ChatBot {
     role: MessageRole,
     name: Option<String>,
     content: Option<String>,
-    function_call: Option<FunctionCall>,
+    tool_call: Option<Vec<ToolCall>>,
     model_name: String,
-    client: Client,
+    client: OpenAIClient,
 }
 
 impl ChatBot {
@@ -519,37 +519,39 @@ impl ChatBot {
             // GPT4 or GPT4_1106_PREVIEW
             // https://platform.openai.com/account/limits
             //
-            GPT4_1106_PREVIEW.to_string()
+            GPT4_O.to_string()
         } else {
             GPT3_5_TURBO.to_string()
         };
 
-        let client = Client::new(openai_api_key.to_string());
+        let client = OpenAIClient::new(openai_api_key.to_string());
 
         ChatBot {
             role: MessageRole::user,
             name: None,
             content: None,
-            function_call: None,
+            tool_call: None,
             model_name: model,
             client: client,
         }
     }
 
-    pub fn answer(&self, prompt: String) -> Result<String, anyhow::Error> {
+    pub async fn answer(&self, prompt: String) -> Result<String, anyhow::Error> {
         let model_name = self.model_name.clone();
         let req = ChatCompletionRequest::new(
             model_name,
             vec![chat_completion::ChatCompletionMessage {
                 role: self.role.clone(),
-                content: prompt,
+                content: chat_completion::Content::Text(prompt),
                 name: self.name.clone(),
-                function_call: self.function_call.clone(),
+                // TODO: How to use the tool_call?
+                tool_calls: None,
+                tool_call_id: None,
             }],
         );
 
         let req = req.temperature(0.5);
-        let result = self.client.chat_completion(req)?;
+        let result = self.client.chat_completion(req).await?;
         let message = result.choices[0].message.content.clone();
 
         match message {
@@ -580,7 +582,9 @@ mod tests {
             xrefs: None,
         };
 
-        let mut llm_msg = super::LlmMessage::new("node_summary", node, None).unwrap();
+        super::init_prompt_templates();
+        
+        let mut llm_msg = super::LlmMessage::new("explain_node_summary", node, None).unwrap();
         let answer = llm_msg.answer(&chatbot, None).await.unwrap();
         println!("Prompt: {}", answer.prompt);
         println!("Answer: {}", answer.message);

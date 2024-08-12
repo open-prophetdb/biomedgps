@@ -1247,7 +1247,8 @@ impl Graph {
             //             vector_to_float4(rte.embedding, 400, false),
             //             vector_to_float4(ee2.embedding, 400, false),
             //             12.0,
-            //             true
+            //             true,
+            //             false
             //     ) AS score
             // FROM
             //     biomedgps_entity_embedding ee1,

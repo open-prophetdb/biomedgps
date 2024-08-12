@@ -288,6 +288,26 @@ export async function fetchPublicationsConsensus(
   });
 }
 
+/** Call `/api/v1/publications-summary` with query params to fetch publication summary. POST /api/v1/publications-summary */
+export async function answerQuestionWithPublications(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.answerQuestionWithPublicationsParams,
+  body: swagger.Publication[],
+  options?: { [key: string]: any },
+) {
+  return request<swagger.PublicationsSummary>('/api/v1/publications-summary', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: {
+      ...params,
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/publications-summary` with query params to fetch publication summary. GET /api/v1/publications-summary/${param0} */
 export async function fetchPublicationsSummary(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

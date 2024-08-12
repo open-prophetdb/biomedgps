@@ -80,6 +80,31 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/publications-summary` with query params to fetch publication summary.
+    #[oai(
+        path = "/publications-summary",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "answerQuestionWithPublications"
+    )]
+    async fn answer_question_with_publications(
+        &self,
+        publications: Json<Vec<Publication>>,
+        question: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetPublicationsSummaryResponse {
+        let question = question.0;
+        let publications = publications.0;
+        match Publication::fetch_summary_by_chatgpt(&question, &publications).await {
+            Ok(result) => GetPublicationsSummaryResponse::ok(result),
+            Err(e) => {
+                let err = format!("Failed to fetch publications summary: {}", e);
+                warn!("{}", err);
+                return GetPublicationsSummaryResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/publications/:id` to fetch a publication.
     #[oai(
         path = "/publications/:id",

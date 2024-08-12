@@ -1,4 +1,8 @@
 declare namespace swagger {
+  type answerQuestionWithPublicationsParams = {
+    question: string;
+  };
+
   type Article = {
     ref_id: string;
     pubmed_id: string;
