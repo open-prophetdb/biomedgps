@@ -8,3 +8,4 @@ pub mod kge;
 pub mod init_db;
 pub mod entity;
 pub mod entity_attr;
+pub mod publication;

@@ -46,7 +46,7 @@ pub struct LlmResponse {
     pub created_at: DateTime<Utc>,
 }
 
-/// The context is used to store the context for the LLM. The context can be an entity, an expanded relation, or treatments with disease context.
+/// The context is used to store the context for the LLM. The context can be an entity, an expanded relation, or treatments with disease context. The context is used to identify the specific context from the request. See the route.rs for more details.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct Context {
     pub entity: Option<Entity>,

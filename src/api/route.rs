@@ -1,7 +1,6 @@
 //! This module defines the routes of the API.
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
-use crate::api::publication::Publication;
 use crate::api::schema::{
     ApiTags, DeleteResponse, GetConsensusResultResponse, GetEntityAttrResponse,
     GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse, GetPublicationsResponse,
@@ -19,6 +18,7 @@ use crate::model::graph::Graph;
 use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
+use crate::model::publication::Publication;
 use crate::model::util::match_color;
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
@@ -91,11 +91,13 @@ impl BiomedgpsApi {
         &self,
         publications: Json<Vec<Publication>>,
         question: Query<String>,
+        pool: Data<&Arc<sqlx::PgPool>>,
         _token: CustomSecurityScheme,
     ) -> GetPublicationsSummaryResponse {
         let question = question.0;
         let publications = publications.0;
-        match Publication::fetch_summary_by_chatgpt(&question, &publications).await {
+        let pool_arc = pool.clone();
+        match Publication::fetch_summary_by_chatgpt(&question, &publications, Some(&pool_arc)).await {
             Ok(result) => GetPublicationsSummaryResponse::ok(result),
             Err(e) => {
                 let err = format!("Failed to fetch publications summary: {}", e);

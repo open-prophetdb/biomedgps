@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { MarkdownViewer } from 'biominer-components';
 import RehypeRaw from 'rehype-raw';
+import MarkdownPreview from '@uiw/react-markdown-preview';
 import { Button, List, message, Row, Col, Tag } from 'antd';
 import { FileProtectOutlined } from '@ant-design/icons';
 import type { Publication, PublicationDetail } from 'biominer-components/dist/typings';
@@ -24,6 +24,7 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
     const [abstractMap, setAbstractMap] = useState<Record<string, string>>({});
     const [searchId, setSearchId] = useState<string>('');
     const [publicationSummary, setPublicationSummary] = useState<string>('Loading...');
+    const [publicationSummaryByChatGPT, setPublicationSummaryByChatGPT] = useState<string>('');
     const [generating, setGenerating] = useState<boolean>(false);
 
     const showAbstract = async (doc_id: string): Promise<PublicationDetail> => {
@@ -82,7 +83,7 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
             const docId = docIds[i];
             if (!publicationMap[docId].article_abstract) {
                 const msg = `Load ${i} publication...`;
-                setPublicationSummary(msg);
+                setPublicationSummaryByChatGPT(msg);
                 await showAbstract(docId).then((publication) => {
                     tempAbstractMap[docId] = publication.article_abstract || '';
                 }).catch((error) => {
@@ -94,7 +95,7 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
         }
 
         setAbstractMap(tempAbstractMap);
-        setPublicationSummary('Publications loaded, answering question...');
+        setPublicationSummaryByChatGPT('Publications loaded, answering question...');
 
         answerQuestionWithPublications(
             {
@@ -104,11 +105,11 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
             Object.values(publicationMap)
         ).then((response) => {
             console.log('Answer: ', response);
-            setPublicationSummary(response.summary);
+            setPublicationSummaryByChatGPT(response.summary);
         }).catch((error) => {
             setGenerating(false);
             console.error('Error: ', error);
-            setPublicationSummary('Failed to answer question, because of the following error: ' + error);
+            setPublicationSummaryByChatGPT('Failed to answer question, because of the following error: ' + error);
         });
     }
 
@@ -158,19 +159,23 @@ const PublicationPanel: React.FC<PublicationPanelProps> = (props) => {
             <Col className='publication-panel-header'>
                 <span>
                     <Tag>Question</Tag>
-                    {props.queryStr} <Button type="primary" onClick={() => {
-                        setGenerating(true);
-                        const docIds = Object.keys(publicationMap);
-                        if (docIds.length > 0) {
-                            loadAbstractsAndAnswer(docIds);
-                        }
-                    }} disabled={generating || Object.keys(publicationMap).length == 0} size='small'>
-                        Generate Detailed Answer
-                    </Button>
+                    {props.queryStr}
                 </span>
-                <p>
+                <p style={{ marginTop: '5px' }}>
                     {/* <Tag>Answer by AI</Tag> */}
-                    <MarkdownViewer markdown={publicationSummary} rehypePlugins={[RehypeRaw]} />
+                    <span>
+                        <Tag>Short Answer</Tag> {publicationSummary} <Button type="primary" onClick={() => {
+                            setGenerating(true);
+                            const docIds = Object.keys(publicationMap);
+                            if (docIds.length > 0) {
+                                loadAbstractsAndAnswer(docIds);
+                            }
+                        }} disabled={generating || Object.keys(publicationMap).length == 0} size='small'>
+                            Generate Detailed Answer
+                        </Button>
+                    </span>
+                    {publicationSummaryByChatGPT &&
+                        <MarkdownPreview className='markdown-viewer' source={publicationSummaryByChatGPT} rehypePlugins={[RehypeRaw]} />}
                 </p>
             </Col>
 

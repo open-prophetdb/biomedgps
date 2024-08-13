@@ -29,6 +29,10 @@ const Desc: React.FC<{
     const highlightWords = (text: string, words: string[]): string => {
         let newText = text;
         words.forEach(word => {
+            if (!word) {
+                return;
+            }
+
             let escapedWord = escapeRegExp(word);
             let regex = new RegExp(`(${escapedWord})(?![^<]*>|[^<>]*<\/)`, 'gi');
             newText = newText.replace(regex, '<span class="highlight">$1</span>');

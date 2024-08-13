@@ -28,6 +28,10 @@
     flex-direction: column;
     flex-wrap: nowrap;
 
+    .ant-tag {
+      font-size: 0.85rem;
+    }
+
     .publication-tag {
       font-size: 1rem;
       margin-left: 10px;
@@ -38,6 +42,26 @@
       font-size: 1rem;
       padding: 20px;
       min-height: unset;
+
+      .markdown-viewer,
+      .ant-empty {
+        border: 1px solid #d9d9d9;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0 0;
+        max-height: 500px;
+        overflow: auto;
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+          margin-top: 5px;
+          margin-bottom: 5px;
+        }
+      }
     }
 
     .publication-panel-content {

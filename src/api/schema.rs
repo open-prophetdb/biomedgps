@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
 
-use super::publication::{Publication, PublicationRecords, PublicationsSummary, ConsensusResult};
+use crate::model::publication::{Publication, PublicationRecords, PublicationsSummary, ConsensusResult};
 
 #[derive(Tags)]
 pub enum ApiTags {

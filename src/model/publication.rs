@@ -1,9 +1,10 @@
-use crate::model::llm::ChatBot;
+use crate::model::llm::{ChatBot, LlmContext, LlmMessage, PROMPTS, PROMPT_TEMPLATE};
 use anyhow;
 use log::info;
 use poem_openapi::Object;
 use reqwest;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use urlencoding;
 
 const GUIDESCOPER_PUBLICATIONS_API: &str = "/api/paper_search/";
@@ -33,6 +34,51 @@ pub struct Publication {
     pub article_abstract: Option<String>,
     pub doi: Option<String>,
     pub provider_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
+pub struct PublicationsContext {
+    pub publications: Vec<Publication>,
+    pub question: String,
+}
+
+impl LlmContext for PublicationsContext {
+    fn get_context(&self) -> Self {
+        self.clone()
+    }
+
+    fn render_prompt(
+        &self,
+        prompt_template_category: &str,
+        prompt_template: &str,
+    ) -> Result<String, anyhow::Error> {
+        let mut prompt = prompt_template.to_string();
+        let publications = self.publications.iter().map(|p| {
+            format!("Title: {}\nAuthors: {}\nJournal: {}\nYear: {}\nSummary: {}\nAbstract: {}\nDOI: {}\n", p.title, p.authors.join(", "), p.journal, p.year.unwrap_or(0), p.summary, p.article_abstract.as_ref().unwrap_or(&"".to_string()), p.doi.as_ref().unwrap_or(&"".to_string()))
+        }).collect::<Vec<String>>();
+        prompt = prompt.replace("{{publications}}", &publications.join("\n"));
+        prompt = prompt.replace("{{question}}", &self.question);
+        Ok(prompt)
+    }
+
+    fn register_prompt_template() {
+        let mut prompt_templates = PROMPT_TEMPLATE.lock().unwrap();
+        prompt_templates.insert("answer_question_with_publications", "I have a collection of papers wrappered by the ```:\n```\n{{publications}}\n```\n\nPlease carefully analyze these papers to answer the following question: \n{{question}}\n\nIn your response, please provide a well-integrated analysis that directly answers the question. Include citations from specific papers to support your answer, and ensure that the reasoning behind your answer is clearly explained. Reference relevant details from the papers' summaries or abstracts as needed.");
+
+        let mut prompts = PROMPTS.lock().unwrap();
+
+        let mut m2 = HashMap::new();
+        m2.insert("key", "answer_question_with_publications");
+        m2.insert("label", "Answer question with publications");
+        m2.insert("type", "question");
+
+        // Does it exist?
+        if prompts.contains(&m2) {
+            return;
+        } else {
+            prompts.push(m2);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
@@ -220,6 +266,7 @@ impl Publication {
     pub async fn fetch_summary_by_chatgpt(
         question: &str,
         publications: &Vec<Publication>,
+        pool: Option<&sqlx::PgPool>,
     ) -> Result<PublicationsSummary, anyhow::Error> {
         let openai_api_key = std::env::var("OPENAI_API_KEY").unwrap();
         if openai_api_key.is_empty() {
@@ -227,20 +274,39 @@ impl Publication {
         }
 
         let chatbot = ChatBot::new("GPT4", &openai_api_key);
+        let publications_context = PublicationsContext {
+            publications: publications.clone(),
+            question: question.to_string(),
+        };
 
-        let publications = publications.iter().map(|p| {
-            format!("Title: {}\nAuthors: {}\nJournal: {}\nYear: {}\nSummary: {}\nAbstract: {}\nDOI: {}\n", p.title, p.authors.join(", "), p.journal, p.year.unwrap_or(0), p.summary, p.article_abstract.as_ref().unwrap_or(&"".to_string()), p.doi.as_ref().unwrap_or(&"".to_string()))
-        }).collect::<Vec<String>>();
+        PublicationsContext::register_prompt_template();
 
-        let prompt = format!(
-            "I have a collection of papers wrappered by the ```:\n```\n{}\n```\n\nPlease carefully analyze these papers to answer the following question: \n{}\n\nIn your response, please provide a well-integrated analysis that directly answers the question. Include citations from specific papers to support your answer, and ensure that the reasoning behind your answer is clearly explained. Reference relevant details from the papers' summaries or abstracts as needed.",
-            publications.join("\n"),
-            question,
-        );
+        let mut llm_msg = match LlmMessage::new(
+            "answer_question_with_publications",
+            publications_context,
+            None,
+        ) {
+            Ok(msg) => msg,
+            Err(e) => {
+                return Err(anyhow::Error::msg(format!(
+                    "Failed to create LLM message: {}",
+                    e
+                )));
+            }
+        };
 
-        let response = chatbot.answer(prompt).await?;
+        let response = match llm_msg.answer(&chatbot, pool).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(anyhow::Error::msg(format!(
+                    "Failed to get response from LLM: {}",
+                    e
+                )));
+            }
+        };
+
         Ok(PublicationsSummary {
-            summary: response,
+            summary: response.message.clone(),
             daily_limit_reached: false,
             is_disputed: false,
             is_incomplete: false,

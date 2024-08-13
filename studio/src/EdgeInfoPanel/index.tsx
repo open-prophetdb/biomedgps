@@ -36,7 +36,7 @@ const EdgeInfoPanel: React.FC<EdgeInfoPanelProps> = (props) => {
 
       if (queryStr) {
         return <CommonPanel edgeInfo={props.edgeInfo} relationType={relationType}>
-          <PublicationPanel queryStr={queryStr} />
+          <PublicationPanel queryStr={queryStr} startNode={startNode.data.name} endNode={endNode.data.name} />
         </CommonPanel>;
       }
     }
