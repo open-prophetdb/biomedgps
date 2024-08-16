@@ -45,6 +45,8 @@ const defaultCustomSettings = {
 }
 
 const isDev = process.env.NODE_ENV === 'development';
+const version = process.env.UMI_APP_VERSION ? process.env.UMI_APP_VERSION : 'unknown';
+const introPageEnabled = process.env.UMI_APP_INTRO_PAGE_ENABLED ? process.env.UMI_APP_INTRO_PAGE_ENABLED === 'true' : false;
 const apiPrefix = process.env.UMI_APP_API_PREFIX ? process.env.UMI_APP_API_PREFIX : window.location.origin;
 const CLIENT_ID = process.env.UMI_APP_AUTH0_CLIENT_ID ? process.env.UMI_APP_AUTH0_CLIENT_ID : '<your-client-id>';
 const AUTH0_DOMAIN = process.env.UMI_APP_AUTH0_DOMAIN ? process.env.UMI_APP_AUTH0_DOMAIN : '<your-domain>';
@@ -184,13 +186,17 @@ export const layout: RuntimeConfig = (initialState: any) => {
   const { location } = history;
   const isHomePage = location.pathname === '/';
 
-  if (isHomePage) {
+  if (isHomePage && introPageEnabled) {
     return {
       headerRender: false,
       footerRender: () => <Footer />,
       menuRender: false,
       childrenRender: (children: any, props: any) => {
-        return { children };
+        return (
+          <>
+            {children}
+          </>
+        );
       }
     }
   }
