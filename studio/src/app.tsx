@@ -171,6 +171,23 @@ export function rootContainer(container: React.ReactNode): React.ReactNode {
 // https://pro-components.antdigital.dev/components/layout
 export const layout: RuntimeConfig = (initialState: any) => {
   console.log("initialState: ", initialState);
+  const { location } = history;
+  const isHomePage = location.pathname === '/';
+
+  if (isHomePage) {
+    return {
+      headerRender: false,
+      footerRender: () => <Footer />,
+      menuRender: false,
+      childrenRender: (children: any, props: any) => {
+        return (
+          <>
+            {children}
+          </>
+        );
+      }
+    }
+  }
 
   return {
     layout: 'top',

@@ -1,3 +1,6 @@
+@menu-width: 150px;
+@collapsed-menu-width: 60px;
+
 .knowledge-table-wrapper {
     display: flex;
     width: 100%;
@@ -8,6 +11,7 @@
     background-color: #fff;
 
     .menu-panel {
+        max-width: @menu-width;
         width: fit-content;
         height: 100%;
         display: flex;
@@ -17,6 +21,14 @@
         .ant-menu {
             height: calc(100% - 40px);
             border: unset;
+
+            .ant-menu-item {
+                padding-left: 16px !important;
+            }
+        }
+
+        .ant-menu-inline-collapsed {
+            width: @collapsed-menu-width;
         }
 
         .ant-btn {
@@ -39,11 +51,11 @@
 }
 
 .knowledge-table-container {
-    width: calc(100% - 150px);
+    width: calc(100% - @menu-width);
 }
 
 .collapsed-knowledge-table-container {
-    width: calc(100% - 80px);
+    width: calc(100% - @collapsed-menu-width);
 }
 
 .knowledge-table-container,

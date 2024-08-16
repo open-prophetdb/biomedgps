@@ -120,7 +120,6 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const [edgeInfo, setEdgeInfo] = useState<EdgeInfo | undefined>(undefined);
     const [currentNodes, setCurrentNodes] = useState<(GraphNode | undefined)[]>([]);
     const [activatedNode, setActivatedNode] = useState<GraphNode | undefined>(undefined);
-    const [activeKeys, setActiveKeys] = useState<string[]>(['0', '1', '2', '3']);
     const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
     const [selectedRelationTypes, setSelectedRelationTypes] = useState<string[]>([]);
     const [relationTypeDescs, setRelationTypeDescs] = useState<Record<string, string>>({});
@@ -138,27 +137,10 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [collapsed, setCollapsed] = useState<boolean>(false);
 
-    const [menuKey, setMenuKey] = useState<string>('summary');
+    const [menuKey, setMenuKey] = useState<string>('');
+    const [menuItems, setMenuItems] = useState<any[]>([]);
     const [form] = Form.useForm();
 
-    const menuItems = [
-        {
-            key: 'summary',
-            label: 'Summary',
-            icon: <InfoCircleFilled />,
-            onClick: () => {
-                setMenuKey('summary');
-            },
-        },
-        {
-            key: 'knowledge',
-            label: 'Knowledge',
-            icon: <LinkOutlined />,
-            onClick: () => {
-                setMenuKey('knowledge');
-            },
-        },
-    ];
 
     useEffect(() => {
         if (!isAuthenticated()) {
@@ -494,7 +476,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
             key: 'relation_type',
             align: 'left',
             dataIndex: 'relation_type',
-            // width: 350,
+            width: 350,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.relation_type,
@@ -548,7 +530,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 edge: record as GraphEdge
                             });
                             setDrawerVisible(true);
-                        }}>Publications</Button>
+                        }}>Details</Button>
                     </Popover>
                 </Space>
             ),
@@ -611,7 +593,35 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                         return response.nodes.find((node) => node.data.id === entityId);
                     });
                     setCurrentNodes(nodes);
-                    setActiveKeys(getDefaultKeys(nodes).slice(-1));
+                    const keys = getDefaultKeys(nodes);
+
+                    console.log('Current Nodes: ', nodes, keys);
+                    let newMenuItems = nodes.map((node, index) => {
+                        return {
+                            key: `${keys[index]}`,
+                            label: `${keys[index]}`,
+                            icon: <InfoCircleFilled />,
+                            onClick: () => {
+                                setMenuKey(`${keys[index]}`);
+                            },
+                        };
+                    });
+                    newMenuItems.push(
+                        {
+                            // @ts-ignore, don't worry about the type error
+                            type: 'divider',
+                        }
+                    )
+                    newMenuItems.push({
+                        key: 'knowledge',
+                        label: 'Knowledge',
+                        icon: <LinkOutlined />,
+                        onClick: () => {
+                            setMenuKey('knowledge');
+                        },
+                    });
+                    setMenuItems(newMenuItems);
+                    setMenuKey(`${keys[0]}`);
                 };
 
                 let tableData = edges.map((item) => {
@@ -652,55 +662,29 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     };
 
     const getDefaultKeys = (currentNodes: (GraphNode | undefined)[]) => {
-        return currentNodes?.map((node, index) => index.toString()).concat([`${currentNodes.length + 1}`]);
-    }
-
-    const switchCollapsePanel = (key: string | string[]) => {
-        if (!Array.isArray(key)) {
-            key = [key];
-        }
-
-        console.log('Switched key: ', key);
-        const defaultKeys = getDefaultKeys(currentNodes);
-        if (key.length === 0) {
-            setActiveKeys(defaultKeys);
-        } else {
-            setActiveKeys(key);
-        }
-    }
-
-    const getExtraButton = (index: string) => {
-        return <Button type="default" icon={activeKeys.indexOf(index) < 0 ? <ArrowsAltOutlined /> : <ShrinkOutlined />}
-            onClick={() => {
-                switchCollapsePanel(activeKeys.filter((key) => key !== index));
-            }}
-        >
-            {activeKeys.indexOf(index) < 0 ? 'Expand' : 'Collapse'}
-        </Button>;
-    }
-
-    const getTitle = (node: GraphNode) => {
-        return <span>
-            {node?.nlabel} Card - {node?.data.name} [Click to show more details]
-            {/* <Tooltip title="Click the panel header or `Expand` button to show more details">
-                <Button type="link" style={{ marginLeft: '5px', padding: '4px 0' }}>
-                    <QuestionCircleOutlined />Help
-                </Button>
-            </Tooltip> */}
-        </span>;
+        return currentNodes?.map((node, index) => node?.data.name || 'Unknown');
     }
 
     const handleSubmit = (values: any) => {
     }
 
+    const makeEmptyDescription = (node: GraphNode | undefined) => {
+        if (node === undefined) {
+            return 'No Node Data';
+        } 
+
+        return <span><Tag color={guessColor(node.data.label)}>{node.data.label} | {node.data.id}</Tag><br /><Tag>{node.data.name}</Tag><br />No information is currently available for this type of node. However, you can still make use of the other modules listed in the right panel.</span>;
+    }
+
     const whichPanel = () => {
-        if (menuKey === 'summary') {
+        if (menuKey !== 'knowledge') {
             if (currentNodes.length == 0) {
                 return <Empty description="No Node Data" />
             } else if (currentNodes.length == 1) {
-                return currentNodes[0]?.nlabel == 'Gene' ? <NodeInfoPanel node={currentNodes[0]} /> : 'Current Node is not a Gene, More Coming Soon...';
+                return currentNodes[0]?.nlabel == 'Gene' ? <NodeInfoPanel node={currentNodes[0]} /> : <Empty description={makeEmptyDescription(currentNodes[0])} />
             } else {
-                return null;
+                const node = filter(currentNodes, (node) => node?.data.name === menuKey)[0];
+                return node?.nlabel == 'Gene' ? <NodeInfoPanel node={node} /> : <Empty description={makeEmptyDescription(currentNodes[0])} />
                 // TODO: Implement the multiple nodes panel
                 // return <Tabs defaultActiveKey="1">
                 //     {
@@ -723,7 +707,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                         <Form.Item
                             key={'resource'}
                             label={'Resource'}
-                            initialValue={undefined}
+                            initialValue={[]}
                             name={'resource'}
                             required={false}
                             tooltip={'Select the resources to filter the knowledges.'}
@@ -738,7 +722,6 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 style={{ marginRight: '10px' }}
                                 size="middle"
                                 placeholder="Please select resources to filter."
-                                defaultValue={[]}
                                 onChange={(value: string[]) => {
                                     if (nodeIds) {
                                         fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value);
@@ -755,7 +738,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                         <Form.Item
                             key={'relation_type'}
                             label={'Relation Type'}
-                            initialValue={undefined}
+                            initialValue={[]}
                             name={'relation_type'}
                             required={false}
                             tooltip={'Select the relation types to filter the knowledges.'}
@@ -769,7 +752,6 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 style={{ marginRight: '10px' }}
                                 size="middle"
                                 placeholder="Please select relation types to filter."
-                                defaultValue={[]}
                                 onChange={(value: string[]) => {
                                     if (nodeIds) {
                                         fetchTableData(nodeIds, page, pageSize, value, selectedResources);
@@ -811,7 +793,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                             </Tooltip>
                         </span>
                         <Tooltip title="Download the table data as a TSV file.">
-                            <Button size="large" type="default" onClick={() => {
+                            <Button size="middle" type="default" onClick={() => {
                                 // Download as TSV file
                                 const header = columns.map((col) => col.title);
                                 const data = tableData.map((record) => {
@@ -831,7 +813,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 URL.revokeObjectURL(url);
                             }} icon={<DownloadOutlined />} />
                         </Tooltip>
-                        <Button type="primary" danger size="large"
+                        <Button type="primary" danger size="middle"
                             // disabled={selectedRowKeys.length === 0}
                             onClick={() => {
                                 if (selectedRowKeys.length === 0) {
@@ -840,7 +822,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 }
                                 explainGraph(selectedRowKeys as string[]);
                             }}>
-                            Explain
+                            Explain in Knowledge Graph
                         </Button>
                     </div>
                     <Table
@@ -924,7 +906,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         }
     }
 
-    return (isAuthenticated()) && (total == 0 ? (
+    return (isAuthenticated()) && ((total == 0 || menuKey === '') ? (
         <Row className='empty-knowledge-table-container'>
             <Spin spinning={loading}>
                 <Empty description={
@@ -958,8 +940,8 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         <Row className='knowledge-table-wrapper'>
             <Col className='menu-panel'>
                 <Menu
-                    defaultSelectedKeys={['summary']}
-                    defaultOpenKeys={['summary']}
+                    openKeys={[menuKey]}
+                    selectedKeys={[menuKey]}
                     mode="inline"
                     theme="light"
                     items={menuItems}

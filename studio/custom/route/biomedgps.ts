@@ -5,17 +5,24 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 export const routes = [
   {
     path: '/',
-    name: 'Search Knowledges',
+    name: 'Home',
     icon: 'home',
+    hideInMenu: true,
     component: './Home',
   },
   {
-    path: '/analyze-omics-data',
-    name: 'Analyze Omics Data',
-    icon: 'LineChartOutlined',
-    disabled: true,
-    component: './Home',
+    path: '/dashboard',
+    name: 'Dashboard',
+    icon: 'dashboard',
+    component: './Dashboard',
   },
+  // {
+  //   path: '/analyze-omics-data',
+  //   name: 'Analyze Omics Data',
+  //   icon: 'LineChartOutlined',
+  //   disabled: true,
+  //   component: './Dashboard',
+  // },
   {
     path: '/predict-explain',
     name: 'Predict & Explain',
@@ -44,6 +51,20 @@ export const routes = [
         category: 'knowledge-graph'
       },
     ]
+  },
+  {
+    path: '/statistics',
+    name: 'Statistics',
+    icon: 'table',
+    component: './Statistics',
+    category: 'knowledge-graph'
+  },
+  {
+    path: '/download',
+    name: 'Download',
+    icon: 'CloudDownloadOutlined',
+    component: './Download',
+    category: 'knowledge-graph'
   },
   {
     path: '/mecfs-longcovid',

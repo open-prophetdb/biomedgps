@@ -5,9 +5,16 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 export const routes = [
   {
     path: '/',
-    name: 'Search Knowledges',
+    name: 'Home',
     icon: 'home',
+    hideInMenu: true,
     component: './Home',
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    icon: 'dashboard',
+    component: './Dashboard',
   },
   {
     path: '/analyze-omics-data',

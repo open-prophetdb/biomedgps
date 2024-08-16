@@ -1,189 +1,166 @@
-.welcome {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  background-color: #fff;
-  border: 1px solid #d6d6d6;
-  border-radius: 5px;
+@header-height: 64px;
 
-  .box {
+// In home page, we would like to make the background image full screen
+.ant-layout {
+    .ant-layout-content {
+        height: 100vh;
+    }
+
+    .ant-layout-header {
+        // We need a higher header for the home page
+        height: @header-height !important;
+    }
+}
+
+.welcome {
+    min-width: 1500px;
+    width: 100vw;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100vh;
     display: flex;
-    flex-direction: row;
+    justify-content: center;
     align-items: center;
-    width: 100%;
-    height: 100%;
-    overflow: scroll;
+
+    .header,
+    .content {
+        color: #fff;
+    }
 
     .header {
-      // height: 40%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin: 0;
+        background-color: transparent;
+        display: flex;
+        justify-content: space-between;
 
-      h4 {
-        max-width: 1000px;
-      }
-
-      .ant-select {
-        width: 50%;
-      }
-
-      .desc {
-        margin: 10px 0;
-      }
-    }
-
-    .text-statistics {
-      display: flex;
-      padding: 0 10%;
-      flex-direction: row;
-      width: 100%;
-
-      .stat-item-container {
-        height: 100%;
-
-        .stat-item {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: calc(100% - 40px);
-          min-height: 200px;
-          margin: 20px;
-          border: 1px solid #d6d6d6;
-          border-radius: 5px;
-
-          .stat,
-          .ant-spin-nested-loading {
-            padding: 10px 0;
-            font-size: 1.5rem;
-          }
-
-          .icon {
-            font-size: 3.5rem;
-            color: #108ee9;
-          }
-
-          .title {
+        .ant-menu {
+            background-color: transparent;
+            color: #fff;
             font-size: 1.2rem;
-          }
+            font-weight: 500;
 
-          .desc {
-            // display: none;
-            margin: 8px 0;
-          }
+            .ant-menu-item:hover {
+                color: #fff;
+            }
         }
-      }
+
+        .logo {
+            height: 64px;
+        }
+
+        .ant-btn {
+            margin: auto 0;
+            margin-left: 20px;
+        }
     }
 
-    @media screen and (max-width: 1024px) {
-      .data-stat {
-        width: 100%;
-        margin-bottom: 30px;
-      }
-      
-      .image-container {
-        width: 100%;
-      }
+    .content {
+        height: calc(100vh - @header-height);
+
+        .ant-row {
+            height: 100%;
+            margin: 0 50px 0 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: justify;
+
+            h1 {
+                font-size: 2.4rem;
+            }
+
+            p {
+                font-size: 1.5rem;
+            }
+        }
+
+        .content-container {
+            height: 100%;
+            overflow: scroll;
+        }
+
+        .text-content,
+        .feature-content,
+        .statistics-content {
+            height: 100vh;
+        }
+
+        .feature-content,
+        .statistics-content {
+            h3 {
+                font-size: 2.4rem;
+                margin-top: 150px;
+                margin-bottom: 50px;
+            }
+        }
+
+        .feature-content>.ant-row {
+            height: 680px;
+            margin-bottom: 300px;
+
+            .ant-card {
+                margin-right: 20px;
+                margin-bottom: 20px;
+                text-align: left;
+
+                .ant-card-cover {
+                    height: 200px;
+                    overflow: hidden;
+                    border-bottom: 1px solid #d6d6d6;
+
+                    img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: contain;
+                    }
+                }
+
+                .ant-card-body {
+                    height: 110px;
+                    padding: 16px;
+                }
+            }
+        }
+
+        .statistics-content>.ant-row {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 450px;
+            margin-bottom: 300px;
+
+            .stat-item-container {
+                .stat-item {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 200px;
+                    margin: 10px;
+                    border: 1px solid #d6d6d6;
+                    border-radius: 5px;
+
+                    .stat,
+                    .ant-spin-nested-loading {
+                        padding: 10px 0;
+                        font-size: 1.5rem;
+                    }
+
+                    .icon {
+                        font-size: 3.5rem;
+                        color: #108ee9;
+                    }
+
+                    .title {
+                        font-size: 1.2rem;
+                    }
+
+                    .desc {
+                        // display: none;
+                        margin: 8px 0;
+                    }
+                }
+            }
+        }
     }
-
-    @media screen and (min-width: 1024px) {
-      .data-stat {
-        width: calc(50% - 30px);
-        margin-right: 30px;
-      }
-
-      .image-container {
-        width: 50%;
-      }
-
-    }
-
-    .statistics {
-      width: 100%;
-
-      .data-stat {
-        .desc {
-          font-size: 1rem;
-          max-height: fit-content;
-          overflow: scroll;
-          
-          span {
-            display: inline-block;
-            margin-bottom: 10px;
-          }
-
-          // List style
-          ul,
-          li {
-            margin: 0;
-            padding: 0;
-            border-bottom: 1px solid #d6d6d6;
-          }
-
-          li {
-            padding: 5px 0;
-          }
-        }
-      }
-
-      .image-container {
-        .carousel-status {
-          display: none;
-        }
-
-        .legend {
-          opacity: 0.05;
-        }
-
-        .legend:hover {
-          opacity: 1;
-        }
-        
-        .control-dots {
-          opacity: 0.1;
-        }
-
-        .control-dots:hover {
-          opacity: 1;
-        }
-      }
-    }
-  }
-}
-
-/* Vistor Statistics */
-iframe[style^='background'] {
-  position: absolute !important;
-  top: unset !important;
-  right: 0;
-  bottom: 0;
-  left: unset !important;
-  z-index: 1000;
-  display: block;
-  width: 50px;
-  height: 50px;
-}
-
-div:has(> iframe[style^='background']) {
-  position: fixed !important;
-  right: 0;
-  bottom: 0;
-  width: 100px;
-  height: 50px;
-  padding-top: 0% !important;
-}
-
-body > div[style^='max-width'] {
-  position: absolute;
-  max-width: 100px !important;
-}
-
-.entity-id-popover {
-    max-width: 450px;
-    white-space: wrap;
 }

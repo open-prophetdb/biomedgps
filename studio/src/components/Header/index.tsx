@@ -156,7 +156,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   return (
     <Space className={`${styles.right} ${styles.light} right-content`}>
       <Row>
-        <Button style={{ marginRight: '0', borderTopRightRadius: '0', borderBottomRightRadius: '0' }}>Default Workspace</Button>
+        <Button style={{ marginRight: '0', borderTopRightRadius: '0', borderBottomRightRadius: '0', borderRight: '0' }}>Default Workspace</Button>
         <Button type="primary" style={{ borderTopLeftRadius: '0', borderBottomLeftRadius: '0' }} disabled>Switch Workspace</Button>
       </Row>
       {
@@ -167,7 +167,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       {
         isHeaderHidden() ? null : (
           <Dropdown menu={{ items, onClick: onClick }} placement="bottomLeft">
-            <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>About</Button>
+            <Button type="text" icon={<InfoCircleOutlined />} style={{ height: '40px' }}>Help</Button>
           </Dropdown>
         )
       }
@@ -180,9 +180,9 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
           ) : (
             isAuthEnabled() ?
               <Dropdown menu={{ items: userItems, onClick: onClick }} placement="bottomLeft">
-                <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+                <Button type="primary" icon={<UserOutlined />} shape='circle' />
               </Dropdown>
-              : <Button type="primary" icon={<UserOutlined />}>{username}</Button>
+              : <Button type="primary" icon={<UserOutlined />} shape='circle' />
           )
         )
       }

@@ -51,7 +51,7 @@ const NodeInfoPanel: React.FC<{ node?: GraphNode, hiddenItems?: string[] }> = ({
     {
       label: "Summary",
       key: "summary",
-      children: <Empty description="Comming soon..." />
+      children: <Empty />
     }
   ]
 
