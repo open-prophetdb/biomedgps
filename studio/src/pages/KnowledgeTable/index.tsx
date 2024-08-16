@@ -13,7 +13,7 @@ import type { EdgeInfo } from '@/EdgeInfoPanel/index.t';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
 import { sortBy, filter, uniqBy, groupBy, map, sumBy, set } from 'lodash';
-import { guessColor, truncateString, getUsername, logoutWithRedirect, isAuthEnabled, isAuthenticated } from '@/components/util';
+import { guessColor, truncateString } from '@/components/util';
 import EntityCard from '@/components/EntityCard';
 
 import './index.less';
@@ -143,54 +143,49 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
 
 
     useEffect(() => {
-        if (!isAuthenticated()) {
-            logoutWithRedirect();
-        } else {
+        if (queriedNodeId || queriedNodeIds || props.nodeId) {
+            if (queriedNodeId) {
+                setNodeIds([queriedNodeId]);
+            } else {
+                setNodeIds(undefined);
+            }
 
-            if (queriedNodeId || queriedNodeIds || props.nodeId) {
-                if (queriedNodeId) {
-                    setNodeIds([queriedNodeId]);
+            if (queriedNodeIds) {
+                const ids = queriedNodeIds.split(',');
+                if (ids.length > 0) {
+                    setNodeIds(ids);
                 } else {
                     setNodeIds(undefined);
                 }
-
-                if (queriedNodeIds) {
-                    const ids = queriedNodeIds.split(',');
-                    if (ids.length > 0) {
-                        setNodeIds(ids);
-                    } else {
-                        setNodeIds(undefined);
-                    }
-                }
-
-                if (props.nodeId) {
-                    setNodeIds([props.nodeId]);
-                }
-
-                fetchRelationMetadata().then((relationStat) => {
-                    const o = makeRelationTypes(relationStat)
-                    let descs = {} as Record<string, string>;
-                    o.forEach((item) => {
-                        descs[item.value] = item.description || 'Unknown';
-                    });
-                    setRelationTypeDescs(descs);
-
-                    let prompts = {} as Record<string, string>;
-                    let res = [] as OptionType[];
-                    relationStat.forEach((item, index) => {
-                        res.push({
-                            order: 0,
-                            label: item.resource,
-                            value: item.resource,
-                        });
-
-                        prompts[item.relation_type] = item.prompt_template || '';
-                    });
-
-                    setRelationTypePrompts(prompts);
-                    setResources(uniqBy(res, 'value'));
-                });
             }
+
+            if (props.nodeId) {
+                setNodeIds([props.nodeId]);
+            }
+
+            fetchRelationMetadata().then((relationStat) => {
+                const o = makeRelationTypes(relationStat)
+                let descs = {} as Record<string, string>;
+                o.forEach((item) => {
+                    descs[item.value] = item.description || 'Unknown';
+                });
+                setRelationTypeDescs(descs);
+
+                let prompts = {} as Record<string, string>;
+                let res = [] as OptionType[];
+                relationStat.forEach((item, index) => {
+                    res.push({
+                        order: 0,
+                        label: item.resource,
+                        value: item.resource,
+                    });
+
+                    prompts[item.relation_type] = item.prompt_template || '';
+                });
+
+                setRelationTypePrompts(prompts);
+                setResources(uniqBy(res, 'value'));
+            });
         }
     }, [])
 
@@ -671,7 +666,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const makeEmptyDescription = (node: GraphNode | undefined) => {
         if (node === undefined) {
             return 'No Node Data';
-        } 
+        }
 
         return <span><Tag color={guessColor(node.data.label)}>{node.data.label} | {node.data.id}</Tag><br /><Tag>{node.data.name}</Tag><br />No information is currently available for this type of node. However, you can still make use of the other modules listed in the right panel.</span>;
     }
@@ -906,7 +901,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         }
     }
 
-    return (isAuthenticated()) && ((total == 0 || menuKey === '') ? (
+    return ((total == 0 || menuKey === '') ? (
         <Row className='empty-knowledge-table-container'>
             <Spin spinning={loading}>
                 <Empty description={
@@ -922,7 +917,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 nodeIds ? `( ${nodeIds.join(', ')} )` : ''
                             }
                         </p>
-                        <Button type="primary" onClick={() => history.push('/')}>
+                        <Button type="primary" onClick={() => history.push('/dashboard')}>
                             Go Back to Home Page
                         </Button>
                     </>

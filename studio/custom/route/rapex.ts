@@ -3,11 +3,18 @@ import * as icons from "@ant-design/icons";
 import type { MenuDataItem } from '@ant-design/pro-components';
 
 export const routes = [
+  // We don't need a introductary page as we run the app for a publication
   {
     path: '/',
     name: 'Search Knowledges',
-    icon: 'home',
-    component: './Home',
+    icon: 'dashboard',
+    component: './Dashboard',
+  },
+  {
+    path: '/dashboard',
+    name: 'Search Knowledges',
+    icon: 'dashboard',
+    component: './Dashboard',
   },
   {
     path: '/analyze-omics-data',

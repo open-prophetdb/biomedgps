@@ -241,7 +241,7 @@ const HomePage: React.FC = () => {
     ];
 
     return (
-        <Row className="welcome">
+        <Row className="dashboard">
             <Row className="box">
                 <Col className="header">
                     <h1>RAPEX - Response to Air Pollution EXposure</h1>

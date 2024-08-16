@@ -1,4 +1,3 @@
-import { isAuthenticated, logoutWithRedirect } from '@/components/util';
 import { Row, Col, Button, message as AntMessage, Empty } from 'antd';
 import { KnowledgeGraph } from 'biominer-components';
 import React, { useEffect, useState, memo, Suspense } from 'react';
@@ -24,13 +23,6 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
   const ChatBox = React.lazy(() => import('@/components/ChatBox'));
 
   useEffect(() => {
-    console.log("isAuthenticated in KnowledgeGraph: ", isAuthenticated());
-    if (!isAuthenticated()) {
-      logoutWithRedirect();
-    }
-  }, [])
-
-  useEffect(() => {
     if (chatBoxVisible) {
       setSpan(kgThreeQuartersSpan)
     } else {
@@ -38,7 +30,7 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
     }
   }, [chatBoxVisible])
 
-  return isAuthenticated() && <Row gutter={8} className="chat-ai-container">
+  return <Row gutter={8} className="chat-ai-container">
     {
       chatBoxVisible ? (
         <Col xxl={24 - span} xl={24 - span} lg={24 - span} md={24} sm={24} xs={24}>

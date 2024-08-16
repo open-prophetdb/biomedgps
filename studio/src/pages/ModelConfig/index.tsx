@@ -15,7 +15,7 @@ import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
 import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import EntityCard from '@/components/EntityCard';
-import { truncateString, getUsername, logoutWithRedirect, isAuthenticated } from '@/components/util';
+import { truncateString } from '@/components/util';
 
 import './index.less';
 
@@ -250,18 +250,13 @@ const ModelConfig: React.FC = (props) => {
   const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
 
   useEffect(() => {
-    console.log("isAuthenticated in ModelConfig: ", isAuthenticated());
-    if (!isAuthenticated()) {
-      logoutWithRedirect();
-    } else {
-      fetchStatistics().then((data) => {
-        const relationStats = data.relation_stat;
-        setRelationStat(relationStats);
+    fetchStatistics().then((data) => {
+      const relationStats = data.relation_stat;
+      setRelationStat(relationStats);
 
-        const relationTypes = makeRelationTypes(relationStats);
-        setRelationTypeOptions(relationTypes);
-      });
-    }
+      const relationTypes = makeRelationTypes(relationStats);
+      setRelationTypeOptions(relationTypes);
+    });
   }, []);
 
   useEffect(() => {
@@ -877,107 +872,106 @@ const ModelConfig: React.FC = (props) => {
     }
   }
 
-  return (
-    isAuthenticated() && <Layout className='model-panel' key={currentModel}>
-      <Sider width={100}>
-        <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
-          {models.map((model, index) => (
-            <Menu.Item key={index} icon={null} disabled={model.disabled}>
-              <Tooltip title={`${model.disabled ? 'Disabled' : ''} > ${model.name} | ${model.description}`} placement="right" key={index}>
-                <Button icon={model.icon} size='large' style={{ color: detectColor(model.name) }}></Button>
-              </Tooltip>
-              <span>{model.shortName}</span>
-            </Menu.Item>
-          ))}
-        </Menu>
-      </Sider>
-      <Row className='model-config-panel' gutter={16}>
-        <Col className="model-parameter" span={leftSpan}>
-          <Header className="model-parameter-header">
-            <h3>{models[currentModel].name}</h3>
-            <p>{models[currentModel].description}</p>
-          </Header>
-          <Form layout="vertical" onFinish={handleSubmit} className='model-parameter-body' form={form} key={predictionType}>
-            {renderForm()}
-            <Button type="primary" htmlType="submit" className='model-parameter-button'
-              size='large' loading={loading}>
-              Apply Parameters
-            </Button>
-          </Form>
-        </Col>
-        <Col className="model-result" span={24 - leftSpan}>
-          {loading ?
-            <Empty description='Predicting using the given parameters...'
-              style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column' }}>
-              <Spin size="large" />
-            </Empty> :
-            <GraphTable edgeDataSources={edgeDataSources} nodeDataSources={nodeDataSources} key={JSON.stringify(params)}
-              emptyMessage='Please setup related parameters in the left side and generate some predicted result first.'
-              onExplainRow={(row: EdgeAttribute) => {
-                setLoading(true);
-                const source_id = row.source_id;
-                const source_type = row.source_type;
-                const target_id = row.target_id;
-                const target_type = row.target_type;
-                const relation_type = row.reltype;
+  return (<Layout className='model-panel' key={currentModel}>
+    <Sider width={100}>
+      <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
+        {models.map((model, index) => (
+          <Menu.Item key={index} icon={null} disabled={model.disabled}>
+            <Tooltip title={`${model.disabled ? 'Disabled' : ''} > ${model.name} | ${model.description}`} placement="right" key={index}>
+              <Button icon={model.icon} size='large' style={{ color: detectColor(model.name) }}></Button>
+            </Tooltip>
+            <span>{model.shortName}</span>
+          </Menu.Item>
+        ))}
+      </Menu>
+    </Sider>
+    <Row className='model-config-panel' gutter={16}>
+      <Col className="model-parameter" span={leftSpan}>
+        <Header className="model-parameter-header">
+          <h3>{models[currentModel].name}</h3>
+          <p>{models[currentModel].description}</p>
+        </Header>
+        <Form layout="vertical" onFinish={handleSubmit} className='model-parameter-body' form={form} key={predictionType}>
+          {renderForm()}
+          <Button type="primary" htmlType="submit" className='model-parameter-button'
+            size='large' loading={loading}>
+            Apply Parameters
+          </Button>
+        </Form>
+      </Col>
+      <Col className="model-result" span={24 - leftSpan}>
+        {loading ?
+          <Empty description='Predicting using the given parameters...'
+            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column' }}>
+            <Spin size="large" />
+          </Empty> :
+          <GraphTable edgeDataSources={edgeDataSources} nodeDataSources={nodeDataSources} key={JSON.stringify(params)}
+            emptyMessage='Please setup related parameters in the left side and generate some predicted result first.'
+            onExplainRow={(row: EdgeAttribute) => {
+              setLoading(true);
+              const source_id = row.source_id;
+              const source_type = row.source_type;
+              const target_id = row.target_id;
+              const target_type = row.target_type;
+              const relation_type = row.reltype;
 
-                const first_fn = fetchOneStepLinkedNodes({
-                  query_str: makeQueryStr(source_type, source_id),
-                  page_size: 40
-                })
+              const first_fn = fetchOneStepLinkedNodes({
+                query_str: makeQueryStr(source_type, source_id),
+                page_size: 40
+              })
 
-                const second_fn = fetchOneStepLinkedNodes({
-                  query_str: makeQueryStr(target_type, target_id),
-                  page_size: 40
-                })
+              const second_fn = fetchOneStepLinkedNodes({
+                query_str: makeQueryStr(target_type, target_id),
+                page_size: 40
+              })
 
-                Promise.all([first_fn, second_fn]).then((responses) => {
-                  const source_nodes = responses[0];
-                  const target_nodes = responses[1];
+              Promise.all([first_fn, second_fn]).then((responses) => {
+                const source_nodes = responses[0];
+                const target_nodes = responses[1];
 
-                  let d = {
-                    nodes: source_nodes.nodes.concat(target_nodes.nodes) as GraphNode[],
-                    edges: source_nodes.edges.concat(target_nodes.edges) as GraphEdge[]
-                  }
+                let d = {
+                  nodes: source_nodes.nodes.concat(target_nodes.nodes) as GraphNode[],
+                  edges: source_nodes.edges.concat(target_nodes.edges) as GraphEdge[]
+                }
 
-                  const edges = edgeDataSources
-                    .filter((edge) => row.relid === edge.relid)
-                    .map((edge) => edge.metadata);
+                const edges = edgeDataSources
+                  .filter((edge) => row.relid === edge.relid)
+                  .map((edge) => edge.metadata);
 
-                  d = {
-                    nodes: d.nodes,
-                    edges: d.edges.concat(edges as GraphEdge[])
-                  }
+                d = {
+                  nodes: d.nodes,
+                  edges: d.edges.concat(edges as GraphEdge[])
+                }
 
-                  console.log('ExplainRow: ', row, d, source_nodes, target_nodes, edges);
-                  setLoading(false);
-                  if (d && d.nodes && d.nodes.length > 0) {
-                    pushGraphDataToLocalStorage(d);
-                    history.push('/predict-explain/knowledge-graph');
-                  } else {
-                    message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
-                  }
-                }).catch((error) => {
-                  setLoading(false);
-                  console.log('ExplainRow Error: ', error);
-                  message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
-                });
-              }}
-              onLoadGraph={(graph) => {
-                console.log('onLoadGraph: ', graph);
-                if (graph && graph.nodes && graph.nodes.length > 0) {
-                  pushGraphDataToLocalStorage(graph);
+                console.log('ExplainRow: ', row, d, source_nodes, target_nodes, edges);
+                setLoading(false);
+                if (d && d.nodes && d.nodes.length > 0) {
+                  pushGraphDataToLocalStorage(d);
                   history.push('/predict-explain/knowledge-graph');
                 } else {
-                  message.warning("You need to generate some predicted result and pick up the interested rows first.", 5)
+                  message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
                 }
-              }}
-              edgeStat={relationStat}
-            />
-          }
-        </Col>
-      </Row>
-    </Layout>
+              }).catch((error) => {
+                setLoading(false);
+                console.log('ExplainRow Error: ', error);
+                message.warning("Cannot find an attention subgraph for explaining the predicted relation.", 5)
+              });
+            }}
+            onLoadGraph={(graph) => {
+              console.log('onLoadGraph: ', graph);
+              if (graph && graph.nodes && graph.nodes.length > 0) {
+                pushGraphDataToLocalStorage(graph);
+                history.push('/predict-explain/knowledge-graph');
+              } else {
+                message.warning("You need to generate some predicted result and pick up the interested rows first.", 5)
+              }
+            }}
+            edgeStat={relationStat}
+          />
+        }
+      </Col>
+    </Row>
+  </Layout>
   );
 };
 

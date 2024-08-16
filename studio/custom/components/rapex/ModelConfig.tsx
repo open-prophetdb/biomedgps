@@ -15,7 +15,7 @@ import { fetchStatistics } from '@/services/swagger/KnowledgeGraph';
 import { makeRelationTypes } from 'biominer-components/dist/utils';
 import type { OptionType, RelationStat, ComposeQueryItem, QueryItem, GraphEdge, GraphNode } from 'biominer-components/dist/typings';
 import EntityCard from '@/components/EntityCard';
-import { truncateString, getUsername, logoutWithRedirect, isAuthenticated } from '@/components/util';
+import { truncateString } from '@/components/util';
 
 import './index.less';
 
@@ -250,18 +250,13 @@ const ModelConfig: React.FC = (props) => {
     const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
 
     useEffect(() => {
-        console.log("isAuthenticated in ModelConfig: ", isAuthenticated());
-        if (!isAuthenticated()) {
-            logoutWithRedirect();
-        } else {
-            fetchStatistics().then((data) => {
-                const relationStats = data.relation_stat;
-                setRelationStat(relationStats);
+        fetchStatistics().then((data) => {
+            const relationStats = data.relation_stat;
+            setRelationStat(relationStats);
 
-                const relationTypes = makeRelationTypes(relationStats);
-                setRelationTypeOptions(relationTypes);
-            });
-        }
+            const relationTypes = makeRelationTypes(relationStats);
+            setRelationTypeOptions(relationTypes);
+        });
     }, []);
 
     useEffect(() => {
@@ -879,7 +874,7 @@ const ModelConfig: React.FC = (props) => {
     }
 
     return (
-        isAuthenticated() && <Layout className='model-panel' key={currentModel}>
+        <Layout className='model-panel' key={currentModel}>
             <Sider width={100}>
                 <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
                     {models.map((model, index) => (

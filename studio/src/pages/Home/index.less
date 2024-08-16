@@ -2,13 +2,13 @@
 
 // In home page, we would like to make the background image full screen
 .ant-layout {
-    .ant-layout-content {
+    .ant-layout-content:has(.welcome) {
         height: 100vh;
-    }
 
-    .ant-layout-header {
-        // We need a higher header for the home page
-        height: @header-height !important;
+        .ant-layout-header {
+            // We need a higher header for the home page
+            height: @header-height !important;
+        }
     }
 }
 
@@ -51,6 +51,8 @@
         .ant-btn {
             margin: auto 0;
             margin-left: 20px;
+            font-size: 1.2rem;
+            height: auto;
         }
     }
 

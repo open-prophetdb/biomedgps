@@ -5,6 +5,7 @@ import type { MenuDataItem } from '@ant-design/pro-components';
 export const routes = [
   {
     path: '/',
+    key: 'home',
     name: 'Home',
     icon: 'home',
     hideInMenu: true,
@@ -12,12 +13,14 @@ export const routes = [
   },
   {
     path: '/dashboard',
+    key: 'dashboard',
     name: 'Dashboard',
     icon: 'dashboard',
     component: './Dashboard',
   },
   {
     path: '/analyze-omics-data',
+    key: 'analyze-omics-data',
     name: 'Analyze Omics Data',
     icon: 'LineChartOutlined',
     disabled: true,
@@ -25,11 +28,13 @@ export const routes = [
   },
   {
     path: '/predict-explain',
+    key: 'predict-explain',
     name: 'Predict & Explain',
     icon: 'link',
     routes: [
       {
         path: '/predict-explain/knowledge-table',
+        key: 'knowledge-table',
         name: 'Knowledge Table',
         icon: 'table',
         hideInMenu: true,
@@ -38,6 +43,7 @@ export const routes = [
       },
       {
         path: '/predict-explain/predict-model',
+        key: 'predict-model',
         name: 'Predict Drugs/Targets',
         icon: 'history',
         component: './ModelConfig',
@@ -45,6 +51,7 @@ export const routes = [
       },
       {
         path: '/predict-explain/knowledge-graph',
+        key: 'knowledge-graph',
         name: 'Explain Your Results',
         icon: 'comment',
         component: './KnowledgeGraph',
@@ -54,6 +61,7 @@ export const routes = [
   },
   {
     path: '/mecfs-longcovid',
+    key: 'mecfs-longcovid',
     name: 'ME/CFS & LongCOVID',
     icon: 'table',
     component: './KnowledgeTable',
@@ -64,6 +72,7 @@ export const routes = [
   },
   {
     path: '/statistics',
+    key: 'statistics',
     name: 'Statistics',
     icon: 'table',
     component: './Statistics',
@@ -71,6 +80,7 @@ export const routes = [
   },
   {
     path: '/knowledge-graph-editor',
+    key: 'knowledge-graph-editor',
     name: 'knowledge-graph-editor',
     icon: 'link',
     hideInMenu: true,
@@ -79,6 +89,7 @@ export const routes = [
   },
   {
     name: 'chatbot',
+    key: 'chatbot',
     icon: 'comment',
     path: '/chatbot',
     hideInMenu: true,
@@ -86,6 +97,7 @@ export const routes = [
   },
   {
     name: 'about',
+    key: 'about',
     icon: 'info-circle',
     path: '/about',
     hideInMenu: true,
@@ -93,6 +105,7 @@ export const routes = [
   },
   {
     name: 'help',
+    key: 'help',
     icon: 'question-circle',
     path: '/help',
     hideInMenu: true,
@@ -100,6 +113,7 @@ export const routes = [
   },
   {
     name: 'changelog',
+    key: 'changelog',
     icon: 'field-time',
     path: '/changelog',
     hideInMenu: true,
@@ -107,12 +121,14 @@ export const routes = [
   },
   {
     name: 'not-authorized',
+    key: 'not-authorized',
     hideInMenu: true,
     path: '/not-authorized',
     component: './NotAuthorized',
   },
   {
     path: '/*',
+    key: '404',
     component: './404',
   },
 ];
