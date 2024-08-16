@@ -45,7 +45,7 @@ build-biomedgps-studio:
 	@cp studio/custom/route/rapex.ts frontend/config/routes.ts
 	# @cd studio && yarn && yarn openapi || true
 	# @cd frontend && yarn
-	@cd frontend && yarn build:biomedgps-embed && cd ..
+	@cd frontend && UMI_APP_VERSION=`git describe --tags --always` yarn build:biomedgps-embed && cd ..
 
 build-rapex-studio:
 	@printf "Building studio based on openapi...\n"
@@ -62,7 +62,7 @@ build-rapex-studio:
 	@cp studio/custom/route/rapex.ts frontend/config/routes.ts
 	# @cd studio && yarn && yarn openapi || true
 	# @cd frontend && yarn
-	@cd frontend && yarn build:rapex-embed && cd ..
+	@cd frontend && UMI_APP_VERSION=`git describe --tags --always` yarn build:rapex-embed && cd ..
 
 build-biomedgps:
 	@cargo build --release

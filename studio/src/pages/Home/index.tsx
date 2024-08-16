@@ -233,7 +233,7 @@ const HomePage: React.FC = () => {
         <Row className="welcome">
             <Row className="box">
                 <Col className="header">
-                    <img src={require('@/assets/logo-white.png')} alt="logo" height="80" />
+                    {/* <img src={require('@/assets/logo-white.png')} alt="logo" height="80" /> */}
                     <h4 style={{ textAlign: 'center', fontSize: '1rem', lineHeight: '24px' }}>
                         Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
                         <br />

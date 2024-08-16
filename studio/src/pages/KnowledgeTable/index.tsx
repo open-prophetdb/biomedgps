@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin, Select, Collapse } from 'antd';
-import { ArrowsAltOutlined, DownloadOutlined, ExpandAltOutlined, QuestionCircleOutlined, ShrinkOutlined } from '@ant-design/icons';
+import { Table, Row, Col, Form, Menu, Tabs, Tag, Space, message, Popover, Button, Empty, Tooltip, Drawer, Spin, Select } from 'antd';
+import { ArrowsAltOutlined, DownloadOutlined, ExpandAltOutlined, InfoCircleFilled, LinkOutlined, QuestionCircleOutlined, ShrinkOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { Header } from 'antd/lib/layout/layout';
 import type { ColumnsType } from 'antd/es/table';
 import { useLocation } from "react-router-dom";
 import { fetchOneStepLinkedNodes, fetchRelationCounts, fetchRelationMetadata } from '@/services/swagger/KnowledgeGraph';
@@ -135,6 +136,29 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [collapsed, setCollapsed] = useState<boolean>(false);
+
+    const [menuKey, setMenuKey] = useState<string>('summary');
+    const [form] = Form.useForm();
+
+    const menuItems = [
+        {
+            key: 'summary',
+            label: 'Summary',
+            icon: <InfoCircleFilled />,
+            onClick: () => {
+                setMenuKey('summary');
+            },
+        },
+        {
+            key: 'knowledge',
+            label: 'Knowledge',
+            icon: <LinkOutlined />,
+            onClick: () => {
+                setMenuKey('knowledge');
+            },
+        },
+    ];
 
     useEffect(() => {
         if (!isAuthenticated()) {
@@ -242,42 +266,6 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
 
     // EdgeData
     const columns: ColumnsType<any> = [
-        {
-            title: 'Relation Type',
-            key: 'relation_type',
-            align: 'left',
-            dataIndex: 'relation_type',
-            fixed: 'left',
-            width: 350,
-            filters: sortBy(uniqBy(tableData.map((item) => {
-                return {
-                    text: item.relation_type,
-                    value: item.relation_type,
-                };
-            }), 'value'), 'value'),
-            filterMode: 'menu',
-            filterSearch: true,
-            filterMultiple: true,
-            sorter: (a, b) => a.relation_type.localeCompare(b.relation_type),
-            onFilter: (value, record) => record.relation_type.indexOf(value) === 0,
-            render(text, record) {
-                return (
-                    <span>
-                        <Tag>{text}</Tag>
-                        <br />
-                        {relationTypeDescs[text] || 'Unknown'}
-                    </span>
-                );
-            }
-        },
-        {
-            title: 'Resource',
-            dataIndex: 'resource',
-            key: 'resource',
-            align: 'center',
-            width: 100,
-            // fixed: 'left',
-        },
         // {
         //     title: 'PMID',
         //     dataIndex: 'pmids',
@@ -306,6 +294,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
             title: 'Source Name',
             dataIndex: 'source_name',
             key: 'source_name',
+            fixed: 'left',
             align: 'center',
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
@@ -314,7 +303,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                 };
             }), 'value'), 'value'),
             filterMode: 'menu',
-            // width: 200,
+            width: 300,
             filterSearch: true,
             sorter: (a, b) => a.source_name.localeCompare(b.source_name),
             onFilter: (value, record) => record.source_name.indexOf(value) === 0,
@@ -349,10 +338,10 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     {<br />}
                     {(record.source_id.startsWith('ENTREZ:') || record.source_id.startsWith('DrugBank:')) ?
                         <a onClick={() => { setActivatedNode(record.source_node) }}>
-                            {record.source_id}
+                            <Tag bordered><span style={{ color: guessColor(text) }}>{record.source_type} | {record.source_id}</span></Tag>
                         </a> :
                         <a target="_blank" href={guessLink(record.source_id)}>
-                            {record.source_id}
+                            <Tag bordered><span style={{ color: guessColor(text) }}>{record.source_type} | {record.source_id}</span></Tag>
                         </a>
                     }
                 </>;
@@ -376,32 +365,32 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         //         );
         //     }
         // },
-        {
-            title: 'Source Type',
-            dataIndex: 'source_type',
-            width: 200,
-            align: 'center',
-            key: 'source_type',
-            filters: sortBy(uniqBy(tableData.map((item) => {
-                return {
-                    text: item.source_type,
-                    value: item.source_type,
-                };
-            }), 'value'), 'value'),
-            filterMode: 'menu',
-            filterSearch: true,
-            sorter: (a, b) => a.source_type.localeCompare(b.source_type),
-            onFilter: (value, record) => record.source_type.indexOf(value) === 0,
-            render: (text) => {
-                return <Tag color={guessColor(text)}>{text}</Tag>;
-            }
-        },
+        // {
+        //     title: 'Source Type',
+        //     dataIndex: 'source_type',
+        //     width: 200,
+        //     align: 'center',
+        //     key: 'source_type',
+        //     filters: sortBy(uniqBy(tableData.map((item) => {
+        //         return {
+        //             text: item.source_type,
+        //             value: item.source_type,
+        //         };
+        //     }), 'value'), 'value'),
+        //     filterMode: 'menu',
+        //     filterSearch: true,
+        //     sorter: (a, b) => a.source_type.localeCompare(b.source_type),
+        //     onFilter: (value, record) => record.source_type.indexOf(value) === 0,
+        //     render: (text) => {
+        //         return <Tag color={guessColor(text)}>{text}</Tag>;
+        //     }
+        // },
         {
             title: 'Target Name',
             dataIndex: 'target_name',
             align: 'center',
             key: 'target_name',
-            // width: 200,
+            width: 300,
             filters: sortBy(uniqBy(tableData.map((item) => {
                 return {
                     text: item.target_name,
@@ -443,10 +432,10 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     {<br />}
                     {(record.target_id.startsWith('ENTREZ:') || record.target_id.startsWith('DrugBank:')) ?
                         <a onClick={() => { setActivatedNode(record.target_node) }}>
-                            {record.target_id}
+                            <Tag bordered><span style={{ color: guessColor(text) }}>{record.target_type} | {record.target_id}</span></Tag>
                         </a> :
                         <a target="_blank" href={guessLink(record.target_id)}>
-                            {record.target_id}
+                            <Tag bordered><span style={{ color: guessColor(text) }}>{record.target_type} | {record.target_id}</span></Tag>
                         </a>
                     }
                 </>;
@@ -469,26 +458,26 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         //         );
         //     }
         // },
-        {
-            title: 'Target Type',
-            dataIndex: 'target_type',
-            align: 'center',
-            key: 'target_type',
-            width: 200,
-            filters: sortBy(uniqBy(tableData.map((item) => {
-                return {
-                    text: item.target_type,
-                    value: item.target_type,
-                };
-            }), 'value'), 'value'),
-            filterMode: 'menu',
-            filterSearch: true,
-            sorter: (a, b) => a.target_type.localeCompare(b.target_type),
-            onFilter: (value, record) => record.target_type.indexOf(value) === 0,
-            render: (text) => {
-                return <Tag color={guessColor(text)}>{text}</Tag>;
-            }
-        },
+        // {
+        //     title: 'Target Type',
+        //     dataIndex: 'target_type',
+        //     align: 'center',
+        //     key: 'target_type',
+        //     width: 200,
+        //     filters: sortBy(uniqBy(tableData.map((item) => {
+        //         return {
+        //             text: item.target_type,
+        //             value: item.target_type,
+        //         };
+        //     }), 'value'), 'value'),
+        //     filterMode: 'menu',
+        //     filterSearch: true,
+        //     sorter: (a, b) => a.target_type.localeCompare(b.target_type),
+        //     onFilter: (value, record) => record.target_type.indexOf(value) === 0,
+        //     render: (text) => {
+        //         return <Tag color={guessColor(text)}>{text}</Tag>;
+        //     }
+        // },
         {
             title: 'Score',
             dataIndex: 'score',
@@ -499,6 +488,41 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                 return <span>{text.toFixed(3)}</span>;
             },
             sorter: (a, b) => a.score - b.score,
+        },
+        {
+            title: 'Relation Type',
+            key: 'relation_type',
+            align: 'left',
+            dataIndex: 'relation_type',
+            // width: 350,
+            filters: sortBy(uniqBy(tableData.map((item) => {
+                return {
+                    text: item.relation_type,
+                    value: item.relation_type,
+                };
+            }), 'value'), 'value'),
+            filterMode: 'menu',
+            filterSearch: true,
+            filterMultiple: true,
+            sorter: (a, b) => a.relation_type.localeCompare(b.relation_type),
+            onFilter: (value, record) => record.relation_type.indexOf(value) === 0,
+            render(text, record) {
+                return (
+                    <span>
+                        <Tag>{text}</Tag>
+                        <br />
+                        {relationTypeDescs[text] || 'Unknown'}
+                    </span>
+                );
+            }
+        },
+        {
+            title: 'Resource',
+            dataIndex: 'resource',
+            key: 'resource',
+            align: 'center',
+            width: 100,
+            // fixed: 'left',
         },
         {
             title: 'Action',
@@ -666,8 +690,242 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         </span>;
     }
 
+    const handleSubmit = (values: any) => {
+    }
+
+    const whichPanel = () => {
+        if (menuKey === 'summary') {
+            if (currentNodes.length == 0) {
+                return <Empty description="No Node Data" />
+            } else if (currentNodes.length == 1) {
+                return currentNodes[0]?.nlabel == 'Gene' ? <NodeInfoPanel node={currentNodes[0]} /> : 'Current Node is not a Gene, More Coming Soon...';
+            } else {
+                return null;
+                // TODO: Implement the multiple nodes panel
+                // return <Tabs defaultActiveKey="1">
+                //     {
+                //         currentNodes.map((node, index) => {
+                //             return node?.nlabel == 'Gene' ? <Tabs.TabPane key={index} tab={getTitle(node)}>
+                //                 <NodeInfoPanel node={node} key={`${index}`} />
+                //             </Tabs.TabPane> : null;
+                //         })
+                //     }
+                // </Tabs>
+            }
+        } else if (menuKey === 'knowledge') {
+            return <>
+                <Col className="model-parameter" span={4}>
+                    <Header className="model-parameter-header">
+                        <h3>Query or Predict Knowledges</h3>
+                        <p>Please select the resources and relation types to filter the knowledges.</p>
+                    </Header>
+                    <Form layout="vertical" onFinish={handleSubmit} className='model-parameter-body' form={form}>
+                        <Form.Item
+                            key={'resource'}
+                            label={'Resource'}
+                            initialValue={undefined}
+                            name={'resource'}
+                            required={false}
+                            tooltip={'Select the resources to filter the knowledges.'}
+                            rules={[{ required: false, message: 'Select the resources to filter the knowledges.' }]}
+                        >
+                            <Select
+                                mode="multiple"
+                                allowClear
+                                maxTagCount={2}
+                                // It's not working, I use css to limit the tag text length instead.
+                                // maxTagTextLength={12}
+                                style={{ marginRight: '10px' }}
+                                size="middle"
+                                placeholder="Please select resources to filter."
+                                defaultValue={[]}
+                                onChange={(value: string[]) => {
+                                    if (nodeIds) {
+                                        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value);
+                                        setSelectedResources(value);
+
+                                        // The total number of items has been changed, so we need to reset the page and page size.
+                                        setPage(1);
+                                        setPageSize(30);
+                                    }
+                                }}
+                                options={resources}
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            key={'relation_type'}
+                            label={'Relation Type'}
+                            initialValue={undefined}
+                            name={'relation_type'}
+                            required={false}
+                            tooltip={'Select the relation types to filter the knowledges.'}
+                            rules={[{ required: false, message: 'Select the relation types to filter the knowledges.' }]}>
+                            <Select
+                                mode="multiple"
+                                allowClear
+                                maxTagCount={2}
+                                // It's not working, I use css to limit the tag text length instead.
+                                // maxTagTextLength={12}
+                                style={{ marginRight: '10px' }}
+                                size="middle"
+                                placeholder="Please select relation types to filter."
+                                defaultValue={[]}
+                                onChange={(value: string[]) => {
+                                    if (nodeIds) {
+                                        fetchTableData(nodeIds, page, pageSize, value, selectedResources);
+                                        setSelectedRelationTypes(value);
+
+                                        // The total number of items has been changed, so we need to reset the page and page size.
+                                        setPage(1);
+                                        setPageSize(30);
+                                    }
+                                }}
+                            // options={relationTypeOptions}
+                            >
+                                {relationTypeOptions.map((item: OptionType) => {
+                                    return (
+                                        <Select.Option key={item.value} value={item.value}>
+                                            <div className="option-container">
+                                                <div className="option-label">{item.label}</div>
+                                                <div className="option-description">{item.description || relationTypeDescs[item.value] || 'Unknown'}</div>
+                                            </div>
+                                        </Select.Option>
+                                    );
+                                })}
+                            </Select>
+                        </Form.Item>
+                        {/* <Button type="primary" htmlType="submit" className='model-parameter-button'
+                            size='large' loading={loading}>
+                            Apply Parameters
+                        </Button> */}
+                    </Form>
+                </Col>
+                <Col className='model-result' span={20}>
+                    <div className='button-container'>
+                        <span>
+                            Selected {selectedRowKeys.length} items
+                            <Tooltip title="You can select several items by clicking on the checkboxes and explain them together.">
+                                <Button type="link" style={{ marginLeft: '5px', padding: '4px 0' }}>
+                                    <QuestionCircleOutlined />Help
+                                </Button>
+                            </Tooltip>
+                        </span>
+                        <Tooltip title="Download the table data as a TSV file.">
+                            <Button size="large" type="default" onClick={() => {
+                                // Download as TSV file
+                                const header = columns.map((col) => col.title);
+                                const data = tableData.map((record) => {
+                                    return columns.map((col: any) => {
+                                        return record[col.key];
+                                    });
+                                });
+                                const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
+                                const blob = new Blob([tsvData], { type: 'text/tsv' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `knowledges-${nodeIds?.join('-')}-${new Date().toISOString()}.tsv`;
+                                a.click();
+
+                                // Delete the url
+                                URL.revokeObjectURL(url);
+                            }} icon={<DownloadOutlined />} />
+                        </Tooltip>
+                        <Button type="primary" danger size="large"
+                            // disabled={selectedRowKeys.length === 0}
+                            onClick={() => {
+                                if (selectedRowKeys.length === 0) {
+                                    message.warning('Please select at least one row to explain.', 5);
+                                    return;
+                                }
+                                explainGraph(selectedRowKeys as string[]);
+                            }}>
+                            Explain
+                        </Button>
+                    </div>
+                    <Table
+                        className={'graph-table'}
+                        style={{ width: '100%', height: '100%', padding: '0 5px' }}
+                        size="small"
+                        columns={columns}
+                        loading={loading}
+                        scroll={{ x: 1000, y: 'calc(100vh - 145px)' }}
+                        dataSource={tableData || []}
+                        rowSelection={{
+                            selectedRowKeys,
+                            onChange: onSelectChange,
+                        }}
+                        rowKey={(record) => getRowKey(record)}
+                        expandable={{
+                            expandedRowRender: (record) => (
+                                <p style={{ margin: 0 }}>
+                                    <Tag>Key Sentence</Tag> {record.key_sentence || 'No Key Sentence'}
+                                </p>
+                            ),
+                        }}
+                        pagination={{
+                            showSizeChanger: true,
+                            showQuickJumper: false,
+                            pageSizeOptions: ['10', '20', '50', '100', '300', '500'],
+                            current: page,
+                            pageSize: pageSize,
+                            total: total || 0,
+                            position: ['topLeft'],
+                            showTotal: (total) => {
+                                return `Total ${total} records`;
+                            },
+                        }}
+                        onChange={(pagination) => {
+                            setPage(pagination.current || 1);
+                            setPageSize(pagination.pageSize || 10);
+                        }}
+                    ></Table>
+                    <Drawer
+                        width={'80%'}
+                        className='node-drawer'
+                        height={'100%'}
+                        title={activatedNode ? `Node Information - ${activatedNode.data.name}` : 'Node Information'}
+                        rootStyle={{ position: 'absolute' }}
+                        closable={true}
+                        mask={true}
+                        placement={'right'}
+                        onClose={() => {
+                            setActivatedNode(undefined);
+                        }}
+                        open={activatedNode !== undefined}
+                    >
+                        {
+                            activatedNode ?
+                                <NodeInfoPanel node={activatedNode} /> :
+                                <Empty description="No node data for this knowledge." />
+                        }
+                    </Drawer>
+                    <Drawer
+                        width={'80%'}
+                        className='knowledge-drawer'
+                        height={'100%'}
+                        title={`Knowledge Information - ${edgeInfo?.startNode?.data.name} - ${edgeInfo?.edge?.reltype} - ${edgeInfo?.endNode?.data.name}`}
+                        rootStyle={{ position: 'absolute' }}
+                        closable={true}
+                        mask={true}
+                        placement={'right'}
+                        onClose={() => {
+                            setDrawerVisible(false);
+                        }}
+                        destroyOnClose={true}
+                        open={drawerVisible}
+                    >
+                        {(drawerVisible && edgeInfo) ?
+                            <EdgeInfoPanel edgeInfo={edgeInfo} />
+                            : <Empty description="No publication data for this knowledge." />}
+                    </Drawer>
+                </Col>
+            </>
+        }
+    }
+
     return (isAuthenticated()) && (total == 0 ? (
-        <Row className='knowledge-table-container'>
+        <Row className='empty-knowledge-table-container'>
             <Spin spinning={loading}>
                 <Empty description={
                     <>
@@ -698,192 +956,22 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         </Row>
     ) : (
         <Row className='knowledge-table-wrapper'>
-            <Collapse activeKey={activeKeys} ghost onChange={switchCollapsePanel}>
-                {currentNodes.length > 0 && currentNodes.map((node, index) => {
-                    return node?.nlabel == 'Gene' ? <Collapse.Panel header={getTitle(node)} key={index} showArrow={false}
-                        extra={getExtraButton(index.toString())}
-                    >
-                        <NodeInfoPanel node={node} key={`${index}`} />
-                    </Collapse.Panel> : null;
-                })}
-                <Collapse.Panel header="Knowledges" key={`${currentNodes.length + 1}`} showArrow={false}>
-                    <Row className="knowledge-table-container">
-                        <div className='button-container'>
-                            <span>
-                                Selected {selectedRowKeys.length} items
-                                <Tooltip title="You can select several items by clicking on the checkboxes and explain them together.">
-                                    <Button type="link" style={{ marginLeft: '5px', padding: '4px 0' }}>
-                                        <QuestionCircleOutlined />Help
-                                    </Button>
-                                </Tooltip>
-                            </span>
-                            <Select
-                                mode="multiple"
-                                allowClear
-                                maxTagCount={2}
-                                // It's not working, I use css to limit the tag text length instead.
-                                // maxTagTextLength={12}
-                                style={{ width: '210px', marginRight: '10px' }}
-                                size="large"
-                                placeholder="Please select resources to filter."
-                                defaultValue={[]}
-                                onChange={(value: string[]) => {
-                                    if (nodeIds) {
-                                        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value);
-                                        setSelectedResources(value);
-
-                                        // The total number of items has been changed, so we need to reset the page and page size.
-                                        setPage(1);
-                                        setPageSize(30);
-                                    }
-                                }}
-                                options={resources}
-                            />
-                            <Select
-                                mode="multiple"
-                                allowClear
-                                maxTagCount={2}
-                                // It's not working, I use css to limit the tag text length instead.
-                                // maxTagTextLength={12}
-                                style={{ width: '350px', marginRight: '10px' }}
-                                size="large"
-                                placeholder="Please select relation types to filter."
-                                defaultValue={[]}
-                                onChange={(value: string[]) => {
-                                    if (nodeIds) {
-                                        fetchTableData(nodeIds, page, pageSize, value, selectedResources);
-                                        setSelectedRelationTypes(value);
-
-                                        // The total number of items has been changed, so we need to reset the page and page size.
-                                        setPage(1);
-                                        setPageSize(30);
-                                    }
-                                }}
-                            // options={relationTypeOptions}
-                            >
-                                {relationTypeOptions.map((item: OptionType) => {
-                                    return (
-                                        <Select.Option key={item.value} value={item.value}>
-                                            <div className="option-container">
-                                                <div className="option-label">{item.label}</div>
-                                                <div className="option-description">{item.description || relationTypeDescs[item.value] || 'Unknown'}</div>
-                                            </div>
-                                        </Select.Option>
-                                    );
-                                })}
-                            </Select>
-                            <Tooltip title="Download the table data as a TSV file.">
-                                <Button size="large" type="default" onClick={() => {
-                                    // Download as TSV file
-                                    const header = columns.map((col) => col.title);
-                                    const data = tableData.map((record) => {
-                                        return columns.map((col: any) => {
-                                            return record[col.key];
-                                        });
-                                    });
-                                    const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
-                                    const blob = new Blob([tsvData], { type: 'text/tsv' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `knowledges-${nodeIds?.join('-')}-${new Date().toISOString()}.tsv`;
-                                    a.click();
-
-                                    // Delete the url
-                                    URL.revokeObjectURL(url);
-                                }} icon={<DownloadOutlined />} />
-                            </Tooltip>
-                            <Button type="primary" danger size="large"
-                                // disabled={selectedRowKeys.length === 0}
-                                onClick={() => {
-                                    if (selectedRowKeys.length === 0) {
-                                        message.warning('Please select at least one row to explain.', 5);
-                                        return;
-                                    }
-                                    explainGraph(selectedRowKeys as string[]);
-                                }}>
-                                Explain
-                            </Button>
-                        </div>
-                        <Table
-                            className={'graph-table'}
-                            style={{ width: '100%', height: '100%' }}
-                            size="small"
-                            columns={columns}
-                            loading={loading}
-                            scroll={{ x: 1000, y: 'calc(100vh - 165px)' }}
-                            dataSource={tableData || []}
-                            rowSelection={{
-                                selectedRowKeys,
-                                onChange: onSelectChange,
-                            }}
-                            rowKey={(record) => getRowKey(record)}
-                            expandable={{
-                                expandedRowRender: (record) => (
-                                    <p style={{ margin: 0 }}>
-                                        <Tag>Key Sentence</Tag> {record.key_sentence || 'No Key Sentence'}
-                                    </p>
-                                ),
-                            }}
-                            pagination={{
-                                showSizeChanger: true,
-                                showQuickJumper: false,
-                                pageSizeOptions: ['10', '20', '50', '100', '300', '500'],
-                                current: page,
-                                pageSize: pageSize,
-                                total: total || 0,
-                                position: ['topLeft'],
-                                showTotal: (total) => {
-                                    return `Total ${total} records`;
-                                },
-                            }}
-                            onChange={(pagination) => {
-                                setPage(pagination.current || 1);
-                                setPageSize(pagination.pageSize || 10);
-                            }}
-                        ></Table>
-                        <Drawer
-                            width={'80%'}
-                            className='node-drawer'
-                            height={'100%'}
-                            title={activatedNode ? `Node Information - ${activatedNode.data.name}` : 'Node Information'}
-                            rootStyle={{ position: 'absolute' }}
-                            closable={true}
-                            mask={true}
-                            placement={'right'}
-                            onClose={() => {
-                                setActivatedNode(undefined);
-                            }}
-                            open={activatedNode !== undefined}
-                        >
-                            {
-                                activatedNode ?
-                                    <NodeInfoPanel node={activatedNode} /> :
-                                    <Empty description="No node data for this knowledge." />
-                            }
-                        </Drawer>
-                        <Drawer
-                            width={'80%'}
-                            className='knowledge-drawer'
-                            height={'100%'}
-                            title={`Knowledge Information - ${edgeInfo?.startNode?.data.name} - ${edgeInfo?.edge?.reltype} - ${edgeInfo?.endNode?.data.name}`}
-                            rootStyle={{ position: 'absolute' }}
-                            closable={true}
-                            mask={true}
-                            placement={'right'}
-                            onClose={() => {
-                                setDrawerVisible(false);
-                            }}
-                            destroyOnClose={true}
-                            open={drawerVisible}
-                        >
-                            {(drawerVisible && edgeInfo) ?
-                                <EdgeInfoPanel edgeInfo={edgeInfo} />
-                                : <Empty description="No publication data for this knowledge." />}
-                        </Drawer>
-                    </Row>
-                </Collapse.Panel>
-            </Collapse>
+            <Col className='menu-panel'>
+                <Menu
+                    defaultSelectedKeys={['summary']}
+                    defaultOpenKeys={['summary']}
+                    mode="inline"
+                    theme="light"
+                    items={menuItems}
+                    inlineCollapsed={collapsed}
+                />
+                <Button type="primary" onClick={() => { setCollapsed(!collapsed) }} style={{ marginBottom: 16 }}>
+                    {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                </Button>
+            </Col>
+            <Row className={`${collapsed ? 'collapsed-' : ''}knowledge-table-container`}>
+                {whichPanel()}
+            </Row>
         </Row>
     ));
 };

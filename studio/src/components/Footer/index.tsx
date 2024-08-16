@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import CookieConsent, { Cookies } from 'react-cookie-consent';
-import { GithubOutlined } from '@ant-design/icons';
+import { GithubOutlined, FieldTimeOutlined } from '@ant-design/icons';
 import { DefaultFooter } from '@ant-design/pro-components';
 import { Row } from 'antd';
+import type { MenuProps } from 'antd';
 import './index.less';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [cookieName, setCookieName] = useState<string>('biomedgps-cookie-consent-form');
   const [cookieEnabled, setCookieEnabled] = useState<boolean | undefined>(undefined);
+  const version = process.env.UMI_APP_VERSION || '0.1.0';
 
   useEffect(() => {
     const v = Cookies.get(cookieName);
@@ -40,7 +42,7 @@ const Footer: React.FC = () => {
   return (
     <Row className='footer-container'>
       <DefaultFooter
-        copyright={`${currentYear} OpenProphetDB Team`}
+        copyright={`${currentYear} OpenProphetDB Team | Version ${version}`}
         links={[
           {
             key: 'open-prophetdb',
