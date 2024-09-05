@@ -148,10 +148,139 @@ export async function fetchEntityColorMap(options?: { [key: string]: any }) {
   });
 }
 
+/** Call `/api/v1/entity-curations` with query params to fetch entity curations. GET /api/v1/entity-curations */
+export async function fetchEntityCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEntityCurationParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseEntityCuration>('/api/v1/entity-curations', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-curations` with payload to create a entity curation. POST /api/v1/entity-curations */
+export async function postEntityCuration(
+  body: swagger.EntityCuration,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.EntityCuration>('/api/v1/entity-curations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-curations/:id` with payload to update a entity curation. PUT /api/v1/entity-curations/${param0} */
+export async function putEntityCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.putEntityCurationParams,
+  body: swagger.EntityCuration,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.EntityCuration>(`/api/v1/entity-curations/${param0}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-curations/:id` with payload to delete a entity curation. DELETE /api/v1/entity-curations/${param0} */
+export async function deleteEntityCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteEntityCurationParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<any>(`/api/v1/entity-curations/${param0}`, {
+    method: 'DELETE',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/entity-metadata` with query params to fetch all entity metadata. GET /api/v1/entity-metadata */
 export async function fetchEntityMetadata(options?: { [key: string]: any }) {
   return request<swagger.EntityMetadata[]>('/api/v1/entity-metadata', {
     method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-metadata-curations` with query params to fetch entity metadata curations. GET /api/v1/entity-metadata-curations */
+export async function fetchEntityMetadataCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEntityMetadataCurationParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseEntityMetadataCuration>(
+    '/api/v1/entity-metadata-curations',
+    {
+      method: 'GET',
+      params: {
+        ...params,
+      },
+      ...(options || {}),
+    },
+  );
+}
+
+/** Call `/api/v1/entity-metadata-curations` with payload to create a entity metadata curation. POST /api/v1/entity-metadata-curations */
+export async function postEntityMetadataCuration(
+  body: swagger.EntityMetadataCuration,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.EntityMetadataCuration>('/api/v1/entity-metadata-curations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-metadata-curations/:id` with payload to update a entity metadata curation. PUT /api/v1/entity-metadata-curations/${param0} */
+export async function putEntityMetadataCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.putEntityMetadataCurationParams,
+  body: swagger.EntityMetadataCuration,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.EntityMetadataCuration>(`/api/v1/entity-metadata-curations/${param0}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-metadata-curations/:id` with payload to delete a entity metadata curation. DELETE /api/v1/entity-metadata-curations/${param0} */
+export async function deleteEntityMetadataCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteEntityMetadataCurationParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<any>(`/api/v1/entity-metadata-curations/${param0}`, {
+    method: 'DELETE',
+    params: { ...queryParams },
     ...(options || {}),
   });
 }

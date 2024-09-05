@@ -22,6 +22,7 @@ pub const ENTITY_NAME_MAX_LENGTH: u64 = 255;
 pub const RELATION_ID_MAX_LENGTH: u64 = 255;
 pub const DEFAULT_MAX_LENGTH: u64 = 64;
 pub const DEFAULT_MIN_LENGTH: u64 = 1;
+pub const DEFAULT_FINGERPRINT_LENGTH: u64 = 1024;
 
 lazy_static! {
     // The relation_id is like "<RELATION_TYPE>|<SOURCE_ID>|<TARGET_ID>", e.g. "STRING::ACTIVATOR::Gene:Compound|Gene::ENTREZ:1017|Compound::DrugBank:2083"
@@ -775,6 +776,7 @@ impl RelationMetadata {
 pub struct Payload {
     pub project_id: String,
     pub organization_id: String,
+    // TODO: Add more fields if needed
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
@@ -863,14 +865,26 @@ pub struct KnowledgeCuration {
     ))]
     pub curator: String,
 
-    #[validate(range(min = 1, message = "pmid must be greater than 0"))]
-    pub pmid: i64,
+    #[validate(length(
+        max = "DEFAULT_FINGERPRINT_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of fingerprint must be between 1 and 1024."
+    ))]
+    pub fingerprint: String,
 
     // The payload field is a jsonb field which contains the project_id and organization_id.
     pub payload: Option<serde_json::Value>,
+
+    // The annotation field is a jsonb field which contains the xpath and offset.
+    pub annotation: Option<serde_json::Value>,
 }
 
 impl KnowledgeCuration {
+    pub fn update_curator(&mut self, curator: String) -> &Self {
+        self.curator = curator;
+        return self;
+    }
+
     pub fn to_relation(&self) -> Relation {
         Relation {
             id: self.id,
@@ -883,7 +897,8 @@ impl KnowledgeCuration {
             key_sentence: Some(self.key_sentence.clone()),
             resource: self.curator.clone(),
             dataset: Some(DEFAULT_DATASET_NAME.to_string()),
-            pmids: Some(format!("{}", self.pmid)),
+            // TODO: We don't like pmid anymore, we should use the fingerprint instead.
+            pmids: None,
             score: None,
         }
     }
@@ -891,7 +906,7 @@ impl KnowledgeCuration {
     pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KnowledgeCuration>, anyhow::Error> {
         let columns = <KnowledgeCuration as CheckData>::fields().join(",");
         let sql_str =
-            format!("SELECT id,created_at,payload,{columns} FROM biomedgps_knowledge_curation");
+            format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_knowledge_curation");
         let records = sqlx::query_as::<_, KnowledgeCuration>(sql_str.as_str())
             .fetch_all(pool)
             .await?;
@@ -984,7 +999,7 @@ impl KnowledgeCuration {
     }
 
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, curator, pmid, payload) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *";
+        let sql_str = "INSERT INTO biomedgps_knowledge_curation (relation_type, source_name, source_type, source_id, target_name, target_type, target_id, key_sentence, curator, fingerprint, payload) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *";
         let payload = match &self.payload {
             Some(payload) => sqlx::types::Json(Payload {
                 project_id: KnowledgeCuration::get_value("project_id", payload)?,
@@ -1006,7 +1021,7 @@ impl KnowledgeCuration {
             .bind(&self.target_id)
             .bind(&self.key_sentence)
             .bind(&self.curator)
-            .bind(&self.pmid)
+            .bind(&self.fingerprint)
             .bind(&payload)
             .fetch_one(pool)
             .await?;
@@ -1019,7 +1034,7 @@ impl KnowledgeCuration {
         pool: &sqlx::PgPool,
         id: i64,
     ) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "UPDATE biomedgps_knowledge_curation SET relation_type = $1, source_name = $2, source_type = $3, source_id = $4, target_name = $5, target_type = $6, target_id = $7, key_sentence = $8, created_at = now(), pmid = $9 WHERE id = $10 RETURNING *";
+        let sql_str = "UPDATE biomedgps_knowledge_curation SET relation_type = $1, source_name = $2, source_type = $3, source_id = $4, target_name = $5, target_type = $6, target_id = $7, key_sentence = $8, created_at = now(), fingerprint = $9 WHERE id = $10 RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
             .bind(&self.relation_type)
             .bind(&self.source_name)
@@ -1029,7 +1044,7 @@ impl KnowledgeCuration {
             .bind(&self.target_type)
             .bind(&self.target_id)
             .bind(&self.key_sentence)
-            .bind(&self.pmid)
+            .bind(&self.fingerprint)
             .bind(id)
             .fetch_one(pool)
             .await?;
@@ -1037,10 +1052,11 @@ impl KnowledgeCuration {
         AnyOk(knowledge_curation)
     }
 
-    pub async fn delete(pool: &sqlx::PgPool, id: i64) -> Result<KnowledgeCuration, anyhow::Error> {
-        let sql_str = "DELETE FROM biomedgps_knowledge_curation WHERE id = $1 RETURNING *";
+    pub async fn delete(pool: &sqlx::PgPool, id: i64, curator: &str) -> Result<KnowledgeCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_knowledge_curation WHERE id = $1 AND curator = $2 RETURNING *";
         let knowledge_curation = sqlx::query_as::<_, KnowledgeCuration>(sql_str)
             .bind(id)
+            .bind(curator)
             .fetch_one(pool)
             .await?;
 
@@ -1061,7 +1077,7 @@ impl CheckData for KnowledgeCuration {
             "target_type".to_string(),
             "target_id".to_string(),
             "curator".to_string(),
-            "pmid".to_string(),
+            "fingerprint".to_string(),
         ]
     }
 
@@ -1076,7 +1092,570 @@ impl CheckData for KnowledgeCuration {
             "target_id".to_string(),
             "key_sentence".to_string(),
             "curator".to_string(),
-            "pmid".to_string(),
+            "fingerprint".to_string(),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object, sqlx::FromRow, Validate)]
+pub struct EntityMetadataCuration {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource must be between 1 and 64."
+    ))]
+    pub entity_id: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type must be between 1 and 64."
+    ))]
+    pub entity_type: String,
+
+    #[validate(length(
+        max = "ENTITY_NAME_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of description must be between 1 and 64."
+    ))]
+    pub entity_name: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of resource must be between 1 and 64."
+    ))]
+    pub field_name: String,
+
+    pub field_value: String,
+
+    pub field_title: String,
+
+    pub key_sentence: String,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
+    pub created_at: DateTime<Utc>,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of curator must be between 1 and 64."
+    ))]
+    pub curator: String,
+
+    #[validate(length(
+        max = "DEFAULT_FINGERPRINT_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of fingerprint must be between 1 and 1024."
+    ))]
+    pub fingerprint: String,
+
+    // The payload field is a jsonb field which contains the project_id and organization_id.
+    pub payload: Option<serde_json::Value>,
+
+    // The annotation field is a jsonb field which contains the xpath and offset.
+    pub annotation: Option<serde_json::Value>,
+}
+
+impl EntityMetadataCuration {
+    pub fn update_curator(&mut self, curator: &str) {
+        self.curator = curator.to_string();
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<EntityMetadataCuration>, anyhow::Error> {
+        let columns = <EntityMetadataCuration as CheckData>::fields().join(",");
+        let sql_str =
+            format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_entity_metadata_curation");
+        let records = sqlx::query_as::<_, EntityMetadataCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
+    }
+
+    pub async fn get_records_by_owner(
+        pool: &sqlx::PgPool,
+        curator: &str,
+        project_id: i32,
+        organization_id: i32,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<RecordResponse<EntityMetadataCuration>, anyhow::Error> {
+        let project_id_qstr = if project_id >= 0 {
+            format!("payload->>'project_id' = '{}'", project_id)
+        } else {
+            format!("payload->>'project_id' IS NOT NULL")
+        };
+
+        let organization_id_qstr = if organization_id >= 0 {
+            format!("payload->>'organization_id' = '{}'", organization_id)
+        } else {
+            format!("payload->>'organization_id' IS NOT NULL")
+        };
+
+        let curator_qstr = if project_id < 0 && organization_id < 0 {
+            format!("curator = '{}'", curator)
+        } else {
+            format!("curator IS NOT NULL")
+        };
+
+        let where_str = format!(
+            "{} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr
+        );
+
+        let page = match page {
+            Some(page) => page,
+            None => 1,
+        };
+
+        let page_size = match page_size {
+            Some(page_size) => page_size,
+            None => 10,
+        };
+
+        let limit = page_size;
+
+        let offset = (page - 1) * page_size;
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let sql_str = format!(
+            "SELECT * FROM biomedgps_entity_metadata_curation WHERE {} {} LIMIT {} OFFSET {}",
+            where_str, order_by_str, limit, offset
+        );
+
+        let records = sqlx::query_as::<_, EntityMetadataCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!(
+            "SELECT COUNT(*) FROM biomedgps_entity_metadata_curation WHERE {}",
+            where_str
+        );
+
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(RecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page,
+            page_size: page_size,
+        })
+    }
+
+    fn get_value(key: &str, json: &serde_json::Value) -> Result<String, anyhow::Error> {
+        match json[key].as_str() {
+            Some(value) => Ok(value.to_string()),
+            None => Err(anyhow::anyhow!("The {} field is missing.", key)),
+        }
+    }
+
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EntityMetadataCuration, anyhow::Error> {
+        let sql_str = "INSERT INTO biomedgps_entity_metadata_curation (entity_id, entity_type, entity_name, field_name, field_value, field_title, key_sentence, curator, fingerprint, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: EntityMetadataCuration::get_value("project_id", payload)?,
+                organization_id: EntityMetadataCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
+        // We just want to treat the annotation as a jsonb field, we don't want to deserialize it.
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let entity_metadata_curation = sqlx::query_as::<_, EntityMetadataCuration>(sql_str)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .bind(&self.field_name)
+            .bind(&self.field_value)
+            .bind(&self.field_title)
+            .bind(&self.key_sentence)
+            .bind(&self.curator)
+            .bind(&self.fingerprint)
+            .bind(&payload)
+            .bind(&annotation)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_metadata_curation)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<EntityMetadataCuration, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_entity_metadata_curation SET entity_id = $1, entity_type = $2, entity_name = $3, field_name = $4, field_value = $5, field_title = $6, key_sentence = $7, created_at = now(), fingerprint = $8, payload = $9, annotation = $10 WHERE id = $11 AND curator = $12 RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: EntityMetadataCuration::get_value("project_id", payload)?,
+                organization_id: EntityMetadataCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
+        // We just want to treat the annotation as a jsonb field, we don't want to deserialize it.
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let entity_metadata_curation = sqlx::query_as::<_, EntityMetadataCuration>(sql_str)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .bind(&self.field_name)
+            .bind(&self.field_value)
+            .bind(&self.field_title)
+            .bind(&self.key_sentence)
+            .bind(&self.fingerprint)
+            .bind(&curator)
+            .bind(&payload)
+            .bind(&annotation)
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_metadata_curation)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<EntityMetadataCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_entity_metadata_curation WHERE id = $1 AND curator = $2 RETURNING *";
+        let entity_metadata_curation = sqlx::query_as::<_, EntityMetadataCuration>(sql_str)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_metadata_curation)
+    }
+}
+
+impl CheckData for EntityMetadataCuration {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<EntityMetadataCuration>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "field_name".to_string(),
+            "field_value".to_string(),
+            "curator".to_string(),
+            "fingerprint".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "field_name".to_string(),
+            "field_value".to_string(),
+            "field_title".to_string(),
+            "key_sentence".to_string(),
+            "curator".to_string(),
+            "fingerprint".to_string(),
+            // Don't add payload and annotation here, because we don't want to serialize them.
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct EntityCuration {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_id must be between 1 and 64."
+    ))]
+    pub entity_id: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_type must be between 1 and 64."
+    ))]
+    pub entity_type: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of entity_name must be between 1 and 64."
+    ))]
+    pub entity_name: String,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
+    pub created_at: DateTime<Utc>,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of curator must be between 1 and 64."
+    ))]
+    pub curator: String,
+
+    #[validate(length(
+        max = "DEFAULT_FINGERPRINT_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of fingerprint must be between 1 and 1024."
+    ))]
+    pub fingerprint: String,
+
+    // The payload field is a jsonb field which contains the project_id and organization_id.
+    pub payload: Option<serde_json::Value>,
+
+    // The annotation field is a jsonb field which contains the xpath and offset.
+    pub annotation: Option<serde_json::Value>,
+}
+
+impl EntityCuration {
+    pub fn update_curator(&mut self, curator: &str) {
+        self.curator = curator.to_string();
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<EntityCuration>, anyhow::Error> {
+        let columns = <EntityCuration as CheckData>::fields().join(",");
+        let sql_str = format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_entity_curation");
+        let records = sqlx::query_as::<_, EntityCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
+    }
+
+    pub async fn get_records_by_owner(
+        pool: &sqlx::PgPool,
+        curator: &str,
+        project_id: i32,
+        organization_id: i32,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<RecordResponse<EntityCuration>, anyhow::Error> {
+        let project_id_qstr = if project_id >= 0 {
+            format!("payload->>'project_id' = '{}'", project_id)
+        } else {
+            format!("payload->>'project_id' IS NOT NULL")
+        };
+
+        let organization_id_qstr = if organization_id >= 0 {
+            format!("payload->>'organization_id' = '{}'", organization_id)
+        } else {
+            format!("payload->>'organization_id' IS NOT NULL")
+        };
+
+        let curator_qstr = if project_id < 0 && organization_id < 0 {
+            format!("curator = '{}'", curator)
+        } else {
+            format!("curator IS NOT NULL")
+        };
+
+        let where_str = format!(
+            "{} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr
+        );
+
+        let page = match page {
+            Some(page) => page,
+            None => 1,
+        };
+
+        let page_size = match page_size {
+            Some(page_size) => page_size,
+            None => 10,
+        };
+
+        let limit = page_size;
+        let offset = (page - 1) * page_size;
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let sql_str = format!(
+            "SELECT * FROM biomedgps_entity_curation WHERE {} {} LIMIT {} OFFSET {}",
+            where_str, order_by_str, limit, offset
+        );
+
+        let records = sqlx::query_as::<_, EntityCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!("SELECT COUNT(*) FROM biomedgps_entity_curation WHERE {}", where_str);
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(RecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page,
+            page_size: page_size,
+        })
+    }
+
+    fn get_value(key: &str, json: &serde_json::Value) -> Result<String, anyhow::Error> {
+        match json[key].as_str() {
+            Some(value) => Ok(value.to_string()),
+            None => Err(anyhow::anyhow!("The {} field is missing.", key)),
+        }
+    }
+
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EntityCuration, anyhow::Error> {
+        let sql_str = "INSERT INTO biomedgps_entity_curation (entity_id, entity_type, entity_name, curator, fingerprint, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: EntityCuration::get_value("project_id", payload)?,
+                organization_id: EntityCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
+        // We just want to treat the annotation as a jsonb field, we don't want to deserialize it.
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let entity_curation = sqlx::query_as::<_, EntityCuration>(sql_str)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .bind(&self.curator)
+            .bind(&self.fingerprint)
+            .bind(&payload)
+            .bind(&annotation)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_curation)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<EntityCuration, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_entity_curation SET entity_id = $1, entity_type = $2, entity_name = $3, curator = $4, fingerprint = $5, payload = $6, annotation = $7 WHERE id = $8 AND curator = $9 RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: EntityCuration::get_value("project_id", payload)?,
+                organization_id: EntityCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
+        // We just want to treat the annotation as a jsonb field, we don't want to deserialize it.
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let entity_curation = sqlx::query_as::<_, EntityCuration>(sql_str)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .bind(&self.curator)
+            .bind(&self.fingerprint)
+            .bind(&payload)
+            .bind(&annotation)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_curation)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<EntityCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_entity_curation WHERE id = $1 AND curator = $2 RETURNING *";
+        let entity_curation = sqlx::query_as::<_, EntityCuration>(sql_str)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_curation)
+    }
+}
+
+impl CheckData for EntityCuration {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<EntityCuration>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "curator".to_string(),
+            "fingerprint".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "entity_id".to_string(),
+            "entity_type".to_string(),
+            "entity_name".to_string(),
+            "curator".to_string(),
+            "fingerprint".to_string(),
+            "payload".to_string(),
+            "annotation".to_string(),
         ]
     }
 }

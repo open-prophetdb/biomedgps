@@ -36,6 +36,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
           const currentTime = Date.now() / 1000;
 
           if (decodedToken.exp < currentTime + 5 * 60) {
+            // TODO: How to refresh the access token correctly? getAccessTokenSilently might not a good solution. I don't know currently. So I need to test it further.
             const newAccessToken = await getAccessTokenSilently();
             document.cookie = `jwt_access_token=${newAccessToken};max-age=86400;path=/`;
           }

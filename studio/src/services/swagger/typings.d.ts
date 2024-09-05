@@ -108,6 +108,14 @@ declare namespace swagger {
     id: number;
   };
 
+  type deleteEntityCurationParams = {
+    id: number;
+  };
+
+  type deleteEntityMetadataCurationParams = {
+    id: number;
+  };
+
   type deleteSubgraphParams = {
     id: string;
   };
@@ -194,11 +202,39 @@ declare namespace swagger {
     page_size: number;
   };
 
+  type EntityCuration = {
+    id: number;
+    entity_id: string;
+    entity_type: string;
+    entity_name: string;
+    created_at: string;
+    curator: string;
+    fingerprint: string;
+    payload?: any;
+    annotation?: any;
+  };
+
   type EntityMetadata = {
     id: number;
     resource: string;
     entity_type: string;
     entity_count: number;
+  };
+
+  type EntityMetadataCuration = {
+    id: number;
+    entity_id: string;
+    entity_type: string;
+    entity_name: string;
+    field_name: string;
+    field_value: string;
+    field_title: string;
+    key_sentence: string;
+    created_at: string;
+    curator: string;
+    fingerprint: string;
+    payload?: any;
+    annotation?: any;
   };
 
   type ErrorMessage = {
@@ -270,6 +306,18 @@ declare namespace swagger {
     page?: number;
     page_size?: number;
     entity_type: string;
+  };
+
+  type fetchEntityCurationParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
+  type fetchEntityMetadataCurationParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
   };
 
   type fetchNodesParams = {
@@ -374,8 +422,9 @@ declare namespace swagger {
     key_sentence: string;
     created_at: string;
     curator: string;
-    pmid: number;
+    fingerprint: string;
     payload?: any;
+    annotation?: any;
   };
 
   type Label = {
@@ -568,6 +617,14 @@ declare namespace swagger {
     id: number;
   };
 
+  type putEntityCurationParams = {
+    id: number;
+  };
+
+  type putEntityMetadataCurationParams = {
+    id: number;
+  };
+
   type putSubgraphParams = {
     id: string;
   };
@@ -586,6 +643,28 @@ declare namespace swagger {
   type RecordResponseEntity2D = {
     /** data */
     records: Entity2D[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseEntityCuration = {
+    /** data */
+    records: EntityCuration[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseEntityMetadataCuration = {
+    /** data */
+    records: EntityMetadataCuration[];
     /** total num */
     total: number;
     /** current page index */

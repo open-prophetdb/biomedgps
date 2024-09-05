@@ -9,8 +9,8 @@ use crate::api::schema::{
     PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery,
 };
 use crate::model::core::{
-    Entity, Entity2D, EntityMetadata, KnowledgeCuration, RecordResponse, Relation, RelationCount,
-    RelationMetadata, Statistics, Subgraph,
+    Entity, Entity2D, EntityCuration, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
+    RelationCount, RelationMetadata, Statistics, Subgraph, EntityMetadataCuration
 };
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
@@ -97,7 +97,8 @@ impl BiomedgpsApi {
         let question = question.0;
         let publications = publications.0;
         let pool_arc = pool.clone();
-        match Publication::fetch_summary_by_chatgpt(&question, &publications, Some(&pool_arc)).await {
+        match Publication::fetch_summary_by_chatgpt(&question, &publications, Some(&pool_arc)).await
+        {
             Ok(result) => GetPublicationsSummaryResponse::ok(result),
             Err(e) => {
                 let err = format!("Failed to fetch publications summary: {}", e);
@@ -765,7 +766,10 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> PostResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
-        let payload = payload.0;
+        let mut payload = payload.0;
+
+        // We don't like the owner field to be set by the frontend, so we set it to the curator.
+        payload.update_curator(_token.0.username);
 
         match payload.validate() {
             Ok(_) => {}
@@ -801,8 +805,11 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> PostResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
-        let payload = payload.0;
+        let mut payload = payload.0;
         let id = id.0;
+
+        // We don't like the owner field to be set by the frontend, so we set it to the curator.
+        payload.update_curator(_token.0.username);
 
         if id < 0 {
             let err = format!("Invalid id: {}", id);
@@ -851,10 +858,386 @@ impl BiomedgpsApi {
             return DeleteResponse::bad_request(err);
         }
 
-        match KnowledgeCuration::delete(&pool_arc, id).await {
+        let username = _token.0.username;
+        match KnowledgeCuration::delete(&pool_arc, id, &username).await {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete curated knowledge: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-curations` with query params to fetch entity curations.
+    #[oai(
+        path = "/entity-curations",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityCuration"
+    )]
+    async fn fetch_entity_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<EntityCuration> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RecordResponse::<EntityCuration>::get_records(
+            &pool_arc,
+            "biomedgps_entity_curation",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch entity curations: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-curations` with payload to create a entity curation.
+    #[oai(
+        path = "/entity-curations",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postEntityCuration"
+    )]
+    async fn post_entity_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<EntityCuration>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<EntityCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match payload.insert(&pool_arc).await {
+            Ok(ec) => PostResponse::created(ec),
+            Err(e) => {
+                let err = format!("Failed to insert entity curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-curations/:id` with payload to update a entity curation.
+    #[oai(
+        path = "/entity-curations/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putEntityCuration"
+    )]
+    async fn put_entity_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<EntityCuration>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<EntityCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let id = id.0;
+
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match payload.update(&pool_arc, id, &username).await {
+            Ok(ec) => PostResponse::created(ec),
+            Err(e) => {
+                let err = format!("Failed to update entity curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-curations/:id` with payload to delete a entity curation.
+    #[oai(
+        path = "/entity-curations/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteEntityCuration"
+    )]
+    async fn delete_entity_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let username = _token.0.username;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        }
+
+        match EntityCuration::delete(&pool_arc, id, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete entity curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-metadata-curations` with query params to fetch entity metadata curations.
+    #[oai(
+        path = "/entity-metadata-curations",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityMetadataCuration"
+    )]
+    async fn fetch_entity_metadata_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<EntityMetadataCuration> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RecordResponse::<EntityMetadataCuration>::get_records(
+            &pool_arc,
+            "biomedgps_entity_metadata_curation",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch entity metadata curations: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-metadata-curations` with payload to create a entity metadata curation.
+    #[oai(
+        path = "/entity-metadata-curations",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postEntityMetadataCuration"
+    )]
+    async fn post_entity_metadata_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<EntityMetadataCuration>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<EntityMetadataCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match payload.insert(&pool_arc).await {
+            Ok(emc) => PostResponse::created(emc),
+            Err(e) => {
+                let err = format!("Failed to insert entity metadata curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-metadata-curations/:id` with payload to update a entity metadata curation.
+    #[oai(
+        path = "/entity-metadata-curations/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putEntityMetadataCuration"
+    )]
+    async fn put_entity_metadata_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<EntityMetadataCuration>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<EntityMetadataCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let id = id.0;
+
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match payload.update(&pool_arc, id, &username).await {
+            Ok(emc) => PostResponse::created(emc),
+            Err(e) => {
+                let err = format!("Failed to update entity metadata curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-metadata-curations/:id` with payload to delete a entity metadata curation.
+    #[oai(
+        path = "/entity-metadata-curations/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteEntityMetadataCuration"
+    )]
+    async fn delete_entity_metadata_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let username = _token.0.username;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        }
+
+        match EntityMetadataCuration::delete(&pool_arc, id, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete entity metadata curation: {}", e);
                 warn!("{}", err);
                 DeleteResponse::not_found(err)
             }
