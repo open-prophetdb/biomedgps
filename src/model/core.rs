@@ -11,6 +11,7 @@ use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::{debug, info};
+use poem_openapi::types::Type;
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -917,6 +918,7 @@ impl KnowledgeCuration {
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
         curator: &str,
+        fingerprint: Option<&str>,
         project_id: i32,
         organization_id: i32,
         page: Option<u64>,
@@ -935,6 +937,12 @@ impl KnowledgeCuration {
             format!("payload->>'organization_id' IS NOT NULL")
         };
 
+        let fingerprint_qstr = if fingerprint.is_some() {
+            format!("fingerprint = '{}'", fingerprint.unwrap())
+        } else {
+            format!("fingerprint IS NOT NULL")
+        };
+
         let curator_qstr = if project_id < 0 && organization_id < 0 {
             format!("curator = '{}'", curator)
         } else {
@@ -942,8 +950,8 @@ impl KnowledgeCuration {
         };
 
         let where_str = format!(
-            "{} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr
+            "{} AND {} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
         );
 
         let page = match page {
@@ -1182,6 +1190,7 @@ impl EntityMetadataCuration {
 
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
+        fingerprint: &str,
         curator: &str,
         project_id: i32,
         organization_id: i32,
@@ -1201,6 +1210,12 @@ impl EntityMetadataCuration {
             format!("payload->>'organization_id' IS NOT NULL")
         };
 
+        let fingerprint_qstr = if fingerprint.is_empty() {
+            format!("fingerprint IS NOT NULL")
+        } else {
+            format!("fingerprint = '{}'", fingerprint)
+        };
+
         let curator_qstr = if project_id < 0 && organization_id < 0 {
             format!("curator = '{}'", curator)
         } else {
@@ -1208,8 +1223,8 @@ impl EntityMetadataCuration {
         };
 
         let where_str = format!(
-            "{} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr
+            "{} AND {} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
         );
 
         let page = match page {
@@ -1266,6 +1281,28 @@ impl EntityMetadataCuration {
     }
 
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EntityMetadataCuration, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_entity_metadata_curation WHERE fingerprint = $1 AND curator = $2 AND entity_id = $3 AND entity_type = $4 AND entity_name = $5 AND field_name = $6 AND field_value = $7";
+        let record = sqlx::query_as::<_, EntityMetadataCuration>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .bind(&self.field_name)
+            .bind(&self.field_value)
+            .fetch_one(pool)
+            .await;
+
+        match record {
+            Ok(record) => {
+                if record.id > 0 {
+                    return self.update(pool, record.id, &self.curator).await;
+                }
+            }
+            Err(e) => {
+            }
+        }
+            
         let sql_str = "INSERT INTO biomedgps_entity_metadata_curation (entity_id, entity_type, entity_name, field_name, field_value, field_title, key_sentence, curator, fingerprint, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *";
         let payload = match &self.payload {
             Some(payload) => sqlx::types::Json(Payload {
@@ -1395,6 +1432,390 @@ impl CheckData for EntityMetadataCuration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct KeySentenceCuration {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_FINGERPRINT_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of fingerprint must be between 1 and 1024."
+    ))]
+    pub fingerprint: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of curator must be between 1 and 64."
+    ))]
+    pub curator: String,
+
+    pub key_sentence: String,
+
+    pub description: String,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
+    pub created_at: DateTime<Utc>,
+
+    pub payload: Option<serde_json::Value>,
+
+    pub annotation: Option<serde_json::Value>,
+}
+
+impl CheckData for KeySentenceCuration {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<KeySentenceCuration>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "fingerprint".to_string(),
+            "curator".to_string(),
+            "key_sentence".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "fingerprint".to_string(),
+            "curator".to_string(),
+            "key_sentence".to_string(),
+            "description".to_string(),
+            // Don't add payload and annotation here, because we don't want to serialize them.
+        ]
+    }
+}
+
+impl KeySentenceCuration {
+    pub fn update_curator(&mut self, curator: &str) {
+        self.curator = curator.to_string();
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KeySentenceCuration>, anyhow::Error> {
+        let columns = <KeySentenceCuration as CheckData>::fields().join(",");
+        let sql_str = format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_key_sentence_curation");
+        let records = sqlx::query_as::<_, KeySentenceCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
+    }
+
+    pub async fn get_records_by_owner(
+        pool: &sqlx::PgPool,
+        fingerprint: &str,
+        curator: &str,
+        project_id: i32,
+        organization_id: i32,
+        page: Option<u64>,
+        page_size: Option<u64>,
+        order_by: Option<&str>,
+    ) -> Result<RecordResponse<KeySentenceCuration>, anyhow::Error> {
+        let project_id_qstr = if project_id >= 0 {
+            format!("payload->>'project_id' = '{}'", project_id)
+        } else {
+            format!("payload->>'project_id' IS NOT NULL")
+        };
+
+        let organization_id_qstr = if organization_id >= 0 {
+            format!("payload->>'organization_id' = '{}'", organization_id)
+        } else {
+            format!("payload->>'organization_id' IS NOT NULL")
+        };
+
+        let fingerprint_qstr = if fingerprint.is_empty() {
+            format!("fingerprint IS NOT NULL")
+        } else {
+            format!("fingerprint = '{}'", fingerprint)
+        };
+
+        let curator_qstr = if project_id < 0 && organization_id < 0 {
+            format!("curator = '{}'", curator)
+        } else {
+            format!("curator IS NOT NULL")
+        };
+
+        let where_str = format!(
+            "{} AND {} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
+        );
+
+        let page = match page {
+            Some(page) => page,
+            None => 1,
+        };
+
+        let page_size = match page_size {
+            Some(page_size) => page_size,
+            None => 10,
+        };
+
+        let limit = page_size;
+
+        let offset = (page - 1) * page_size;
+
+        let order_by_str = if order_by.is_none() {
+            "".to_string()
+        } else {
+            format!("ORDER BY {}", order_by.unwrap())
+        };
+
+        let sql_str = format!(
+            "SELECT * FROM biomedgps_key_sentence_curation WHERE {} {} LIMIT {} OFFSET {}",
+            where_str, order_by_str, limit, offset
+        );
+
+        let records = sqlx::query_as::<_, KeySentenceCuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        let sql_str = format!(
+            "SELECT COUNT(*) FROM biomedgps_key_sentence_curation WHERE {}",
+            where_str
+        );
+
+        let total = sqlx::query_as::<_, (i64,)>(sql_str.as_str())
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(RecordResponse {
+            records: records,
+            total: total.0 as u64,
+            page: page,
+            page_size: page_size,
+        })
+    }   
+
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KeySentenceCuration, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_key_sentence_curation WHERE fingerprint = $1 AND curator = $2 AND key_sentence = $3";
+        let record = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.key_sentence)
+            .fetch_one(pool)
+            .await;    
+    
+        match record {
+            Ok(record) => {
+                if record.id > 0 {
+                    return self.update(pool, record.id, &self.curator).await;
+                }
+            }
+            Err(e) => {
+
+            }
+        }
+
+        let sql_str = "INSERT INTO biomedgps_key_sentence_curation (fingerprint, curator, key_sentence, description, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(payload.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.key_sentence)
+            .bind(&self.description)
+            .bind(&payload)
+            .bind(&annotation)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(key_sentence_curation)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<KeySentenceCuration, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_key_sentence_curation SET fingerprint = $1, curator = $2, key_sentence = $3, description = $4, payload = $5, annotation = $6 WHERE id = $7 AND curator = $8 RETURNING *";
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(payload.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let annotation = match &self.annotation {
+            Some(annotation) => sqlx::types::Json(annotation.clone()),
+            None => sqlx::types::Json(serde_json::Value::Null),
+        };
+
+        let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.key_sentence)
+            .bind(&self.description)
+            .bind(&payload)
+            .bind(&annotation)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(key_sentence_curation)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<KeySentenceCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_key_sentence_curation WHERE id = $1 AND curator = $2 RETURNING *";
+        let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(key_sentence_curation)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct WebpageMetadata {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_FINGERPRINT_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of fingerprint must be between 1 and 1024."
+    ))]
+    pub fingerprint: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of curator must be between 1 and 64."
+    ))]
+    pub curator: String,
+
+    pub note: String,
+
+    pub metadata: serde_json::Value,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
+    pub created_at: DateTime<Utc>,
+}
+
+impl CheckData for WebpageMetadata {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<WebpageMetadata>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "fingerprint".to_string(),
+            "curator".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "fingerprint".to_string(),
+            "curator".to_string(),
+            "note".to_string(),
+            // Don't add metadata here, because we don't want to serialize it.
+        ]
+    }
+}
+
+impl WebpageMetadata {
+    pub fn update_curator(&mut self, curator: &str) {
+        self.curator = curator.to_string();
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<WebpageMetadata>, anyhow::Error> {
+        let columns = <WebpageMetadata as CheckData>::fields().join(",");
+        let sql_str = format!("SELECT id,created_at,metadata,{columns} FROM biomedgps_webpage_metadata");
+        let records = sqlx::query_as::<_, WebpageMetadata>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
+    }
+
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<WebpageMetadata, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_webpage_metadata WHERE fingerprint = $1 AND curator = $2";
+        let record = sqlx::query_as::<_, WebpageMetadata>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .fetch_one(pool)
+            .await?;
+
+        if record.id > 0 {
+            if record.note != self.note {
+                return self.update(pool, record.id, &self.curator).await;
+            }
+
+            return AnyOk(record);
+        }
+
+        let sql_str = "INSERT INTO biomedgps_webpage_metadata (fingerprint, curator, note, metadata) VALUES ($1, $2, $3, $4) RETURNING *";
+        let webpage_metadata = sqlx::query_as::<_, WebpageMetadata>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.note)
+            .bind(&self.metadata)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(webpage_metadata)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<WebpageMetadata, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_webpage_metadata SET fingerprint = $1, curator = $2, note = $3, metadata = $4 WHERE id = $5 AND curator = $6 RETURNING *";
+        let webpage_metadata = sqlx::query_as::<_, WebpageMetadata>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.note)
+            .bind(&self.metadata)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(webpage_metadata)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        id: i64,
+        curator: &str,
+    ) -> Result<WebpageMetadata, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_webpage_metadata WHERE id = $1 AND curator = $2 RETURNING *";
+        let webpage_metadata = sqlx::query_as::<_, WebpageMetadata>(sql_str)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(webpage_metadata)
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct EntityCuration {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]
@@ -1466,6 +1887,7 @@ impl EntityCuration {
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
         curator: &str,
+        fingerprint: &str,
         project_id: i32,
         organization_id: i32,
         page: Option<u64>,
@@ -1484,6 +1906,12 @@ impl EntityCuration {
             format!("payload->>'organization_id' IS NOT NULL")
         };
 
+        let fingerprint_qstr = if fingerprint.is_empty() {
+            format!("fingerprint IS NOT NULL")
+        } else {
+            format!("fingerprint = '{}'", fingerprint)
+        };
+
         let curator_qstr = if project_id < 0 && organization_id < 0 {
             format!("curator = '{}'", curator)
         } else {
@@ -1491,8 +1919,8 @@ impl EntityCuration {
         };
 
         let where_str = format!(
-            "{} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr
+            "{} AND {} AND {} AND {}",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
         );
 
         let page = match page {
@@ -1544,6 +1972,26 @@ impl EntityCuration {
     }
 
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<EntityCuration, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_entity_curation WHERE fingerprint = $1 AND curator = $2 AND entity_id = $3 AND entity_type = $4 AND entity_name = $5";
+        let record = sqlx::query_as::<_, EntityCuration>(sql_str)
+            .bind(&self.fingerprint)
+            .bind(&self.curator)
+            .bind(&self.entity_id)
+            .bind(&self.entity_type)
+            .bind(&self.entity_name)
+            .fetch_one(pool)
+            .await;
+            
+        match record {
+            Ok(record) => {
+                if record.id > 0 {
+                    return self.update(pool, record.id, &self.curator).await;
+                }
+            }
+            Err(e) => {
+            }
+        }
+
         let sql_str = "INSERT INTO biomedgps_entity_curation (entity_id, entity_type, entity_name, curator, fingerprint, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
         let payload = match &self.payload {
             Some(payload) => sqlx::types::Json(Payload {
@@ -1659,6 +2107,159 @@ impl CheckData for EntityCuration {
         ]
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct Configuration {
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    pub id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of config_name must be between 1 and 64."
+    ))]
+    pub config_name: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of config_title must be between 1 and 64."
+    ))]
+    pub config_title: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of config_description must be between 1 and 64."
+    ))]
+    pub config_description: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of category must be between 1 and 64."
+    ))]
+    pub category: String,
+
+    #[validate(length(
+        max = "DEFAULT_MAX_LENGTH",
+        min = "DEFAULT_MIN_LENGTH",
+        message = "The length of owner must be between 1 and 64."
+    ))]
+    pub owner: String,
+}
+
+impl Configuration {
+    pub fn update_owner(&mut self, owner: &str) {
+        self.owner = owner.to_string();
+    }
+
+    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Configuration>, anyhow::Error> {
+        let columns = <Configuration as CheckData>::fields().join(",");
+        let sql_str = format!("SELECT id,{columns} FROM biomedgps_configuration");
+        let records = sqlx::query_as::<_, Configuration>(sql_str.as_str())
+            .fetch_all(pool)
+            .await?;
+
+        AnyOk(records)
+    }
+
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Configuration, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_configuration WHERE config_name = $1 AND category = $2 AND owner = $3";
+        let record = sqlx::query_as::<_, Configuration>(sql_str)
+            .bind(&self.config_name)
+            .bind(&self.category)
+            .bind(&self.owner)
+            .fetch_one(pool)
+            .await;
+
+        match record {
+            Ok(record) => {
+                if record.id > 0 {
+                    return self.update(pool, record.id, &self.owner).await;
+                }
+            }
+            Err(e) => {
+            }
+        }
+
+        let sql_str = "INSERT INTO biomedgps_configuration (config_name, config_title, config_description, category, owner) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+        let configuration = sqlx::query_as::<_, Configuration>(sql_str)
+            .bind(&self.config_name)
+            .bind(&self.config_title)
+            .bind(&self.config_description)
+            .bind(&self.category)
+            .bind(&self.owner)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(configuration)
+    }
+
+    pub async fn update(
+        &self,
+        pool: &sqlx::PgPool,
+        id: i64,
+        owner: &str,
+    ) -> Result<Configuration, anyhow::Error> {
+        let sql_str = "UPDATE biomedgps_configuration SET config_name = $1, config_title = $2, config_description = $3, category = $4, owner = $5 WHERE id = $6 AND owner = $7 RETURNING *";
+        let configuration = sqlx::query_as::<_, Configuration>(sql_str)
+            .bind(&self.config_name)
+            .bind(&self.config_title)
+            .bind(&self.config_description)
+            .bind(&self.category)
+            .bind(id)
+            .bind(owner)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(configuration)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        config_name: &str,
+        category: &str, 
+        owner: &str,
+    ) -> Result<Configuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_configuration WHERE config_name = $1 AND category = $2 AND owner = $3 RETURNING *";
+        let configuration = sqlx::query_as::<_, Configuration>(sql_str)
+            .bind(config_name)
+            .bind(category)
+            .bind(owner)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(configuration)
+    }
+}
+
+impl CheckData for Configuration {
+    fn check_csv_is_valid(filepath: &PathBuf) -> Vec<Box<dyn Error>> {
+        Self::check_csv_is_valid_default::<Configuration>(filepath)
+    }
+
+    fn unique_fields() -> Vec<String> {
+        vec![
+            "config_name".to_string(),
+            "category".to_string(),
+            "owner".to_string(),
+        ]
+    }
+
+    fn fields() -> Vec<String> {
+        vec![
+            "config_name".to_string(),
+            "config_title".to_string(),
+            "config_description".to_string(),
+            "category".to_string(),
+            "owner".to_string(),
+        ]
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Relation {

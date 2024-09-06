@@ -1773,6 +1773,7 @@ impl Graph {
         match KnowledgeCuration::get_records_by_owner(
             pool,
             curator,
+            None,  // TODO: Do we need to filter the knowledges by website fingerprint?
             project_id,
             organization_id,
             page,

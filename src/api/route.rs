@@ -9,8 +9,9 @@ use crate::api::schema::{
     PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery,
 };
 use crate::model::core::{
-    Entity, Entity2D, EntityCuration, EntityMetadata, KnowledgeCuration, RecordResponse, Relation,
-    RelationCount, RelationMetadata, Statistics, Subgraph, EntityMetadataCuration
+    Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration,
+    KnowledgeCuration, RecordResponse, Relation, RelationCount, RelationMetadata, Statistics,
+    Subgraph, WebpageMetadata, KeySentenceCuration
 };
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
@@ -584,7 +585,8 @@ impl BiomedgpsApi {
     async fn fetch_curated_knowledges_by_owner(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        curator: Query<String>,
+        curator: Query<Option<String>>,
+        fingerprint: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
@@ -595,14 +597,21 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let curator = curator.0;
 
-        if curator != _token.0.username {
-            let err = format!(
-                "You cannot query curated knowledges from other users. You are {} and you are querying {}'s curated knowledges.",
-                _token.0.username, curator
-            );
-            warn!("{}", err);
-            return GetRecordsResponse::bad_request(err);
-        }
+        let curator = match curator {
+            Some(curator) => {
+                if curator != _token.0.username {
+                    let err = format!(
+                        "You cannot query curated knowledges from other users. You are {} and you are querying other users' curated knowledges.",
+                        _token.0.username
+                    );
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                } else {
+                    curator
+                }
+            }
+            None => _token.0.username.clone(),
+        };
 
         let project_id = match project_id.0 {
             Some(project_id) => {
@@ -660,9 +669,18 @@ impl BiomedgpsApi {
             return GetRecordsResponse::bad_request(err);
         };
 
+        let fingerprint = match fingerprint.0 {
+            Some(fingerprint) => fingerprint,
+            None => {
+                warn!("Fingerprint is empty.");
+                "".to_string()
+            }
+        };
+
         match KnowledgeCuration::get_records_by_owner(
             &pool_arc,
             &curator,
+            Some(&fingerprint),
             project_id,
             organization_id,
             page.0,
@@ -940,6 +958,105 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/entity-curations-by-owner` with query params to fetch entity curations by owner.
+    #[oai(
+        path = "/entity-curations-by-owner",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityCurationByOwner"
+    )]
+    async fn fetch_entity_curation_by_owner(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        project_id: Query<Option<String>>,
+        organization_id: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<EntityCuration> {
+        let pool_arc = pool.clone();
+        let curator = &_token.0.username;
+
+        let project_id = match project_id.0 {
+            Some(project_id) => {
+                // Convert project_id to i32
+                match project_id.parse::<i32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse project id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Project id is empty.");
+                -1
+            }
+        };
+
+        let organization_id = match organization_id.0 {
+            Some(organization_id) => {
+                // Convert organization_id to i32
+                match organization_id.parse::<i32>() {
+                    Ok(organization_id) => organization_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse organization id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Organization id is empty.");
+                -1
+            }
+        };
+
+        // Get organizations and projects from the token
+        let user = &_token.0;
+        if organization_id != -1 && !user.organizations.contains(&organization_id) {
+            let err = format!(
+                "User {} doesn't have access to organization {}. Your system might not support querying curated knowledges by organization or you don't have access to this organization.",
+                user.username, organization_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        if project_id != -1 && !user.projects.contains(&project_id) {
+            let err = format!(
+                "User {} doesn't have access to project {}. Your system might not support querying curated knowledges by project or you don't have access to this project.",
+                user.username, project_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        match EntityCuration::get_records_by_owner(
+            &pool_arc,
+            &curator,
+            &fingerprint,
+            project_id,
+            organization_id,
+            page.0,
+            page_size.0,
+            // TODO: get an order_by clause from query
+            Some("id ASC"),
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch curated knowledges: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/entity-curations` with payload to create a entity curation.
     #[oai(
         path = "/entity-curations",
@@ -1128,6 +1245,106 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/entity-metadata-curations-by-owner` with query params to fetch entity metadata curations by owner.
+    #[oai(
+        path = "/entity-metadata-curations-by-owner",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEntityMetadataCurationByOwner"
+    )]
+    async fn fetch_entity_metadata_curation_by_owner(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        project_id: Query<Option<String>>,
+        organization_id: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<EntityMetadataCuration> {
+        let pool_arc = pool.clone();
+        let curator = &_token.0.username;
+        let fingerprint = &fingerprint.0;
+        let page = page.0;
+        let page_size = page_size.0;
+
+        let project_id = match project_id.0 {
+            Some(project_id) => {
+                // Convert project_id to i32
+                match project_id.parse::<i32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse project id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Project id is empty.");
+                -1
+            }
+        };
+
+        let organization_id = match organization_id.0 {
+            Some(organization_id) => {
+                // Convert organization_id to i32
+                match organization_id.parse::<i32>() {
+                    Ok(organization_id) => organization_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse organization id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Organization id is empty.");
+                -1
+            }
+        };
+
+        // Get organizations and projects from the token
+        let user = &_token.0;
+        if organization_id != -1 && !user.organizations.contains(&organization_id) {
+            let err = format!(
+                "User {} doesn't have access to organization {}. Your system might not support querying curated knowledges by organization or you don't have access to this organization.",
+                user.username, organization_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        }
+
+        if project_id != -1 && !user.projects.contains(&project_id) {
+            let err = format!(
+                "User {} doesn't have access to project {}. Your system might not support querying curated knowledges by project or you don't have access to this project.",
+                user.username, project_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        }
+
+        match EntityMetadataCuration::get_records_by_owner(
+            &pool_arc,
+            &curator,
+            &fingerprint,
+            project_id,
+            organization_id,
+            page,
+            page_size,
+            Some("id ASC"),
+        )
+        .await
+        {
+            Ok(entities) => GetRecordsResponse::ok(entities),
+            Err(e) => {
+                let err = format!("Failed to fetch entity metadata curations: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
     /// Call `/api/v1/entity-metadata-curations` with payload to create a entity metadata curation.
     #[oai(
         path = "/entity-metadata-curations",
@@ -1238,6 +1455,694 @@ impl BiomedgpsApi {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete entity metadata curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata` with query params to fetch webpage metadata.
+    #[oai(
+        path = "/webpage-metadata",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchWebpageMetadata"
+    )]
+    async fn fetch_webpage_metadata(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<WebpageMetadata> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RecordResponse::<WebpageMetadata>::get_records(
+            &pool_arc,
+            "biomedgps_webpage_metadata",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch webpage metadata: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata` with payload to create a webpage metadata.
+    #[oai(
+        path = "/webpage-metadata",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postWebpageMetadata"
+    )]
+    async fn post_webpage_metadata(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<WebpageMetadata>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<WebpageMetadata> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.insert(&pool_arc).await {
+            Ok(wm) => PostResponse::created(wm),
+            Err(e) => {
+                let err = format!("Failed to insert webpage metadata: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata/:id` with payload to update a webpage metadata.
+    #[oai(
+        path = "/webpage-metadata/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putWebpageMetadata"
+    )]
+    async fn put_webpage_metadata(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<WebpageMetadata>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<WebpageMetadata> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let id = id.0;
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.update(&pool_arc, id, &username).await {
+            Ok(wm) => PostResponse::created(wm),
+            Err(e) => {
+                let err = format!("Failed to update webpage metadata: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata/:id` with payload to delete a webpage metadata.
+    #[oai(
+        path = "/webpage-metadata/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteWebpageMetadata"
+    )]
+    async fn delete_webpage_metadata(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let username = _token.0.username;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        }
+
+        match WebpageMetadata::delete(&pool_arc, id, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete webpage metadata: {}", e);
+            
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations` with query params to fetch key sentence curations.
+    #[oai(
+        path = "/key-sentence-curations",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchKeySentenceCuration"
+    )]
+    async fn fetch_key_sentence_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<KeySentenceCuration> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RecordResponse::<KeySentenceCuration>::get_records(
+            &pool_arc,
+            "biomedgps_key_sentence_curation",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch key sentence curations: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations-by-owner` with query params to fetch key sentence curations by owner.
+    #[oai(
+        path = "/key-sentence-curations-by-owner",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchKeySentenceCurationByOwner"
+    )]
+    async fn fetch_key_sentence_curation_by_owner(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        curator: Query<Option<String>>,
+        fingerprint: Query<Option<String>>,
+        project_id: Query<Option<String>>,
+        organization_id: Query<Option<String>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<KeySentenceCuration> {
+        let pool_arc = pool.clone();
+        let curator = curator.0;
+
+        let curator = match curator {
+            Some(curator) => {
+                if curator != _token.0.username {
+                    let err = format!(
+                        "You cannot query curated key sentences from other users. You are {} and you are querying other users' curated key sentences.",
+                        _token.0.username
+                    );
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                } else {
+                    curator
+                }
+            }
+            None => _token.0.username.clone(),
+        };
+
+        let project_id = match project_id.0 {
+            Some(project_id) => {
+                // Convert project_id to i32
+                match project_id.parse::<i32>() {
+                    Ok(project_id) => project_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse project id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Project id is empty.");
+                -1
+            }
+        };
+
+        let organization_id = match organization_id.0 {
+            Some(organization_id) => {
+                // Convert organization_id to i32
+                match organization_id.parse::<i32>() {
+                    Ok(organization_id) => organization_id,
+                    Err(e) => {
+                        let err = format!("Failed to parse organization id: {}", e);
+                        warn!("{}", err);
+                        return GetRecordsResponse::bad_request(err);
+                    }
+                }
+            }
+            None => {
+                warn!("Organization id is empty.");
+                -1
+            }
+        };
+
+        // Get organizations and projects from the token
+        let user = &_token.0;
+        if organization_id != -1 && !user.organizations.contains(&organization_id) {
+            let err = format!(
+                "User {} doesn't have access to organization {}. Your system might not support querying curated knowledges by organization or you don't have access to this organization.",
+                user.username, organization_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        if project_id != -1 && !user.projects.contains(&project_id) {
+            let err = format!(
+                "User {} doesn't have access to project {}. Your system might not support querying curated knowledges by project or you don't have access to this project.",
+                user.username, project_id
+            );
+            warn!("{}", err);
+            return GetRecordsResponse::bad_request(err);
+        };
+
+        let fingerprint = match fingerprint.0 {
+            Some(fingerprint) => fingerprint,
+            None => {
+                warn!("Fingerprint is empty.");
+                "".to_string()
+            }
+        };
+
+        match KeySentenceCuration::get_records_by_owner(
+            &pool_arc,
+            &curator,
+            &fingerprint,
+            project_id,
+            organization_id,
+            page.0,
+            page_size.0,
+            // TODO: get an order_by clause from query
+            Some("id ASC"),
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch curated knowledges: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations` with payload to create a key sentence curation.
+    #[oai(
+        path = "/key-sentence-curations",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postKeySentenceCuration"
+    )]
+    async fn post_key_sentence_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<KeySentenceCuration>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<KeySentenceCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let username = _token.0.username;
+        payload.update_curator(&username);
+        
+        match payload.validate() {      
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+        
+        match payload.insert(&pool_arc).await {
+            Ok(ksc) => PostResponse::created(ksc),
+            Err(e) => {
+                let err = format!("Failed to insert key sentence curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations/:id` with payload to update a key sentence curation.
+    #[oai(
+        path = "/key-sentence-curations/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putKeySentenceCuration"
+    )]
+    async fn put_key_sentence_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<KeySentenceCuration>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<KeySentenceCuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let id = id.0;
+        let username = _token.0.username;
+        payload.update_curator(&username);
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate payload: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.update(&pool_arc, id, &username).await {
+            Ok(ksc) => PostResponse::created(ksc),
+            Err(e) => {
+                let err = format!("Failed to update key sentence curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations/:id` with payload to delete a key sentence curation.
+    #[oai(
+        path = "/key-sentence-curations/:id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteKeySentenceCuration"
+    )]
+    async fn delete_key_sentence_curation(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let username = _token.0.username;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        }
+
+        match KeySentenceCuration::delete(&pool_arc, id, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete key sentence curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/configurations` with query params to fetch configurations.
+    #[oai(
+        path = "/configurations",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchConfigurations"
+    )]
+    async fn fetch_configurations(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Configuration> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query_str = match query_str.0 {
+            Some(query_str) => query_str,
+            None => {
+                warn!("Query string is empty.");
+                "".to_string()
+            }
+        };
+
+        let query = if query_str == "" {
+            None
+        } else {
+            debug!("Query string: {}", &query_str);
+            // Parse query string as json
+            match serde_json::from_str(&query_str) {
+                Ok(query) => Some(query),
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            }
+        };
+
+        match RecordResponse::<Configuration>::get_records(
+            &pool_arc,
+            "biomedgps_configuration",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch configurations: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/configurations` with payload to create a configuration.
+    #[oai(
+        path = "/configurations",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postConfiguration"
+    )]
+    async fn post_configuration(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<Configuration>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<Configuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let username = _token.0.username;
+        payload.update_owner(&username);
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate configuration: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.insert(&pool_arc).await {
+            Ok(config) => PostResponse::created(config),
+            Err(e) => {
+                let err = format!("Failed to insert configuration: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/configurations/:id` with payload to update a configuration.
+    #[oai(
+        path = "/configurations/:id",
+        method = "put",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "putConfiguration"
+    )]
+    async fn put_configuration(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<Configuration>,
+        id: Path<i64>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<Configuration> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let id = id.0;
+        let username = _token.0.username;
+        payload.update_owner(&username);
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate configuration: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.update(&pool_arc, id, &username).await {
+            Ok(config) => PostResponse::created(config),
+            Err(e) => {
+                let err = format!("Failed to update configuration: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/configurations` with payload to delete a configuration.
+    #[oai(
+        path = "/configurations",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteConfiguration"
+    )]
+    async fn delete_configuration(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        config_name: Query<String>,
+        category: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let config_name = config_name.0;
+        let category = category.0;
+        let username = _token.0.username;
+
+        if config_name == "" || category == "" {
+            let err = format!(
+                "Invalid config_name or category: {} {}",
+                config_name, category
+            );
+            warn!("{}", err);
+            return DeleteResponse::bad_request(err);
+        };
+
+        match Configuration::delete(&pool_arc, &config_name, &category, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete configuration: {}", e);
                 warn!("{}", err);
                 DeleteResponse::not_found(err)
             }

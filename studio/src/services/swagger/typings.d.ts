@@ -81,6 +81,15 @@ declare namespace swagger {
     targets: Target[];
   };
 
+  type Configuration = {
+    id: number;
+    config_name: string;
+    config_title: string;
+    config_description: string;
+    category: string;
+    owner: string;
+  };
+
   type ConsensusResult = {
     results_analyzed_count: number;
     yes_percent: number;
@@ -104,6 +113,11 @@ declare namespace swagger {
     text: string;
   };
 
+  type deleteConfigurationParams = {
+    config_name: string;
+    category: string;
+  };
+
   type deleteCuratedKnowledgeParams = {
     id: number;
   };
@@ -116,8 +130,16 @@ declare namespace swagger {
     id: number;
   };
 
+  type deleteKeySentenceCurationParams = {
+    id: number;
+  };
+
   type deleteSubgraphParams = {
     id: string;
+  };
+
+  type deleteWebpageMetadataParams = {
+    id: number;
   };
 
   type Dosage = {
@@ -261,6 +283,12 @@ declare namespace swagger {
     url: string;
   };
 
+  type fetchConfigurationsParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
   type fetchCuratedGraphParams = {
     curator: string;
     project_id?: string;
@@ -271,7 +299,8 @@ declare namespace swagger {
   };
 
   type fetchCuratedKnowledgesByOwnerParams = {
-    curator: string;
+    curator?: string;
+    fingerprint?: string;
     project_id?: string;
     organization_id?: string;
     page?: number;
@@ -308,13 +337,44 @@ declare namespace swagger {
     entity_type: string;
   };
 
+  type fetchEntityCurationByOwnerParams = {
+    fingerprint: string;
+    project_id?: string;
+    organization_id?: string;
+    page?: number;
+    page_size?: number;
+  };
+
   type fetchEntityCurationParams = {
     page?: number;
     page_size?: number;
     query_str?: string;
   };
 
+  type fetchEntityMetadataCurationByOwnerParams = {
+    fingerprint: string;
+    project_id?: string;
+    organization_id?: string;
+    page?: number;
+    page_size?: number;
+  };
+
   type fetchEntityMetadataCurationParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
+  type fetchKeySentenceCurationByOwnerParams = {
+    curator?: string;
+    fingerprint?: string;
+    project_id?: string;
+    organization_id?: string;
+    page?: number;
+    page_size?: number;
+  };
+
+  type fetchKeySentenceCurationParams = {
     page?: number;
     page_size?: number;
     query_str?: string;
@@ -387,6 +447,12 @@ declare namespace swagger {
     query_str?: string;
   };
 
+  type fetchWebpageMetadataParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
   type GeneralReferences = {
     articles: Article[];
     links: Link[];
@@ -408,6 +474,17 @@ declare namespace swagger {
     fill: string;
     size: number;
     color: string;
+  };
+
+  type KeySentenceCuration = {
+    id: number;
+    fingerprint: string;
+    curator: string;
+    key_sentence: string;
+    description: string;
+    created_at: string;
+    payload?: any;
+    annotation?: any;
   };
 
   type KnowledgeCuration = {
@@ -613,6 +690,10 @@ declare namespace swagger {
     results_analyzed_count: number;
   };
 
+  type putConfigurationParams = {
+    id: number;
+  };
+
   type putCuratedKnowledgeParams = {
     id: number;
   };
@@ -625,8 +706,27 @@ declare namespace swagger {
     id: number;
   };
 
+  type putKeySentenceCurationParams = {
+    id: number;
+  };
+
   type putSubgraphParams = {
     id: string;
+  };
+
+  type putWebpageMetadataParams = {
+    id: number;
+  };
+
+  type RecordResponseConfiguration = {
+    /** data */
+    records: Configuration[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
   };
 
   type RecordResponseEntity = {
@@ -673,6 +773,17 @@ declare namespace swagger {
     page_size: number;
   };
 
+  type RecordResponseKeySentenceCuration = {
+    /** data */
+    records: KeySentenceCuration[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
   type RecordResponseKnowledgeCuration = {
     /** data */
     records: KnowledgeCuration[];
@@ -698,6 +809,17 @@ declare namespace swagger {
   type RecordResponseSubgraph = {
     /** data */
     records: Subgraph[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseWebpageMetadata = {
+    /** data */
+    records: WebpageMetadata[];
     /** total num */
     total: number;
     /** current page index */
@@ -777,5 +899,14 @@ declare namespace swagger {
     references: GeneralReferences;
     known_action: string;
     polypeptide?: Polypeptide[];
+  };
+
+  type WebpageMetadata = {
+    id: number;
+    fingerprint: string;
+    curator: string;
+    note: string;
+    metadata: any;
+    created_at: string;
   };
 }

@@ -17,6 +17,70 @@ export async function fetchEdgesAutoConnectNodes(
   });
 }
 
+/** Call `/api/v1/configurations` with query params to fetch configurations. GET /api/v1/configurations */
+export async function fetchConfigurations(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchConfigurationsParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseConfiguration>('/api/v1/configurations', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/configurations` with payload to create a configuration. POST /api/v1/configurations */
+export async function postConfiguration(
+  body: swagger.Configuration,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.Configuration>('/api/v1/configurations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/configurations` with payload to delete a configuration. DELETE /api/v1/configurations */
+export async function deleteConfiguration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteConfigurationParams,
+  options?: { [key: string]: any },
+) {
+  return request<any>('/api/v1/configurations', {
+    method: 'DELETE',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/configurations/:id` with payload to update a configuration. PUT /api/v1/configurations/${param0} */
+export async function putConfiguration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.putConfigurationParams,
+  body: swagger.Configuration,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.Configuration>(`/api/v1/configurations/${param0}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/curated-graph` with query params to fetch curated graph. GET /api/v1/curated-graph */
 export async function fetchCuratedGraph(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -178,6 +242,21 @@ export async function postEntityCuration(
   });
 }
 
+/** Call `/api/v1/entity-curations-by-owner` with query params to fetch entity curations by owner. GET /api/v1/entity-curations-by-owner */
+export async function fetchEntityCurationByOwner(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEntityCurationByOwnerParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseEntityCuration>('/api/v1/entity-curations-by-owner', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/entity-curations/:id` with payload to update a entity curation. PUT /api/v1/entity-curations/${param0} */
 export async function putEntityCuration(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -252,6 +331,24 @@ export async function postEntityMetadataCuration(
   });
 }
 
+/** Call `/api/v1/entity-metadata-curations-by-owner` with query params to fetch entity metadata curations by owner. GET /api/v1/entity-metadata-curations-by-owner */
+export async function fetchEntityMetadataCurationByOwner(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEntityMetadataCurationByOwnerParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseEntityMetadataCuration>(
+    '/api/v1/entity-metadata-curations-by-owner',
+    {
+      method: 'GET',
+      params: {
+        ...params,
+      },
+      ...(options || {}),
+    },
+  );
+}
+
 /** Call `/api/v1/entity-metadata-curations/:id` with payload to update a entity metadata curation. PUT /api/v1/entity-metadata-curations/${param0} */
 export async function putEntityMetadataCuration(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -296,6 +393,87 @@ export async function fetchEntity2D(
     params: {
       ...params,
     },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/key-sentence-curations` with query params to fetch key sentence curations. GET /api/v1/key-sentence-curations */
+export async function fetchKeySentenceCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchKeySentenceCurationParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseKeySentenceCuration>('/api/v1/key-sentence-curations', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/key-sentence-curations` with payload to create a key sentence curation. POST /api/v1/key-sentence-curations */
+export async function postKeySentenceCuration(
+  body: swagger.KeySentenceCuration,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.KeySentenceCuration>('/api/v1/key-sentence-curations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/key-sentence-curations-by-owner` with query params to fetch key sentence curations by owner. GET /api/v1/key-sentence-curations-by-owner */
+export async function fetchKeySentenceCurationByOwner(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchKeySentenceCurationByOwnerParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseKeySentenceCuration>(
+    '/api/v1/key-sentence-curations-by-owner',
+    {
+      method: 'GET',
+      params: {
+        ...params,
+      },
+      ...(options || {}),
+    },
+  );
+}
+
+/** Call `/api/v1/key-sentence-curations/:id` with payload to update a key sentence curation. PUT /api/v1/key-sentence-curations/${param0} */
+export async function putKeySentenceCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.putKeySentenceCurationParams,
+  body: swagger.KeySentenceCuration,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.KeySentenceCuration>(`/api/v1/key-sentence-curations/${param0}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/key-sentence-curations/:id` with payload to delete a key sentence curation. DELETE /api/v1/key-sentence-curations/${param0} */
+export async function deleteKeySentenceCuration(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteKeySentenceCurationParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<any>(`/api/v1/key-sentence-curations/${param0}`, {
+    method: 'DELETE',
+    params: { ...queryParams },
     ...(options || {}),
   });
 }
@@ -580,6 +758,69 @@ export async function deleteSubgraph(
 ) {
   const { id: param0, ...queryParams } = params;
   return request<any>(`/api/v1/subgraphs/${param0}`, {
+    method: 'DELETE',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/webpage-metadata` with query params to fetch webpage metadata. GET /api/v1/webpage-metadata */
+export async function fetchWebpageMetadata(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchWebpageMetadataParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseWebpageMetadata>('/api/v1/webpage-metadata', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/webpage-metadata` with payload to create a webpage metadata. POST /api/v1/webpage-metadata */
+export async function postWebpageMetadata(
+  body: swagger.WebpageMetadata,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.WebpageMetadata>('/api/v1/webpage-metadata', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/webpage-metadata/:id` with payload to update a webpage metadata. PUT /api/v1/webpage-metadata/${param0} */
+export async function putWebpageMetadata(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.putWebpageMetadataParams,
+  body: swagger.WebpageMetadata,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.WebpageMetadata>(`/api/v1/webpage-metadata/${param0}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/webpage-metadata/:id` with payload to delete a webpage metadata. DELETE /api/v1/webpage-metadata/${param0} */
+export async function deleteWebpageMetadata(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteWebpageMetadataParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<any>(`/api/v1/webpage-metadata/${param0}`, {
     method: 'DELETE',
     params: { ...queryParams },
     ...(options || {}),
