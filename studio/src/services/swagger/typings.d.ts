@@ -126,8 +126,30 @@ declare namespace swagger {
     id: number;
   };
 
+  type deleteEntityCurationRecordParams = {
+    fingerprint: string;
+    curator: string;
+    entity_id: string;
+    entity_type: string;
+    entity_name: string;
+  };
+
   type deleteEntityMetadataCurationParams = {
     id: number;
+  };
+
+  type deleteEntityMetadataCurationRecordParams = {
+    fingerprint: string;
+    entity_id: string;
+    entity_type: string;
+    entity_name: string;
+    field_name: string;
+    field_value: string;
+  };
+
+  type deleteKeySentenceCurationByFingerprintParams = {
+    fingerprint: string;
+    key_sentence: string;
   };
 
   type deleteKeySentenceCurationParams = {
@@ -136,6 +158,10 @@ declare namespace swagger {
 
   type deleteSubgraphParams = {
     id: string;
+  };
+
+  type deleteWebpageMetadataByFingerprintParams = {
+    fingerprint: string;
   };
 
   type deleteWebpageMetadataParams = {

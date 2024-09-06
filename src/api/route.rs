@@ -1141,6 +1141,49 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/entity-curations/delete-record` with payload to delete a entity curation.
+    #[oai(
+        path = "/entity-curations/delete-record",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteEntityCurationRecord"
+    )]
+    async fn delete_entity_curation_record(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        curator: Query<String>,
+        entity_id: Query<String>,
+        entity_type: Query<String>,
+        entity_name: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let fingerprint = &fingerprint.0;
+        let curator = &curator.0;
+        let entity_id = &entity_id.0;
+        let entity_type = &entity_type.0;
+        let entity_name = &entity_name.0;
+
+        match EntityCuration::delete_record(
+            &pool_arc,
+            &fingerprint,
+            &curator,
+            &entity_id,
+            &entity_type,
+            &entity_name,
+        )
+        .await
+        {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete entity curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+
     /// Call `/api/v1/entity-curations/:id` with payload to delete a entity curation.
     #[oai(
         path = "/entity-curations/:id",
@@ -1326,8 +1369,8 @@ impl BiomedgpsApi {
 
         match EntityMetadataCuration::get_records_by_owner(
             &pool_arc,
-            &curator,
             &fingerprint,
+            &curator,
             project_id,
             organization_id,
             page,
@@ -1424,6 +1467,43 @@ impl BiomedgpsApi {
                 let err = format!("Failed to update entity metadata curation: {}", e);
                 warn!("{}", err);
                 return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/entity-metadata-curations` with payload to delete a entity metadata curation.
+    #[oai(
+        path = "/entity-metadata-curations",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteEntityMetadataCurationRecord"
+    )]
+    async fn delete_entity_metadata_curation_record(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        entity_id: Query<String>,
+        entity_type: Query<String>,
+        entity_name: Query<String>,
+        field_name: Query<String>,
+        field_value: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let fingerprint = fingerprint.0;
+        let username = _token.0.username;
+        let entity_id = entity_id.0;
+        let entity_type = entity_type.0;
+        let entity_name = entity_name.0;
+        let field_name = field_name.0;
+        let field_value = field_value.0;
+
+        match EntityMetadataCuration::delete_record(&pool_arc, &fingerprint, &username, &entity_id, &entity_type, &entity_name, &field_name, &field_value).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete entity metadata curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
             }
         }
     }
@@ -1610,6 +1690,33 @@ impl BiomedgpsApi {
                 let err = format!("Failed to update webpage metadata: {}", e);
                 warn!("{}", err);
                 return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata` with payload to delete a webpage metadata.
+    #[oai(
+        path = "/webpage-metadata",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteWebpageMetadataByFingerprint"
+    )]
+    async fn delete_webpage_metadata_record(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let fingerprint = fingerprint.0;
+        let username = _token.0.username;
+
+        match WebpageMetadata::delete_record(&pool_arc, &fingerprint, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete webpage metadata: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
             }
         }
     }
@@ -1823,8 +1930,8 @@ impl BiomedgpsApi {
 
         match KeySentenceCuration::get_records_by_owner(
             &pool_arc,
-            &curator,
             &fingerprint,
+            &curator,
             project_id,
             organization_id,
             page.0,
@@ -1925,6 +2032,35 @@ impl BiomedgpsApi {
         }
     }
 
+    /// Call `/api/v1/key-sentence-curations` with payload to delete a key sentence curation.
+    #[oai(
+        path = "/key-sentence-curations",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteKeySentenceCurationByFingerprint"
+    )]
+    async fn delete_key_sentence_curation_record(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        key_sentence: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let fingerprint = fingerprint.0;
+        let key_sentence = key_sentence.0;
+        let curator = _token.0.username;
+
+        match KeySentenceCuration::delete_record(&pool_arc, &fingerprint, &curator, &key_sentence).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete key sentence curation: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
+            }
+        }
+    }
+    
     /// Call `/api/v1/key-sentence-curations/:id` with payload to delete a key sentence curation.
     #[oai(
         path = "/key-sentence-curations/:id",

@@ -290,6 +290,21 @@ export async function deleteEntityCuration(
   });
 }
 
+/** Call `/api/v1/entity-curations/delete-record` with payload to delete a entity curation. DELETE /api/v1/entity-curations/delete-record */
+export async function deleteEntityCurationRecord(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteEntityCurationRecordParams,
+  options?: { [key: string]: any },
+) {
+  return request<any>('/api/v1/entity-curations/delete-record', {
+    method: 'DELETE',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/entity-metadata` with query params to fetch all entity metadata. GET /api/v1/entity-metadata */
 export async function fetchEntityMetadata(options?: { [key: string]: any }) {
   return request<swagger.EntityMetadata[]>('/api/v1/entity-metadata', {
@@ -327,6 +342,21 @@ export async function postEntityMetadataCuration(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/entity-metadata-curations` with payload to delete a entity metadata curation. DELETE /api/v1/entity-metadata-curations */
+export async function deleteEntityMetadataCurationRecord(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteEntityMetadataCurationRecordParams,
+  options?: { [key: string]: any },
+) {
+  return request<any>('/api/v1/entity-metadata-curations', {
+    method: 'DELETE',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   });
 }
@@ -423,6 +453,21 @@ export async function postKeySentenceCuration(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/key-sentence-curations` with payload to delete a key sentence curation. DELETE /api/v1/key-sentence-curations */
+export async function deleteKeySentenceCurationByFingerprint(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteKeySentenceCurationByFingerprintParams,
+  options?: { [key: string]: any },
+) {
+  return request<any>('/api/v1/key-sentence-curations', {
+    method: 'DELETE',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   });
 }
@@ -790,6 +835,21 @@ export async function postWebpageMetadata(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/webpage-metadata` with payload to delete a webpage metadata. DELETE /api/v1/webpage-metadata */
+export async function deleteWebpageMetadataByFingerprint(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteWebpageMetadataByFingerprintParams,
+  options?: { [key: string]: any },
+) {
+  return request<any>('/api/v1/webpage-metadata', {
+    method: 'DELETE',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   });
 }

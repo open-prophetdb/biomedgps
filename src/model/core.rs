@@ -1396,6 +1396,31 @@ impl EntityMetadataCuration {
 
         AnyOk(entity_metadata_curation)
     }
+
+    pub async fn delete_record(
+        pool: &sqlx::PgPool,
+        fingerprint: &str,
+        curator: &str,
+        entity_id: &str,
+        entity_type: &str,
+        entity_name: &str,
+        field_name: &str,
+        field_value: &str,
+    ) -> Result<EntityMetadataCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_entity_metadata_curation WHERE fingerprint = $1 AND curator = $2 AND entity_id = $3 AND entity_type = $4 AND entity_name = $5 AND field_name = $6 AND field_value = $7 RETURNING *";
+        let entity_metadata_curation = sqlx::query_as::<_, EntityMetadataCuration>(sql_str)
+            .bind(fingerprint)
+            .bind(curator)
+            .bind(entity_id)
+            .bind(entity_type)
+            .bind(entity_name)
+            .bind(field_name)
+            .bind(field_value)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_metadata_curation)
+    }
 }
 
 impl CheckData for EntityMetadataCuration {
@@ -1590,6 +1615,13 @@ impl KeySentenceCuration {
         })
     }   
 
+    fn get_value(key: &str, json: &serde_json::Value) -> Result<String, anyhow::Error> {
+        match json[key].as_str() {
+            Some(value) => Ok(value.to_string()),
+            None => Err(anyhow::anyhow!("The {} field is missing.", key)),
+        }
+    }
+
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KeySentenceCuration, anyhow::Error> {
         let sql_str = "SELECT * FROM biomedgps_key_sentence_curation WHERE fingerprint = $1 AND curator = $2 AND key_sentence = $3";
         let record = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
@@ -1612,8 +1644,14 @@ impl KeySentenceCuration {
 
         let sql_str = "INSERT INTO biomedgps_key_sentence_curation (fingerprint, curator, key_sentence, description, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
         let payload = match &self.payload {
-            Some(payload) => sqlx::types::Json(payload.clone()),
-            None => sqlx::types::Json(serde_json::Value::Null),
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: KeySentenceCuration::get_value("project_id", payload)?,
+                organization_id: KeySentenceCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
         };
 
         let annotation = match &self.annotation {
@@ -1675,6 +1713,23 @@ impl KeySentenceCuration {
         let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
             .bind(id)
             .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(key_sentence_curation)
+    }
+
+    pub async fn delete_record(
+        pool: &sqlx::PgPool,
+        fingerprint: &str,
+        curator: &str,
+        key_sentence: &str,
+    ) -> Result<KeySentenceCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_key_sentence_curation WHERE fingerprint = $1 AND curator = $2 AND key_sentence = $3 RETURNING *";
+        let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(fingerprint)
+            .bind(curator)
+            .bind(key_sentence)
             .fetch_one(pool)
             .await?;
 
@@ -1756,14 +1811,16 @@ impl WebpageMetadata {
             .bind(&self.fingerprint)
             .bind(&self.curator)
             .fetch_one(pool)
-            .await?;
+            .await;
 
-        if record.id > 0 {
-            if record.note != self.note {
-                return self.update(pool, record.id, &self.curator).await;
+        match record {
+            Ok(record) => {
+                if record.id > 0 {
+                    return self.update(pool, record.id, &self.curator).await;
+                }
             }
-
-            return AnyOk(record);
+            Err(e) => {
+            }
         }
 
         let sql_str = "INSERT INTO biomedgps_webpage_metadata (fingerprint, curator, note, metadata) VALUES ($1, $2, $3, $4) RETURNING *";
@@ -1806,6 +1863,21 @@ impl WebpageMetadata {
         let sql_str = "DELETE FROM biomedgps_webpage_metadata WHERE id = $1 AND curator = $2 RETURNING *";
         let webpage_metadata = sqlx::query_as::<_, WebpageMetadata>(sql_str)
             .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(webpage_metadata)
+    }
+
+    pub async fn delete_record(
+        pool: &sqlx::PgPool,
+        fingerprint: &str,
+        curator: &str,
+    ) -> Result<WebpageMetadata, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_webpage_metadata WHERE fingerprint = $1 AND curator = $2 RETURNING *";
+        let webpage_metadata = sqlx::query_as::<_, WebpageMetadata>(sql_str)
+            .bind(fingerprint)
             .bind(curator)
             .fetch_one(pool)
             .await?;
@@ -2073,6 +2145,27 @@ impl EntityCuration {
         let entity_curation = sqlx::query_as::<_, EntityCuration>(sql_str)
             .bind(id)
             .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(entity_curation)
+    }
+
+    pub async fn delete_record(
+        pool: &sqlx::PgPool,
+        fingerprint: &str,
+        curator: &str,
+        entity_id: &str,
+        entity_type: &str,
+        entity_name: &str,
+    ) -> Result<EntityCuration, anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_entity_curation WHERE fingerprint = $1 AND curator = $2 AND entity_id = $3 AND entity_type = $4 AND entity_name = $5 RETURNING *";
+        let entity_curation = sqlx::query_as::<_, EntityCuration>(sql_str)
+            .bind(fingerprint)
+            .bind(curator)
+            .bind(entity_id)
+            .bind(entity_type)
+            .bind(entity_name)
             .fetch_one(pool)
             .await?;
 
