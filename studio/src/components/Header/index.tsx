@@ -1,4 +1,4 @@
-import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined, FileOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown, Row } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden } from '@/components/util';
@@ -117,6 +117,11 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       key: 'changelog',
       icon: <FieldTimeOutlined />
     },
+    {
+      label: 'Privacy Policy',
+      key: 'privacy-policy',
+      icon: <FileOutlined />
+    }
   ]
 
   const userItems: MenuProps['items'] = [
@@ -135,6 +140,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       history.push('/help')
     } else if (item.key === 'changelog') {
       history.push('/changelog')
+    } else if (item.key === 'privacy-policy') {
+      history.push('/privacy-policy')
     } else if (item.key === 'version') {
       window.open('https://github.com/open-prophetdb/biomedgps/releases', '_blank');
     } else if (item.key === 'logout') {

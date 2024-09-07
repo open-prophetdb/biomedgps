@@ -77,6 +77,14 @@ export const routes = [
     ],
   },
   {
+    path: '/knowledge-curation',
+    key: 'knowledge-curation',
+    name: 'Knowledge Curation',
+    icon: 'table',
+    component: './KnowledgeCuration',
+    category: 'knowledge-graph',
+  },
+  {
     path: '/knowledge-graph-editor',
     name: 'knowledge-graph-editor',
     icon: 'link',
@@ -111,6 +119,13 @@ export const routes = [
     path: '/changelog',
     hideInMenu: true,
     component: './ChangeLog',
+  },
+  {
+    name: 'privacy-policy',
+    icon: 'file',
+    path: '/privacy-policy',
+    hideInMenu: true,
+    component: './PrivacyPolicy',
   },
   {
     name: 'not-authorized',

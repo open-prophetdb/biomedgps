@@ -60,6 +60,14 @@ export const routes = [
     ]
   },
   {
+    path: '/knowledge-curation',
+    key: 'knowledge-curation',
+    name: 'Knowledge Curation',
+    icon: 'table',
+    component: './KnowledgeCuration',
+    category: 'knowledge-graph',
+  },
+  {
     path: '/mecfs-longcovid',
     key: 'mecfs-longcovid',
     name: 'ME/CFS & LongCOVID',
@@ -118,6 +126,13 @@ export const routes = [
     path: '/changelog',
     hideInMenu: true,
     component: './ChangeLog',
+  },
+  {
+    name: 'privacy-policy',
+    icon: 'file',
+    path: '/privacy-policy',
+    hideInMenu: true,
+    component: './PrivacyPolicy',
   },
   {
     name: 'not-authorized',

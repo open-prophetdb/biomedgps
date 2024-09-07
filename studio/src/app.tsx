@@ -32,6 +32,7 @@ import { getJwtAccessToken, logout, logoutWithRedirect, getUsername, isAuthEnabl
 // @ts-ignore
 const publicPath = window.publicPath || process.env.PUBLIC_PATH || '/';
 const defaultCustomSettings = {
+  privacyPolicyUrl: `${publicPath}README/privacy_policy.md`,
   changeLogUrl: `${publicPath}README/changelog.md`,
   aboutUrl: `${publicPath}README/about.md`,
   helpUrl: `${publicPath}README/help.md`,
@@ -172,7 +173,7 @@ export function rootContainer(container: React.ReactNode): React.ReactNode {
 // Gateway to validate the user's authentication status, If you want to ignore more paths, you can add them to the ignore list.
 export function onRouteChange({ clientRoutes, location }: { clientRoutes: any, location: any }) {
   const route = matchRoutes(clientRoutes, location.pathname)?.pop()?.route;
-  const ignoreList = ['/login', '/not-authorized', '/'];
+  const ignoreList = ['/login', '/not-authorized', '/', '/privacy-policy', '/changelog', '/help'];
   console.log("isAuthenticated: ", isAuthenticated(), history.location.pathname, route?.path);
   if (!isAuthenticated() && !ignoreList.includes(route?.path || '')) {
     logoutWithRedirect();
