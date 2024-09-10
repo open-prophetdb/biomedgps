@@ -45,7 +45,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
             align: 'center',
             dataIndex: 'webpage',
             fixed: 'left',
-            width: 50,
+            width: 120,
             render: (text) => {
                 return <a target="_blank" href={text}>Review in Webpage</a>;
             },
@@ -74,7 +74,8 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
                 return <a target="_blank" href={link}>{text}</a>;
             },
             fixed: 'left',
-            width: 150,
+            ellipsis: true,
+            width: 120,
         },
         {
             title: 'Description',
@@ -91,7 +92,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
             render: (text) => {
                 return new Date(text).toLocaleString();
             },
-            width: 50,
+            width: 120,
         },
         {
             title: 'Actions',

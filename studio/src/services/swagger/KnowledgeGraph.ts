@@ -290,13 +290,13 @@ export async function deleteEntityCuration(
   });
 }
 
-/** Call `/api/v1/entity-curations/delete-record` with payload to delete a entity curation. DELETE /api/v1/entity-curations/delete-record */
+/** Call `/api/v1/entity-curations` with payload to delete a entity curation. DELETE /api/v1/entity-curations */
 export async function deleteEntityCurationRecord(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: swagger.deleteEntityCurationRecordParams,
   options?: { [key: string]: any },
 ) {
-  return request<any>('/api/v1/entity-curations/delete-record', {
+  return request<any>('/api/v1/entity-curations', {
     method: 'DELETE',
     params: {
       ...params,

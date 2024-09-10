@@ -316,7 +316,7 @@ declare namespace swagger {
   };
 
   type fetchCuratedGraphParams = {
-    curator: string;
+    curator?: string;
     project_id?: string;
     organization_id?: string;
     page?: number;
@@ -364,7 +364,7 @@ declare namespace swagger {
   };
 
   type fetchEntityCurationByOwnerParams = {
-    fingerprint: string;
+    fingerprint?: string;
     project_id?: string;
     organization_id?: string;
     page?: number;
@@ -378,7 +378,7 @@ declare namespace swagger {
   };
 
   type fetchEntityMetadataCurationByOwnerParams = {
-    fingerprint: string;
+    fingerprint?: string;
     project_id?: string;
     organization_id?: string;
     page?: number;

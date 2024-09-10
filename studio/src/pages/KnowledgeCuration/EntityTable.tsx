@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EntityCuration, EntityTableData } from './typings';
-import { deleteEntityCuration, fetchEntityMetadataCurationByOwner } from '@/services/swagger/KnowledgeGraph';
+import { deleteEntityCuration, fetchEntityCurationByOwner } from '@/services/swagger/KnowledgeGraph';
 
 type KeySentenceTableProps = {
     page?: number;
@@ -28,7 +28,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             align: 'center',
             dataIndex: 'webpage',
             fixed: 'left',
-            width: 50,
+            width: 120,
             render: (text) => {
                 return <a target="_blank" href={text}>Review in Webpage</a>;
             },
@@ -38,14 +38,14 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             dataIndex: 'entity_id',
             key: 'entity_id',
             align: 'center',
-            width: 150,
+            width: 100,
         },
         {
             title: 'Entity Type',
             dataIndex: 'entity_type',
             key: 'entity_type',
             align: 'center',
-            width: 150,
+            width: 50,
         },
         {
             title: 'Entity Name',
@@ -61,6 +61,14 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             align: 'center',
             key: 'fingerprint',
             render: (text) => {
+                const getText = (text: string) => {
+                    if (text.startsWith('http')) {
+                        return text;
+                    } else {
+                        return `${text.split(':')[0].toUpperCase()} | ${text.split(':')[1]}`;
+                    }
+                };
+
                 let link = text;
                 if (text.startsWith('pmid:')) {
                     link = `https://pubmed.ncbi.nlm.nih.gov/?term=${text.split(':')[1]}`;
@@ -68,9 +76,12 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
                     link = `https://doi.org/${text.split(':')[1]}`;
                 }
 
-                return <a target="_blank" href={link}>{text.split(':')[0].toUpperCase()} | {text.split(':')[1]}</a>;
+                return <a target="_blank" href={link}>
+                    {getText(text)}
+                </a>;
             },
             fixed: 'left',
+            ellipsis: true,
             width: 150,
         },
         {
@@ -81,7 +92,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             render: (text) => {
                 return new Date(text).toLocaleString();
             },
-            width: 50,
+            width: 150,
         },
         {
             title: 'Actions',
@@ -147,8 +158,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
 
     useEffect(() => {
         setLoading(true);
-        fetchEntityMetadataCurationByOwner({
-            fingerprint: '',
+        fetchEntityCurationByOwner({
             page: page,
             page_size: pageSize,
         })

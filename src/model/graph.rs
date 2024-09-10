@@ -1842,7 +1842,7 @@ impl Graph {
                 Err(ValidationError::new(&error_msg, vec![]))
             }
         }
-    }
+    }   
 
     /// Fetch the linked nodes with some relation types or other conditions, but only one step
     ///

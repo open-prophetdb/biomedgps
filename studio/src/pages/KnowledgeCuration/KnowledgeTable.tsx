@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { history } from 'umi';
 import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { GraphEdge, GraphTableData } from './typings';
-import { deleteCuratedKnowledge, fetchCuratedKnowledgesByOwner } from '@/services/swagger/KnowledgeGraph';
+import type { GraphData } from 'biominer-components/dist/typings';
+import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
+import { deleteCuratedKnowledge, fetchCuratedGraph, fetchCuratedKnowledges } from '@/services/swagger/KnowledgeGraph';
 
 import './KnowledgeTable.less';
 
@@ -17,24 +20,16 @@ type GraphTableProps = {
 };
 
 const GraphTable: React.FC<GraphTableProps> = (props) => {
-    const [data, setData] = useState<GraphTableData>({} as GraphTableData);
+    const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
+    const [tableData, setTableData] = useState<GraphEdge[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [page, setPage] = useState<number>(props.page || 1);
     const [pageSize, setPageSize] = useState<number>(props.pageSize || 30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+    const [total, setTotal] = useState<number>(0);
 
     const columns: ColumnsType<GraphEdge> = [
-        {
-            title: 'Review',
-            key: 'webpage',
-            align: 'center',
-            dataIndex: 'webpage',
-            fixed: 'left',
-            width: 50,
-            render: (text) => {
-                return <a target="_blank" href={text}>Review in Webpage</a>;
-            },
-        },
         {
             title: 'Relation Type',
             key: 'relation_type',
@@ -42,24 +37,6 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
             dataIndex: 'relation_type',
             fixed: 'left',
             width: 240,
-        },
-        {
-            title: 'Fingerprint',
-            dataIndex: 'fingerprint',
-            align: 'center',
-            key: 'fingerprint',
-            render: (text) => {
-                let link = text;
-                if (text.startsWith('pmid:')) {
-                    link = `https://pubmed.ncbi.nlm.nih.gov/?term=${text.split(':')[1]}`;
-                } else if (text.startsWith('doi:')) {
-                    link = `https://doi.org/${text.split(':')[1]}`;
-                }
-
-                return <a target="_blank" href={link}>{text}</a>;
-            },
-            fixed: 'left',
-            width: 100,
         },
         {
             title: 'Source Name',
@@ -80,7 +57,7 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
             dataIndex: 'source_type',
             align: 'center',
             key: 'source_type',
-            width: 100,
+            width: 120,
         },
         {
             title: 'Target Name',
@@ -101,17 +78,7 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
             dataIndex: 'target_type',
             align: 'center',
             key: 'target_type',
-            width: 100,
-        },
-        {
-            title: 'Created Time',
-            key: 'created_at',
-            align: 'center',
-            dataIndex: 'created_at',
-            render: (text) => {
-                return new Date(text).toLocaleString();
-            },
-            width: 200,
+            width: 120,
         },
         {
             title: 'Actions',
@@ -175,29 +142,80 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
         },
     ];
 
+    const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
+        console.log('selectedRowKeys changed: ', newSelectedRowKeys);
+        setSelectedRowKeys(newSelectedRowKeys);
+    };
+
+    const explainGraph = (selectedRowKeys: string[]) => {
+        if (selectedRowKeys.length === 0) {
+            message.error('Please select at least one edge to explain');
+            return;
+        }
+        const selectedEdges = graphData.edges.filter((edge) => {
+            return selectedRowKeys.includes(edge.relid);
+        });
+        const selectedNodes = graphData.nodes.filter((node) => {
+            return selectedEdges.some((edge) => {
+                return edge.data.source_id === node.data.id || edge.data.target_id === node.data.id;
+            });
+        });
+        const selectedGraphData = {
+            nodes: selectedNodes,
+            edges: selectedEdges,
+        };
+        pushGraphDataToLocalStorage(selectedGraphData);
+        history.push('/predict-explain/knowledge-graph');
+    }
+
     useEffect(() => {
         setLoading(true);
-        fetchCuratedKnowledgesByOwner({
+        fetchCuratedKnowledges({
+            page: page,
+            page_size: 1,
+        }).then((response) => {
+            setTotal(response.total);
+        }).catch((error) => {
+            console.log('Get knowledges error: ', error);
+            setTotal(0);
+        });
+
+        fetchCuratedGraph({
             page: page,
             page_size: pageSize,
+            strict_mode: true,
+            project_id: '-1',
+            organization_id: '-1',
         })
             .then((response) => {
-                setData({
-                    data: response.records.map((record) => {
-                        return {
-                            ...record,
-                            webpage: record.annotation.uri
-                        };
-                    }),
-                    total: response.total,
-                    page: response.page,
-                    pageSize: response.page_size,
+                setGraphData(response);
+                setLoading(false);
+                const edges = response.edges.map((item) => {
+                    return {
+                        // We need it for the row selection
+                        ...item,
+                        ...item.data,
+                    }
                 });
+
+                let tableData = edges.map((item) => {
+                    const newItem: any = { ...item };
+                    const sourceName = response.nodes.find((node) => node.data.id === item.source_id)?.data.name;
+                    const targetName = response.nodes.find((node) => node.data.id === item.target_id)?.data.name;
+                    newItem.source_name = sourceName;
+                    newItem.source_node = response.nodes.find((node) => node.data.id === item.source_id);
+                    newItem.target_name = targetName;
+                    newItem.target_node = response.nodes.find((node) => node.data.id === item.target_id);
+
+                    return newItem;
+                })
+                setTableData(tableData);
                 setLoading(false);
             })
             .catch((error) => {
                 console.log('Get knowledges error: ', error);
-                setData({} as GraphTableData);
+                setGraphData({} as GraphData);
+                setTableData([]);
                 setLoading(false);
             });
     }, [page, pageSize, refreshKey]);
@@ -216,7 +234,11 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
                 columns={columns}
                 loading={loading}
                 scroll={{ x: props.xScroll || 1000, y: props.yScroll || 'calc(100vh - 240px)' }}
-                dataSource={data.data}
+                dataSource={tableData}
+                rowSelection={{
+                    selectedRowKeys,
+                    onChange: onSelectChange,
+                }}
                 rowKey={(record) => getRowKey(record)}
                 expandable={{
                     expandedRowRender: (record) => (
@@ -233,7 +255,7 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
                     pageSizeOptions: props.pageSizeOptions || ['10', '20', '50', '100', '300', '500', '1000'],
                     current: page,
                     pageSize: pageSize,
-                    total: data.total || 0,
+                    total: total || 0,
                     position: ['bottomRight'],
                     showTotal: (total) => {
                         return `Total ${total} items`;

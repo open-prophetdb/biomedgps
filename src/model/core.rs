@@ -1679,15 +1679,23 @@ impl KeySentenceCuration {
         curator: &str,
     ) -> Result<KeySentenceCuration, anyhow::Error> {
         let sql_str = "UPDATE biomedgps_key_sentence_curation SET fingerprint = $1, curator = $2, key_sentence = $3, description = $4, payload = $5, annotation = $6 WHERE id = $7 AND curator = $8 RETURNING *";
-        let payload = match &self.payload {
-            Some(payload) => sqlx::types::Json(payload.clone()),
-            None => sqlx::types::Json(serde_json::Value::Null),
-        };
 
         let annotation = match &self.annotation {
             Some(annotation) => sqlx::types::Json(annotation.clone()),
             None => sqlx::types::Json(serde_json::Value::Null),
         };
+
+        let payload = match &self.payload {
+            Some(payload) => sqlx::types::Json(Payload {
+                project_id: KeySentenceCuration::get_value("project_id", payload)?,
+                organization_id: KeySentenceCuration::get_value("organization_id", payload)?,
+            }),
+            None => sqlx::types::Json(Payload {
+                project_id: "0".to_string(),
+                organization_id: "0".to_string(),
+            }),
+        };
+
 
         let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
             .bind(&self.fingerprint)

@@ -472,7 +472,7 @@ impl BiomedgpsApi {
     async fn fetch_curated_graph(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        curator: Query<String>,
+        curator: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
@@ -481,7 +481,10 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
-        let curator = curator.0;
+        let curator = match curator.0 {
+            Some(curator) => curator,
+            None => _token.0.username.clone(),
+        };
 
         // if curator != _token.0.username {
         //     let err = format!(
@@ -596,6 +599,7 @@ impl BiomedgpsApi {
     ) -> GetRecordsResponse<KnowledgeCuration> {
         let pool_arc = pool.clone();
         let curator = curator.0;
+        let fingerprint = fingerprint.0;
 
         let curator = match curator {
             Some(curator) => {
@@ -669,18 +673,10 @@ impl BiomedgpsApi {
             return GetRecordsResponse::bad_request(err);
         };
 
-        let fingerprint = match fingerprint.0 {
-            Some(fingerprint) => fingerprint,
-            None => {
-                warn!("Fingerprint is empty.");
-                "".to_string()
-            }
-        };
-
         match KnowledgeCuration::get_records_by_owner(
             &pool_arc,
             &curator,
-            Some(&fingerprint),
+            fingerprint.as_deref(),
             project_id,
             organization_id,
             page.0,
@@ -968,7 +964,7 @@ impl BiomedgpsApi {
     async fn fetch_entity_curation_by_owner(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        fingerprint: Query<String>,
+        fingerprint: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
@@ -978,6 +974,13 @@ impl BiomedgpsApi {
     ) -> GetRecordsResponse<EntityCuration> {
         let pool_arc = pool.clone();
         let curator = &_token.0.username;
+        let fingerprint = match &fingerprint.0 {
+            Some(fingerprint) => fingerprint,
+            None => {
+                warn!("Fingerprint is empty.");
+                ""
+            }
+        };
 
         let project_id = match project_id.0 {
             Some(project_id) => {
@@ -1141,9 +1144,9 @@ impl BiomedgpsApi {
         }
     }
 
-    /// Call `/api/v1/entity-curations/delete-record` with payload to delete a entity curation.
+    /// Call `/api/v1/entity-curations` with payload to delete a entity curation.
     #[oai(
-        path = "/entity-curations/delete-record",
+        path = "/entity-curations",
         method = "delete",
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "deleteEntityCurationRecord"
@@ -1160,7 +1163,7 @@ impl BiomedgpsApi {
     ) -> DeleteResponse {
         let pool_arc = pool.clone();
         let fingerprint = &fingerprint.0;
-        let curator = &curator.0;
+        let curator = &_token.0.username;
         let entity_id = &entity_id.0;
         let entity_type = &entity_type.0;
         let entity_name = &entity_name.0;
@@ -1298,7 +1301,7 @@ impl BiomedgpsApi {
     async fn fetch_entity_metadata_curation_by_owner(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        fingerprint: Query<String>,
+        fingerprint: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
@@ -1307,7 +1310,13 @@ impl BiomedgpsApi {
     ) -> GetRecordsResponse<EntityMetadataCuration> {
         let pool_arc = pool.clone();
         let curator = &_token.0.username;
-        let fingerprint = &fingerprint.0;
+        let fingerprint = match &fingerprint.0 {
+            Some(fingerprint) => fingerprint,
+            None => {
+                warn!("Fingerprint is empty.");
+                ""
+            }
+        };
         let page = page.0;
         let page_size = page_size.0;
 
