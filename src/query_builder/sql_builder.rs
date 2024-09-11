@@ -27,7 +27,8 @@ pub struct QueryItem {
 impl QueryItem {
     pub fn new(field: String, value: Value, operator: String) -> Self {
         let allowed_operators = vec![
-            "=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">=", "is", "is not"
+            "=", "!=", "like", "not like", "ilike", "in", "not in", "<>", "<", ">", "<=", ">=",
+            "is", "is not",
         ];
         if !allowed_operators.contains(&operator.as_str()) {
             panic!("Invalid operator: {}", operator);
@@ -163,6 +164,27 @@ pub enum ComposeQuery {
     ComposeQueryItem(ComposeQueryItem),
 }
 
+impl ComposeQuery {
+    pub fn to_string(&self) -> String {
+        let mut query_str = match self {
+            ComposeQuery::QueryItem(item) => item.format(),
+            ComposeQuery::ComposeQueryItem(item) => item.format(),
+        };
+
+        query_str
+    }
+
+    pub fn from_str(query_str: &str) -> Result<Option<Self>, serde_json::Error> {
+        let query = if query_str == "" {
+            None
+        } else {
+            Some(serde_json::from_str(&query_str)?)
+        };
+
+        Ok(query)
+    }
+}
+
 impl ComposeQueryItem {
     pub fn new(operator: &str) -> Self {
         Self {
@@ -292,7 +314,11 @@ pub fn make_order_clause(fields: Vec<String>) -> String {
 pub fn make_order_clause_by_pairs(pairs: Vec<(String, String)>, topk: usize) -> String {
     let mut topk_pairs = Vec::new();
     if topk != 0 {
-        let k = if pairs.len() < topk { pairs.len() } else { topk };
+        let k = if pairs.len() < topk {
+            pairs.len()
+        } else {
+            topk
+        };
         topk_pairs = pairs[0..k].to_vec();
     } else {
         topk_pairs = pairs;

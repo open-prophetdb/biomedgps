@@ -1776,6 +1776,7 @@ impl Graph {
             None,  // TODO: Do we need to filter the knowledges by website fingerprint?
             project_id,
             organization_id,
+            None,
             page,
             page_size,
             order_by,

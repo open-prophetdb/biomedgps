@@ -329,6 +329,7 @@ declare namespace swagger {
     fingerprint?: string;
     project_id?: string;
     organization_id?: string;
+    query_str?: string;
     page?: number;
     page_size?: number;
   };
@@ -369,6 +370,7 @@ declare namespace swagger {
     organization_id?: string;
     page?: number;
     page_size?: number;
+    query_str?: string;
   };
 
   type fetchEntityCurationParams = {
@@ -381,6 +383,7 @@ declare namespace swagger {
     fingerprint?: string;
     project_id?: string;
     organization_id?: string;
+    query_str?: string;
     page?: number;
     page_size?: number;
   };
@@ -398,6 +401,7 @@ declare namespace swagger {
     organization_id?: string;
     page?: number;
     page_size?: number;
+    query_str?: string;
   };
 
   type fetchKeySentenceCurationParams = {

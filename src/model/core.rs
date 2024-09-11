@@ -921,6 +921,7 @@ impl KnowledgeCuration {
         fingerprint: Option<&str>,
         project_id: i32,
         organization_id: i32,
+        query: Option<ComposeQuery>,
         page: Option<u64>,
         page_size: Option<u64>,
         order_by: Option<&str>,
@@ -949,9 +950,18 @@ impl KnowledgeCuration {
             format!("curator IS NOT NULL")
         };
 
+        let mut query_str = match query {
+            Some(query) => query.to_string(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        }
+
         let where_str = format!(
-            "{} AND {} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
+            "{} AND {} AND {} AND {} AND ({})",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr, query_str
         );
 
         let page = match page {
@@ -1194,6 +1204,7 @@ impl EntityMetadataCuration {
         curator: &str,
         project_id: i32,
         organization_id: i32,
+        query: Option<ComposeQuery>,
         page: Option<u64>,
         page_size: Option<u64>,
         order_by: Option<&str>,
@@ -1222,9 +1233,18 @@ impl EntityMetadataCuration {
             format!("curator IS NOT NULL")
         };
 
+        let mut query_str = match query {
+            Some(query) => query.to_string(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        }
+
         let where_str = format!(
-            "{} AND {} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
+            "{} AND {} AND {} AND {} AND ({})",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr, query_str
         );
 
         let page = match page {
@@ -1536,6 +1556,7 @@ impl KeySentenceCuration {
         curator: &str,
         project_id: i32,
         organization_id: i32,
+        query: &Option<ComposeQuery>,
         page: Option<u64>,
         page_size: Option<u64>,
         order_by: Option<&str>,
@@ -1564,9 +1585,18 @@ impl KeySentenceCuration {
             format!("curator IS NOT NULL")
         };
 
+        let mut query_str = match query {
+            Some(query) => query.to_string(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        }
+
         let where_str = format!(
-            "{} AND {} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
+            "{} AND {} AND {} AND {} AND ({})",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr, query_str
         );
 
         let page = match page {
@@ -1970,6 +2000,7 @@ impl EntityCuration {
         fingerprint: &str,
         project_id: i32,
         organization_id: i32,
+        query: &Option<ComposeQuery>,
         page: Option<u64>,
         page_size: Option<u64>,
         order_by: Option<&str>,
@@ -1998,9 +2029,18 @@ impl EntityCuration {
             format!("curator IS NOT NULL")
         };
 
+        let mut query_str = match query {
+            Some(query) => query.to_string(),
+            None => "".to_string(),
+        };
+
+        if query_str.is_empty() {
+            query_str = "1=1".to_string();
+        };
+
         let where_str = format!(
-            "{} AND {} AND {} AND {}",
-            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr
+            "{} AND {} AND {} AND {} AND ({})",
+            curator_qstr, project_id_qstr, organization_id_qstr, fingerprint_qstr, query_str
         );
 
         let page = match page {
@@ -2613,8 +2653,7 @@ impl RelationCount {
         query: &Option<ComposeQuery>,
     ) -> Result<Vec<RelationCount>, anyhow::Error> {
         let mut query_str = match query {
-            Some(ComposeQuery::QueryItem(item)) => item.format(),
-            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
+            Some(query) => query.to_string(),
             None => "".to_string(),
         };
 

@@ -10,8 +10,8 @@ use crate::api::schema::{
 };
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration,
-    KnowledgeCuration, RecordResponse, Relation, RelationCount, RelationMetadata, Statistics,
-    Subgraph, WebpageMetadata, KeySentenceCuration
+    KeySentenceCuration, KnowledgeCuration, RecordResponse, Relation, RelationCount,
+    RelationMetadata, Statistics, Subgraph, WebpageMetadata,
 };
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
@@ -22,7 +22,7 @@ use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
 use crate::model::publication::Publication;
 use crate::model::util::match_color;
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
-use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs};
+use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery};
 use log::{debug, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
@@ -239,28 +239,18 @@ impl BiomedgpsApi {
         let entity_type = entity_type.0;
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetEntityAttrResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         let order_by_clause = match query.clone() {
@@ -383,28 +373,18 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
         let model_table_prefix = model_table_prefix.0;
+        let query_str = query_str.0;
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         let order_by_clause = match query.clone() {
@@ -592,6 +572,7 @@ impl BiomedgpsApi {
         fingerprint: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
+        query_str: Query<Option<String>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
@@ -600,6 +581,7 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let curator = curator.0;
         let fingerprint = fingerprint.0;
+        let query_str = query_str.0;
 
         let curator = match curator {
             Some(curator) => {
@@ -673,12 +655,25 @@ impl BiomedgpsApi {
             return GetRecordsResponse::bad_request(err);
         };
 
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
         match KnowledgeCuration::get_records_by_owner(
             &pool_arc,
             &curator,
             fingerprint.as_deref(),
             project_id,
             organization_id,
+            query,
             page.0,
             page_size.0,
             // TODO: get an order_by clause from query
@@ -713,8 +708,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -723,27 +719,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<KnowledgeCuration>::get_records(
@@ -901,8 +886,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -911,27 +897,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<EntityCuration>::get_records(
@@ -969,11 +944,13 @@ impl BiomedgpsApi {
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
         // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
         _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<EntityCuration> {
         let pool_arc = pool.clone();
         let curator = &_token.0.username;
+        let query_str = query_str.0;
         let fingerprint = match &fingerprint.0 {
             Some(fingerprint) => fingerprint,
             None => {
@@ -1038,12 +1015,25 @@ impl BiomedgpsApi {
             return GetRecordsResponse::bad_request(err);
         };
 
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
         match EntityCuration::get_records_by_owner(
             &pool_arc,
             &curator,
             &fingerprint,
             project_id,
             organization_id,
+            &query,
             page.0,
             page_size.0,
             // TODO: get an order_by clause from query
@@ -1238,8 +1228,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -1248,27 +1239,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<EntityMetadataCuration>::get_records(
@@ -1304,6 +1284,7 @@ impl BiomedgpsApi {
         fingerprint: Query<Option<String>>,
         project_id: Query<Option<String>>,
         organization_id: Query<Option<String>>,
+        query_str: Query<Option<String>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
         _token: CustomSecurityScheme,
@@ -1319,6 +1300,7 @@ impl BiomedgpsApi {
         };
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
         let project_id = match project_id.0 {
             Some(project_id) => {
@@ -1376,12 +1358,25 @@ impl BiomedgpsApi {
             return GetRecordsResponse::bad_request(err);
         }
 
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
         match EntityMetadataCuration::get_records_by_owner(
             &pool_arc,
             &fingerprint,
             &curator,
             project_id,
             organization_id,
+            query,
             page,
             page_size,
             Some("id ASC"),
@@ -1507,7 +1502,18 @@ impl BiomedgpsApi {
         let field_name = field_name.0;
         let field_value = field_value.0;
 
-        match EntityMetadataCuration::delete_record(&pool_arc, &fingerprint, &username, &entity_id, &entity_type, &entity_name, &field_name, &field_value).await {
+        match EntityMetadataCuration::delete_record(
+            &pool_arc,
+            &fingerprint,
+            &username,
+            &entity_id,
+            &entity_type,
+            &entity_name,
+            &field_name,
+            &field_value,
+        )
+        .await
+        {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete entity metadata curation: {}", e);
@@ -1568,8 +1574,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -1578,27 +1585,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<WebpageMetadata>::get_records(
@@ -1757,7 +1753,7 @@ impl BiomedgpsApi {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete webpage metadata: {}", e);
-            
+
                 warn!("{}", err);
                 DeleteResponse::not_found(err)
             }
@@ -1782,8 +1778,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -1792,27 +1789,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<KeySentenceCuration>::get_records(
@@ -1851,11 +1837,13 @@ impl BiomedgpsApi {
         organization_id: Query<Option<String>>,
         page: Query<Option<u64>>,
         page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
         // We need to confirm the token is valid and contains all projects and organizations which the user has access to.
         _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<KeySentenceCuration> {
         let pool_arc = pool.clone();
         let curator = curator.0;
+        let query_str = query_str.0;
 
         let curator = match curator {
             Some(curator) => {
@@ -1937,12 +1925,25 @@ impl BiomedgpsApi {
             }
         };
 
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
         match KeySentenceCuration::get_records_by_owner(
             &pool_arc,
             &fingerprint,
             &curator,
             project_id,
             organization_id,
+            &query,
             page.0,
             page_size.0,
             // TODO: get an order_by clause from query
@@ -1976,8 +1977,8 @@ impl BiomedgpsApi {
         let mut payload = payload.0;
         let username = _token.0.username;
         payload.update_curator(&username);
-        
-        match payload.validate() {      
+
+        match payload.validate() {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to validate payload: {}", e);
@@ -1985,7 +1986,7 @@ impl BiomedgpsApi {
                 return PostResponse::bad_request(err);
             }
         }
-        
+
         match payload.insert(&pool_arc).await {
             Ok(ksc) => PostResponse::created(ksc),
             Err(e) => {
@@ -2060,7 +2061,9 @@ impl BiomedgpsApi {
         let key_sentence = key_sentence.0;
         let curator = _token.0.username;
 
-        match KeySentenceCuration::delete_record(&pool_arc, &fingerprint, &curator, &key_sentence).await {
+        match KeySentenceCuration::delete_record(&pool_arc, &fingerprint, &curator, &key_sentence)
+            .await
+        {
             Ok(_) => DeleteResponse::no_content(),
             Err(e) => {
                 let err = format!("Failed to delete key sentence curation: {}", e);
@@ -2069,7 +2072,7 @@ impl BiomedgpsApi {
             }
         }
     }
-    
+
     /// Call `/api/v1/key-sentence-curations/:id` with payload to delete a key sentence curation.
     #[oai(
         path = "/key-sentence-curations/:id",
@@ -2121,8 +2124,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2131,27 +2135,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<Configuration>::get_records(
@@ -2312,8 +2305,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2322,27 +2316,16 @@ impl BiomedgpsApi {
             }
         };
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         // TODO: We need to add the model name to the query if we allow users to use different model.
@@ -2383,28 +2366,18 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> GetRelationCountResponse {
         let pool_arc = pool.clone();
+        let query_str = query_str.0;
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRelationCountResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RelationCount::get_records(&pool_arc, &query).await {
@@ -2435,8 +2408,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2445,27 +2419,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         // TODO: Could we compute the 2d embedding on the fly or by the biomedgps-cli tool?
@@ -2508,8 +2471,9 @@ impl BiomedgpsApi {
         let page = page.0;
         let page_size = page_size.0;
         let token = token.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2518,27 +2482,16 @@ impl BiomedgpsApi {
             }
         }
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetRecordsResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         match RecordResponse::<Subgraph>::get_records(
@@ -2796,8 +2749,9 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let page = page.0;
         let page_size = page_size.0;
+        let query_str = query_str.0;
 
-        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.0.clone()) {
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
             Ok(_) => {}
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2806,27 +2760,16 @@ impl BiomedgpsApi {
             }
         };
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetGraphResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         let mut graph = Graph::new();
@@ -2862,8 +2805,9 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> GetGraphResponse {
         let pool_arc = pool.clone();
+        let query_str = query_str.0;
 
-        match PredictedNodeQuery::new(&node_id.0, &relation_type.0, &query_str.0, topk.0) {
+        match PredictedNodeQuery::new(&node_id.0, &relation_type.0, &query_str, topk.0) {
             Ok(query) => query,
             Err(e) => {
                 let err = format!("Failed to parse query string: {}", e);
@@ -2872,29 +2816,18 @@ impl BiomedgpsApi {
             }
         };
 
-        let query_str = match query_str.0 {
-            Some(query_str) => query_str,
-            None => {
-                warn!("Query string is empty.");
-                "".to_string()
-            }
-        };
-
         let topk = topk.0;
 
-        let query = if query_str == "" {
-            None
-        } else {
-            debug!("Query string: {}", &query_str);
-            // Parse query string as json
-            match serde_json::from_str(&query_str) {
-                Ok(query) => Some(query),
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
                     return GetGraphResponse::bad_request(err);
                 }
-            }
+            },
+            None => None,
         };
 
         let mut graph = Graph::new();

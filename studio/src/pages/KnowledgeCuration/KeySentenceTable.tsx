@@ -1,5 +1,5 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { KeySentence, KeySentenceTableData } from './typings';
 import { deleteKeySentenceCuration, fetchKeySentenceCurationByOwner } from '@/services/swagger/KnowledgeGraph';
@@ -20,6 +20,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
     const [page, setPage] = useState<number>(props.page || 1);
     const [pageSize, setPageSize] = useState<number>(props.pageSize || 30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [searchText, setSearchText] = useState<string>('');
 
     useImperativeHandle(ref, () => ({
         downloadTable() {
@@ -156,11 +157,33 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
         },
     ];
 
+    const makeSearchQuery = (searchText: string) => {
+        if (!searchText) {
+            return undefined;
+        }
+
+        const composedQuery = {
+            operator: 'or',
+            items: [{
+                operator: 'ilike',
+                field: 'key_sentence',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'description',
+                value: `%${searchText}%`,
+            }],
+        }
+
+        return JSON.stringify(composedQuery);
+    };
+
     useEffect(() => {
         setLoading(true);
         fetchKeySentenceCurationByOwner({
             page: page,
             page_size: pageSize,
+            query_str: makeSearchQuery(searchText)
         })
             .then((response) => {
                 setData({
@@ -179,7 +202,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
                 setData({} as KeySentenceTableData);
                 setLoading(false);
             });
-    }, [page, pageSize, refreshKey]);
+    }, [page, pageSize, refreshKey, searchText]);
 
     const getRowKey = (record: KeySentence) => {
         return record.id || `${JSON.stringify(record)}`;
@@ -187,6 +210,16 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
 
     return (
         <Row className="key-sentence-table-container">
+            <Input.Search
+                placeholder="Search by Keywords [AI Search Functionality Coming Soon]"
+                allowClear
+                enterButton="Search"
+                size="middle"
+                onSearch={(value) => {
+                    setSearchText(value);
+                }}
+                style={{ marginBottom: '10px' }}
+            />
             <Table
                 className={props.className + ' key-sentence-table'}
                 style={props.style}
