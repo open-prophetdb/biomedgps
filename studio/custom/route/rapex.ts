@@ -8,6 +8,7 @@ export const routes = [
     path: '/',
     name: 'Search Knowledges',
     icon: 'dashboard',
+    hideInMenu: true,
     component: './Dashboard',
   },
   {

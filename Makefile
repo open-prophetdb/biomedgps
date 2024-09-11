@@ -52,7 +52,7 @@ build-rapex-studio:
 	@mkdir -p assets
 	@rm -rf frontend && rsync -av --exclude=node_modules --exclude=dist studio/ frontend
 	@ln -s $(PWD)/studio/node_modules $(PWD)/frontend/node_modules
-	@cp studio/custom/components/rapex/Home.tsx frontend/src/pages/Home/index.tsx
+	@cp studio/custom/components/rapex/Dashboard.tsx frontend/src/pages/Dashboard/index.tsx
 	@cp studio/custom/components/rapex/ModelConfig.tsx frontend/src/pages/ModelConfig/index.tsx
 	@cp studio/custom/doc/rapex/help.md frontend/public/README/help.md
 	@cp studio/custom/doc/rapex/download.md frontend/public/README/download.md
