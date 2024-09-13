@@ -4,6 +4,8 @@ use super::graph::COMPOSED_ENTITY_DELIMITER;
 use super::kge::get_entity_emb_table_name;
 use super::util::{get_delimiter, parse_csv_error, ValidationError};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 // use crate::model::util::match_color;
 use crate::query_builder::sql_builder::ComposeQuery;
 use anyhow::Ok as AnyOk;
@@ -11,7 +13,7 @@ use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::{debug, info};
-use poem_openapi::types::Type;
+use sha2::{Digest, Sha256};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -1535,6 +1537,64 @@ impl CheckData for KeySentenceCuration {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct Image {
+    pub raw_image_url: String,
+    pub raw_image_src: String,
+    pub image_path: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub checksum: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl Image {
+    pub fn upload(destdir: &PathBuf, filename: &str, image_bytes: &Vec<u8>, mime_type: &str, raw_image_url: &str, raw_image_src: &str) -> Result<Image, anyhow::Error> {
+        let hasher = Sha256::new();
+        let checksum = hasher.chain_update(image_bytes).finalize();
+        let suffix = filename.split('.').last().unwrap_or("jpg");
+        let checksum_string = format!("{:x}.{}", checksum, suffix);
+
+        // Split the checksum string to make several subfolders
+        let mut subfolders = Vec::new();
+
+        for (i, c) in checksum_string.chars().enumerate() {
+            if i < 3 {
+                subfolders.push(c.to_string());
+            } else {
+                break;
+            }
+        }
+
+        let subdir = subfolders.join("/");
+        let filepath = destdir.join(&subdir).join(&checksum_string);
+
+        if !filepath.exists() {
+            // Make sure the parent directories exist
+            let parent_dir = filepath.parent().unwrap();
+            if !parent_dir.exists() {
+                std::fs::create_dir_all(parent_dir)?;
+            }
+
+            let mut f = File::create(&filepath)?;
+            f.write_all(image_bytes)?;
+        }
+
+        let image = Image {
+            image_path: filepath.to_string_lossy().to_string().replace(destdir.to_str().unwrap(), ""),
+            filename: filename.to_string(),
+            checksum: checksum_string,
+            mime_type: mime_type.to_string(),
+            created_at: Utc::now(),
+            raw_image_url: raw_image_url.to_string(),
+            raw_image_src: raw_image_src.to_string(),
+        };
+
+        Ok(image)
+    }
+}
+
+
 impl KeySentenceCuration {
     pub fn update_curator(&mut self, curator: &str) {
         self.curator = curator.to_string();
@@ -1650,6 +1710,43 @@ impl KeySentenceCuration {
             Some(value) => Ok(value.to_string()),
             None => Err(anyhow::anyhow!("The {} field is missing.", key)),
         }
+    }
+
+    pub async fn add_image_to_payload(pool: &sqlx::PgPool, id: i64, curator: &str, image: &Image) -> Result<KeySentenceCuration, anyhow::Error> {
+        let sql_str = "
+            UPDATE biomedgps_key_sentence_curation 
+            SET payload = jsonb_set(
+                payload,
+                '{images}',
+                COALESCE(
+                    CASE 
+                        WHEN payload->'images' @> jsonb_build_array(jsonb_build_object('checksum', $3))
+                        THEN payload->'images'
+                        ELSE (COALESCE(payload->'images', '[]'::jsonb)) || jsonb_build_array(jsonb_build_object('filename', $1, 'image_path', $2, 'checksum', $3, 'mime_type', $4, 'created_at', $5, 'raw_image_url', $6, 'raw_image_src', $7))
+                    END,
+                    '[]'::jsonb
+                ),
+                true
+            ) 
+            WHERE id = $8 AND curator = $9
+            RETURNING *;
+        ";
+
+        let key_sentence_curation = sqlx::query_as::<_, KeySentenceCuration>(sql_str)
+            .bind(&image.filename)
+            .bind(&image.image_path)
+            .bind(&image.checksum)
+            .bind(&image.mime_type)
+            .bind(&image.created_at)
+            .bind(&image.raw_image_url)
+            .bind(&image.raw_image_src)
+            .bind(id)
+            .bind(curator)
+            .fetch_one(pool)
+            .await?;
+
+        info!("Add image to key sentence curation: {:?} {:?}", key_sentence_curation, image);
+        AnyOk(key_sentence_curation)
     }
 
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<KeySentenceCuration, anyhow::Error> {

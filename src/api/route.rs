@@ -6,10 +6,10 @@ use crate::api::schema::{
     GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse, GetPublicationsResponse,
     GetPublicationsSummaryResponse, GetRecordsResponse, GetRelationCountResponse,
     GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
-    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery,
+    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
 };
 use crate::model::core::{
-    Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration,
+    Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
     KeySentenceCuration, KnowledgeCuration, RecordResponse, Relation, RelationCount,
     RelationMetadata, Statistics, Subgraph, WebpageMetadata,
 };
@@ -22,10 +22,14 @@ use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
 use crate::model::publication::Publication;
 use crate::model::util::match_color;
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
-use crate::query_builder::sql_builder::{get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery};
+use crate::query_builder::sql_builder::{
+    get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery,
+};
 use log::{debug, info, warn};
+
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
+use std::path::PathBuf;
 use std::sync::Arc;
 use validator::Validate;
 
@@ -2036,6 +2040,82 @@ impl BiomedgpsApi {
             Ok(ksc) => PostResponse::created(ksc),
             Err(e) => {
                 let err = format!("Failed to update key sentence curation: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/key-sentence-curations/:id/images` with payload to add an image to a key sentence curation.
+    #[oai(
+        path = "/key-sentence-curations/:id/images",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postKeySentenceCurationImage"
+    )]
+    async fn post_key_sentence_curation_image(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<i64>,
+        upload_image: UploadImage,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<KeySentenceCuration> {
+        let pool_arc = pool.clone();
+        let id = id.0;
+        let username = _token.0.username;
+
+        if id < 0 {
+            let err = format!("Invalid id: {}", id);
+            warn!("{}", err);
+            return PostResponse::bad_request(err);
+        }
+
+        let destdir = match std::env::var("UPLOAD_DIR") {
+            Ok(upload_dir) => PathBuf::from(upload_dir),
+            Err(e) => {
+                let err = format!("Failed to get upload directory: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        let image = upload_image.image;
+        let filename = match image.file_name() {
+            Some(filename) => filename.to_string(),
+            None => "".to_string(),
+        };
+
+        let mime_type = match image.content_type() {
+            Some(mime) => mime.to_string(),
+            None => {
+                let err = format!("Failed to get image content type");
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        let image_bytes = match image.into_vec().await {
+            Ok(image_bytes) => image_bytes,
+            Err(e) => {
+                let err = format!("Failed to get image bytes: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        let image = match Image::upload(&destdir, &filename, &image_bytes, &mime_type, &upload_image.raw_image_url, &upload_image.raw_image_src) {
+            Ok(image) => image,
+            Err(e) => {
+                let err = format!("Failed to upload image: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        };
+
+        match KeySentenceCuration::add_image_to_payload(&pool_arc, id, &username, &image).await {
+            Ok(ksc) => return PostResponse::created(ksc),
+            Err(e) => {
+                let err = format!("Failed to add image to key sentence curation: {}", e);
                 warn!("{}", err);
                 return PostResponse::bad_request(err);
             }

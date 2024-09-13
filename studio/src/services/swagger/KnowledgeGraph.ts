@@ -523,6 +523,50 @@ export async function deleteKeySentenceCuration(
   });
 }
 
+/** Call `/api/v1/key-sentence-curations/:id/images` with payload to add an image to a key sentence curation. POST /api/v1/key-sentence-curations/${param0}/images */
+export async function postKeySentenceCurationImage(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.postKeySentenceCurationImageParams,
+  body: {
+    raw_image_url: string;
+    raw_image_src: string;
+    name: string;
+  },
+  image?: File,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  const formData = new FormData();
+
+  if (image) {
+    formData.append('image', image);
+  }
+
+  Object.keys(body).forEach((ele) => {
+    const item = (body as any)[ele];
+
+    if (item !== undefined && item !== null) {
+      if (typeof item === 'object' && !(item instanceof File)) {
+        if (item instanceof Array) {
+          item.forEach((f) => formData.append(ele, f || ''));
+        } else {
+          formData.append(ele, JSON.stringify(item));
+        }
+      } else {
+        formData.append(ele, item);
+      }
+    }
+  });
+
+  return request<swagger.KeySentenceCuration>(`/api/v1/key-sentence-curations/${param0}/images`, {
+    method: 'POST',
+    params: { ...queryParams },
+    data: formData,
+    requestType: 'form',
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/llm` with query params to get answer from LLM. POST /api/v1/llm */
 export async function askLlm(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

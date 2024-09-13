@@ -647,6 +647,10 @@ declare namespace swagger {
     go_classifiers: GoClassifier[];
   };
 
+  type postKeySentenceCurationImageParams = {
+    id: number;
+  };
+
   type Price = {
     description: string;
     cost: Cost;

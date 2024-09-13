@@ -7,7 +7,7 @@ use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
 use log::warn;
 use poem_openapi::Object;
-use poem_openapi::{payload::Json, ApiResponse, Tags};
+use poem_openapi::{payload::Json, ApiResponse, Tags, Multipart, types::multipart::Upload};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
@@ -675,4 +675,12 @@ impl PaginationQuery {
 
         Ok(pagination)
     }
+}
+
+#[derive(Multipart)]
+pub struct UploadImage {
+    pub raw_image_url: String,
+    pub raw_image_src: String,
+    pub name: String,
+    pub image: Upload,
 }
