@@ -10,6 +10,7 @@ pub mod model;
 pub mod pgvector;
 pub mod proxy;
 pub mod query_builder;
+pub mod schedule;
 
 use log::{debug, error, info, warn, LevelFilter};
 use log4rs;

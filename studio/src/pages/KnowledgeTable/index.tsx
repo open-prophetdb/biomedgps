@@ -532,7 +532,11 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
         }
     ];
 
-    const fetchTableData = async (nodeIds: string[], page: number, pageSize: number, relationTypes?: string[], resources?: string[]) => {
+    const fetchTableData = async (
+        nodeIds: string[], page: number, pageSize: number,
+        relationTypes?: string[], resources?: string[],
+        whichMenu?: string
+    ) => {
         setLoading(true);
         if (nodeIds && nodeIds.length > 0) {
             fetchRelationCounts({ query_str: makeQueryStr(nodeIds, relationTypes, resources) })
@@ -616,7 +620,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                         },
                     });
                     setMenuItems(newMenuItems);
-                    setMenuKey(`${keys[0]}`);
+                    setMenuKey(whichMenu || `${keys[0]}`);
                 };
 
                 let tableData = edges.map((item) => {
@@ -719,7 +723,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 placeholder="Please select resources to filter."
                                 onChange={(value: string[]) => {
                                     if (nodeIds) {
-                                        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value);
+                                        fetchTableData(nodeIds, page, pageSize, selectedRelationTypes, value, 'knowledge');
                                         setSelectedResources(value);
 
                                         // The total number of items has been changed, so we need to reset the page and page size.
@@ -749,7 +753,7 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 placeholder="Please select relation types to filter."
                                 onChange={(value: string[]) => {
                                     if (nodeIds) {
-                                        fetchTableData(nodeIds, page, pageSize, value, selectedResources);
+                                        fetchTableData(nodeIds, page, pageSize, value, selectedResources, 'knowledge');
                                         setSelectedRelationTypes(value);
 
                                         // The total number of items has been changed, so we need to reset the page and page size.
