@@ -629,7 +629,13 @@ const ModelConfig: React.FC = (props) => {
       setRelationStat(relationStats);
 
       const relationTypes = makeRelationTypes(relationStats);
-      setRelationTypeOptions(relationTypes);
+      // The order value is the number of relation count
+      // Magic number, the more number of relation count, the more reliable the prediction.
+      const filteredRelationTypes = relationTypes.filter((relationType) => {
+        return relationType.order > 1000;
+      });
+
+      setRelationTypeOptions(filteredRelationTypes);
 
       predictionTypeInUrl && form.setFieldsValue({
         prediction_type: predictionTypeInUrl

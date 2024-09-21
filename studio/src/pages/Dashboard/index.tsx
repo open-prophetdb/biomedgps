@@ -353,7 +353,8 @@ const HomePage: React.FC = () => {
                             size="large"
                             style={{ width: '100%' }}
                             getPopupContainer={(triggerNode) => {
-                                return triggerNode.parentNode;
+                                // return triggerNode.parentNode;
+                                return document.body;
                             }}
                             loading={loading}
                             defaultActiveFirstOption={false}
