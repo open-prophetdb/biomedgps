@@ -27,10 +27,19 @@ export const routes = [
     component: './Home',
   },
   {
+    path: '/predict-explain/knowledge-graph',
+    key: 'predict-explain',
+    name: 'Explain Your Findings',
+    icon: 'comment',
+    component: './KnowledgeGraph',
+    category: 'knowledge-graph'
+  },
+  {
     path: '/predict-explain',
     key: 'predict-explain',
-    name: 'Predict & Explain',
+    name: 'Predict & Explain Findings',
     icon: 'link',
+    hideInMenu: true,
     routes: [
       {
         path: '/predict-explain/knowledge-table',
@@ -62,7 +71,7 @@ export const routes = [
   {
     path: '/knowledge-curation',
     key: 'knowledge-curation',
-    name: 'Knowledge Curation',
+    name: 'Personalized KG',
     icon: 'table',
     component: './KnowledgeCuration',
     category: 'knowledge-graph',
@@ -70,6 +79,7 @@ export const routes = [
   {
     path: '/mecfs-longcovid',
     key: 'mecfs-longcovid',
+    hideInMenu: true,
     name: 'ME/CFS & LongCOVID',
     icon: 'table',
     component: './KnowledgeTable',
@@ -81,6 +91,7 @@ export const routes = [
   {
     path: '/statistics',
     key: 'statistics',
+    hideInMenu: true,
     name: 'Statistics',
     icon: 'table',
     component: './Statistics',

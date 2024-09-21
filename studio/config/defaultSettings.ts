@@ -7,7 +7,7 @@ const Settings: LayoutSettings & {
   keywords?: string;
 } = {
   navTheme: 'light',
-  layout: 'top',
+  layout: 'mix',
   contentWidth: 'Fluid',
   fixedHeader: false,
   fixSiderbar: true,

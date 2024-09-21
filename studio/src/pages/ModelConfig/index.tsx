@@ -4,6 +4,7 @@ import { DotChartOutlined, DribbbleOutlined, AimOutlined, BranchesOutlined, BugO
 import { history } from 'umi';
 // import { createFromIconfontCN } from '@ant-design/icons';
 import { GraphTable } from 'biominer-components';
+import { useLocation } from "react-router-dom";
 import { makeDataSources, pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
 import { APIs, GraphData, COMPOSED_ENTITY_DELIMITER, Entity } from 'biominer-components/dist/typings';
 import { fetchEntities, fetchPredictedNodes, fetchOneStepLinkedNodes } from '@/services/swagger/KnowledgeGraph';
@@ -240,72 +241,12 @@ const ModelConfig: React.FC = (props) => {
   const [form] = Form.useForm();
   const predictionType = Form.useWatch('prediction_type', form);
 
-  const [loading, setLoading] = useState(false);
-  const [currentModel, setCurrentModel] = useState(0);
-  const [params, setParams] = useState({});
-  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], edges: [] });
-  const [edgeDataSources, setEdgeDataSources] = useState<EdgeAttribute[]>([]);
-  const [nodeDataSources, setNodeDataSources] = useState<NodeAttribute[]>([]);
-  const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
-  const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
+  const search = useLocation().search;
+  // Such as Disease::MONDO:0005404
+  const predictionTypeInUrl = new URLSearchParams(search).get('prediction_type') || undefined;
+  const modelNameInUrl = new URLSearchParams(search).get('model_name') || undefined;
 
-  useEffect(() => {
-    fetchStatistics().then((data) => {
-      const relationStats = data.relation_stat;
-      setRelationStat(relationStats);
-
-      const relationTypes = makeRelationTypes(relationStats);
-      setRelationTypeOptions(relationTypes);
-    });
-  }, []);
-
-  useEffect(() => {
-    const entityType = form.getFieldValue('entity_type');
-    const defaultRelationType = getDefaultRelationType(entityType, predictionType);
-    form.setFieldsValue({ relation_type: defaultRelationType });
-
-    // Reset the entity_id field when the prediction type is changed, because the change of prediction type may lead to the component of entity_id missing.
-    form.setFieldsValue({ entity_id: undefined });
-  }, [predictionType]);
-
-  const formatScore = (score: number) => {
-    // Keep 3 decimal places
-    return parseFloat(score.toFixed(3));
-  }
-
-  useEffect(() => {
-    if (graphData && graphData.edges) {
-      const data = makeDataSources(graphData.edges).map((edge) => {
-        return {
-          ...edge,
-          score: formatScore(edge.score)
-        }
-      });
-      setEdgeDataSources(sortBy(data, ['score']).reverse());
-    }
-
-    if (graphData && graphData.nodes) {
-      setNodeDataSources(makeDataSources(graphData.nodes));
-    }
-  }, [graphData]);
-
-  useEffect(() => {
-    cleanup();
-  }, [currentModel]);
-
-  const cleanup = () => {
-    form.resetFields();
-    setParams({});
-    setGraphData({ nodes: [], edges: [] });
-    cleanTable()
-  }
-
-  const cleanTable = () => {
-    setEdgeDataSources([]);
-    setNodeDataSources([]);
-  }
-
-  const [models, setModels] = useState<ModelItem[]>([{
+  const defaultModels: ModelItem[] = [{
     shortName: 'Disease',
     name: 'Prediction for Disease',
     icon: <BugOutlined />,
@@ -662,7 +603,85 @@ const ModelConfig: React.FC = (props) => {
       defaultValue: 10
     }],
     disabled: true
-  }])
+  }];
+  const getModelIndex = (modelName?: string) => {
+    const modelIndex: Record<string, number> = {};
+    defaultModels.forEach((model, index) => {
+      modelIndex[model.shortName] = index;
+    });
+
+    return modelName ? modelIndex[modelName] || 0 : 0;
+  };
+
+  const [models, setModels] = useState<ModelItem[]>(defaultModels);
+  const [loading, setLoading] = useState(false);
+  const [currentModel, setCurrentModel] = useState(getModelIndex(modelNameInUrl));
+  const [params, setParams] = useState({});
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], edges: [] });
+  const [edgeDataSources, setEdgeDataSources] = useState<EdgeAttribute[]>([]);
+  const [nodeDataSources, setNodeDataSources] = useState<NodeAttribute[]>([]);
+  const [relationTypeOptions, setRelationTypeOptions] = useState<OptionType[]>([]);
+  const [relationStat, setRelationStat] = useState<RelationStat[] | undefined>([]);
+
+  useEffect(() => {
+    fetchStatistics().then((data) => {
+      const relationStats = data.relation_stat;
+      setRelationStat(relationStats);
+
+      const relationTypes = makeRelationTypes(relationStats);
+      setRelationTypeOptions(relationTypes);
+
+      predictionTypeInUrl && form.setFieldsValue({
+        prediction_type: predictionTypeInUrl
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const entityType = form.getFieldValue('entity_type');
+    const defaultRelationType = getDefaultRelationType(entityType, predictionType);
+    form.setFieldsValue({ relation_type: defaultRelationType });
+
+    // Reset the entity_id field when the prediction type is changed, because the change of prediction type may lead to the component of entity_id missing.
+    form.setFieldsValue({ entity_id: undefined });
+  }, [predictionType]);
+
+  const formatScore = (score: number) => {
+    // Keep 3 decimal places
+    return parseFloat(score.toFixed(3));
+  }
+
+  useEffect(() => {
+    if (graphData && graphData.edges) {
+      const data = makeDataSources(graphData.edges).map((edge) => {
+        return {
+          ...edge,
+          score: formatScore(edge.score)
+        }
+      });
+      setEdgeDataSources(sortBy(data, ['score']).reverse());
+    }
+
+    if (graphData && graphData.nodes) {
+      setNodeDataSources(makeDataSources(graphData.nodes));
+    }
+  }, [graphData]);
+
+  useEffect(() => {
+    cleanup();
+  }, [currentModel]);
+
+  const cleanup = () => {
+    form.resetFields();
+    setParams({});
+    setGraphData({ nodes: [], edges: [] });
+    cleanTable()
+  }
+
+  const cleanTable = () => {
+    setEdgeDataSources([]);
+    setNodeDataSources([]);
+  }
 
   const handleMenuClick = (e: any) => {
     console.log('handleMenuClick: ', e);
@@ -873,8 +892,8 @@ const ModelConfig: React.FC = (props) => {
   }
 
   return (<Layout className='model-panel' key={currentModel}>
-    <Sider width={100}>
-      <Menu mode="inline" defaultSelectedKeys={['0']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
+    <Sider width={100} style={{ display: 'none' }}>
+      <Menu mode="inline" defaultSelectedKeys={['Disease']} style={{ height: '100%' }} onClick={handleMenuClick} selectedKeys={[currentModel.toString()]}>
         {models.map((model, index) => (
           <Menu.Item key={index} icon={null} disabled={model.disabled}>
             <Tooltip title={`${model.disabled ? 'Disabled' : ''} > ${model.name} | ${model.description}`} placement="right" key={index}>
@@ -885,7 +904,7 @@ const ModelConfig: React.FC = (props) => {
         ))}
       </Menu>
     </Sider>
-    <Row className='model-config-panel' gutter={16}>
+    <Row className='model-config-panel' gutter={16} style={{ width: '100%' }}>
       <Col className="model-parameter" span={leftSpan}>
         <Header className="model-parameter-header">
           <h3>{models[currentModel].name}</h3>

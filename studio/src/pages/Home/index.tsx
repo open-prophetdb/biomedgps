@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth0 } from "@auth0/auth0-react";
 import { Row, Layout, Col, Card, Button, Input, Menu, message } from 'antd';
 import { createFromIconfontCN, LinkOutlined, LineChartOutlined, CommentOutlined } from '@ant-design/icons';
 // import { ReactSVG } from 'react-svg';
 import { history } from 'umi';
 import type { OptionType } from 'biominer-components/dist/typings';
 import { MenuItemType } from 'antd/es/menu/hooks/useItems';
-import { isAuthenticated } from '@/components/util';
 
 import './index.less';
 
@@ -22,7 +22,9 @@ type StatItem = {
 };
 
 const HomePage: React.FC = () => {
+    const { loginWithRedirect, isAuthenticated } = useAuth0();
     const [nodeOptions, setNodeOptions] = useState<OptionType[] | undefined>(undefined);
+
     const [menuItems, setMenuItems] = useState<MenuItemType[] | undefined>([
         {
             label: 'Predict & Explain Drugs',
@@ -30,7 +32,7 @@ const HomePage: React.FC = () => {
             icon: <LinkOutlined />,
             onClick: () => {
                 console.log('Predict & Explain Drugs');
-                if (isAuthenticated()) {
+                if (isAuthenticated) {
                     history.push('/dashboard');
                 } else {
                     message.info('Please sign in / up first.');
@@ -42,7 +44,7 @@ const HomePage: React.FC = () => {
             key: 'understand-disease',
             icon: <CommentOutlined />,
             onClick: () => {
-                if (isAuthenticated()) {
+                if (isAuthenticated) {
                     history.push('/dashboard');
                 } else {
                     message.info('Please sign in / up first.');
@@ -54,7 +56,7 @@ const HomePage: React.FC = () => {
             key: 'omics-data',
             icon: <LineChartOutlined />,
             onClick: () => {
-                if (isAuthenticated()) {
+                if (isAuthenticated) {
                     history.push('/dashboard');
                 } else {
                     message.info('Please sign in / up first.');

@@ -42,7 +42,7 @@ build-biomedgps-studio:
 	@cp studio/custom/logo/biomedgps.png frontend/public/assets/logo-white.png 
 	@cp studio/custom/logo/biomedgps.png frontend/src/assets/logo-white.png
 	@cp studio/custom/logo/biomedgps.png frontend/public/logo.png
-	@cp studio/custom/route/biomedgps.ts frontend/config/routes.ts
+	# @cp studio/custom/route/biomedgps.ts frontend/config/routes.ts
 	# @cd studio && yarn && yarn openapi || true
 	# @cd frontend && yarn
 	@cd frontend && UMI_APP_VERSION=`git describe --tags --always` yarn build:biomedgps-embed && cd ..
@@ -52,6 +52,7 @@ build-rapex-studio:
 	@mkdir -p assets
 	@rm -rf frontend && rsync -av --exclude=node_modules --exclude=dist studio/ frontend
 	@ln -s $(PWD)/studio/node_modules $(PWD)/frontend/node_modules
+	@cp studio/custom/components/rapex/Dashboard.less frontend/src/pages/Dashboard/index.less
 	@cp studio/custom/components/rapex/Dashboard.tsx frontend/src/pages/Dashboard/index.tsx
 	@cp studio/custom/components/rapex/ModelConfig.tsx frontend/src/pages/ModelConfig/index.tsx
 	@cp studio/custom/doc/rapex/help.md frontend/public/README/help.md

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Spin, Tag, Select, Empty, Popover, message } from 'antd';
+import { Row, Col, Spin, Tag, Select, Empty, Popover, message, Card } from 'antd';
 import { history } from 'umi';
-import { BookOutlined, ToolOutlined, createFromIconfontCN } from '@ant-design/icons';
+import { BookOutlined, ToolOutlined, ApiOutlined, createFromIconfontCN, TableOutlined, BarChartOutlined, CodepenOutlined, NodeIndexOutlined } from '@ant-design/icons';
 // import { ReactSVG } from 'react-svg';
 import { fetchEntities } from '@/services/swagger/KnowledgeGraph';
 import type { OptionType, Entity, ComposeQueryItem, QueryItem } from 'biominer-components/dist/typings';
@@ -229,114 +229,236 @@ const HomePage: React.FC = () => {
         },
     ];
 
+    const features = [
+        {
+            title: 'Predict Drugs',
+            description: 'Predict new drug indications and understand disease mechanisms.',
+            icon: <IconFont className="icon" type="biomedgps-drug" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
+            onClick: () => {
+                history.push('/predict-explain/predict-model?prediction_type=Compound&model_name=Disease');
+            }
+        },
+        {
+            title: 'Predict Targets',
+            description: 'Predict new drug indications and understand disease mechanisms.',
+            icon: <IconFont className="icon" type="biomedgps-drug" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
+            onClick: () => {
+                history.push('/predict-explain/predict-model?prediction_type=Gene&model_name=Disease');
+            }
+        },
+        {
+            title: 'Predict Indications',
+            description: 'Predict new drug indications and understand disease mechanisms.',
+            icon: <IconFont className="icon" type="biomedgps-disease" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
+            onClick: () => {
+                history.push('/predict-explain/predict-model?prediction_type=Disease&model_name=Compound');
+            }
+        },
+        {
+            title: 'Explain Your Findings',
+            description: 'Explain your findings with our explainable AI.',
+            icon: <ApiOutlined style={{ color: '#fff', fontSize: '30px' }} />,
+            onClick: () => {
+                history.push('/predict-explain/knowledge-graph');
+            }
+        },
+        {
+            title: 'Personalized Knowledge Graph',
+            description: 'Manage your personalized knowledge graph.',
+            icon: <NodeIndexOutlined style={{ color: '#fff', fontSize: '30px' }} />,
+            onClick: () => {
+                history.push('/knowledge-curation');
+            }
+        },
+        {
+            title: 'Statistics',
+            description: 'View the statistics of the knowledge graph.',
+            icon: <BarChartOutlined style={{ color: '#fff', fontSize: '30px' }} />,
+            onClick: () => {
+                history.push('/statistics');
+            }
+        },
+        {
+            title: 'ME/CFS & LongCOVID',
+            description: 'Explore the ME/CFS & LongCOVID knowledge graph.',
+            icon: <TableOutlined style={{ color: '#fff', fontSize: '30px' }} />,
+            onClick: () => {
+                history.push('/mecfs-longcovid');
+            }
+        },
+        {
+            title: 'PTSD',
+            description: 'Explore the PTSD knowledge graph.',
+            icon: <TableOutlined style={{ color: '#fff', fontSize: '30px' }} />,
+            onClick: () => {
+                history.push('/predict-explain/knowledge-table?nodeIds=Disease::MONDO:0005146');
+            }
+        }
+    ];
+
+    const FeatureCard = (props: { title: string, description: string, icon: React.ReactNode, onClick: () => void }) => {
+        const { title, description, icon, onClick } = props;
+
+        return (
+            <Card bordered={false} style={{ textAlign: 'left' }} className='feature-card' onClick={onClick}>
+                <Row style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+                    <Col style={{ marginRight: '20px' }}>
+                        <div style={{
+                            backgroundColor: '#59aaff',
+                            marginTop: '5px',
+                            width: '50px',
+                            height: '50px',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            borderRadius: '5px',
+                        }}>
+                            {icon}
+                        </div>
+                    </Col>
+                    <Col>
+                        <span style={{ fontSize: '1rem', fontWeight: '500' }}>{title}</span>
+                        <p style={{ fontSize: '0.9rem', marginBottom: '0px' }}>{description}</p>
+                    </Col>
+                </Row>
+            </Card>
+        );
+    };
+
     return (
         <Row className="dashboard">
             <Row className="box">
-                <Col className="header">
-                    {/* <img src={require('@/assets/logo-white.png')} alt="logo" height="80" /> */}
-                    <h4 style={{ textAlign: 'center', fontSize: '1rem', lineHeight: '24px' }}>
-                        Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
-                        <br />
-                        If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Drug/Target</a> page.
-                        <br />
-                        Please click the following examples to see the results.
-                    </h4>
-                    <Select
-                        showSearch
-                        allowClear
-                        size="large"
-                        getPopupContainer={(triggerNode) => {
-                            return triggerNode.parentNode;
-                        }}
-                        loading={loading}
-                        defaultActiveFirstOption={false}
-                        placeholder="Enter a gene/protein, disease, drug or symptom name to start..."
-                        onSearch={(value) => {
-                            setLoading(true);
-                            fetchNodes(value, setNodeOptions).finally(() => {
-                                setLoading(false);
-                            });
-                        }}
-                        filterOption={false}
-                        onSelect={(value, options) => {
-                            onSearch(value);
-                        }}
-                        notFoundContent={
-                            <Empty
-                                description={
-                                    loading
-                                        ? 'Searching...'
-                                        : nodeOptions !== undefined
-                                            ? 'Not Found or Too Short Input'
-                                            : 'Enter a gene/protein, disease, drug or symptom name to start...'
-                                }
-                            />
+                <Row className='first-row'>
+                    <Col className='left-col'>
+                        {/* 
+                            <h3>Network Medicine Platform</h3>
+                            <p>
+                                Network Medicine for Disease Mechanism and Treatment Based on AI and knowledge graph.
+                            </p> 
+                        */}
+                        <img src={require('@/assets/knowledge_graph_diagram.png')} alt="logo" />
+                    </Col>
+                    <Col className="right-col">
+                        {/* <img src={require('@/assets/logo-white.png')} alt="logo" height="80" /> */}
+                        <h4 style={{ fontSize: '1rem', lineHeight: '24px' }}>
+                            Enter a gene/protein, disease, drug or symptom name to find and explain related known knowledges in our platform.
+                            <br />
+                            If you want to predict new knowledges, please go to the <a onClick={() => { history.push('/predict-explain/predict-model'); }}>Predict Drug/Target</a> page.
+                            <br />
+                            Please click the following examples to see the results.
+                        </h4>
+                        <Select
+                            showSearch
+                            allowClear
+                            size="large"
+                            style={{ width: '100%' }}
+                            getPopupContainer={(triggerNode) => {
+                                return triggerNode.parentNode;
+                            }}
+                            loading={loading}
+                            defaultActiveFirstOption={false}
+                            placeholder="Enter a gene/protein, disease, drug or symptom name to start..."
+                            onSearch={(value) => {
+                                setLoading(true);
+                                fetchNodes(value, setNodeOptions).finally(() => {
+                                    setLoading(false);
+                                });
+                            }}
+                            filterOption={false}
+                            onSelect={(value, options) => {
+                                onSearch(value);
+                            }}
+                            notFoundContent={
+                                <Empty
+                                    description={
+                                        loading
+                                            ? 'Searching...'
+                                            : nodeOptions !== undefined
+                                                ? 'Not Found or Too Short Input'
+                                                : 'Enter a gene/protein, disease, drug or symptom name to start...'
+                                    }
+                                />
+                            }
+                        >
+                            {nodeOptions &&
+                                nodeOptions.map((option: any) => (
+                                    <Select.Option key={option.value} value={option.value} disabled={option.disabled}>
+                                        {option.metadata ? (
+                                            <Popover
+                                                mouseEnterDelay={0.5}
+                                                placement="rightTop"
+                                                title={option.label}
+                                                content={EntityCard(option.metadata)}
+                                                trigger="hover"
+                                                getPopupContainer={(triggeredNode: any) => document.body}
+                                                overlayClassName="entity-id-popover"
+                                                autoAdjustOverflow={false}
+                                                destroyTooltipOnHide={true}
+                                                zIndex={1500}
+                                            >
+                                                {option.label}
+                                            </Popover>
+                                        ) : (
+                                            option.label
+                                        )}
+                                    </Select.Option>
+                                ))}
+                        </Select>
+                        <span className="desc">
+                            <h4 style={{ marginBottom: '10px' }}>Examples:</h4>
+                            <a onClick={() => {
+                                onSearch('Gene::ENTREZ:3569', 'IL6')
+                            }}>
+                                <Tag color={guessColor("Gene")}>Gene | IL6</Tag>
+                            </a>
+                            <a onClick={() => {
+                                onSearch('Compound::DrugBank:DB00028', 'Human immunoglobulin G')
+                            }}>
+                                <Tag color={guessColor("Gene")}>Gene | Human immunoglobulin G</Tag>
+                            </a>
+                            <a onClick={() => {
+                                onSearch('Pathway::WikiPathways:WP1742', 'TP53 Network')
+                            }}>
+                                <Tag color={guessColor("Pathway")}>Pathway | TP53 Network</Tag>
+                            </a>
+                            <a onClick={() => {
+                                onSearch('Disease::MONDO:0005404', 'ME/CFS')
+                            }}>
+                                <Tag color={guessColor("Disease")}>Disease | Chronic Fatigue Syndrome</Tag>
+                            </a>
+                            <a onClick={() => {
+                                onSearch('Disease::MONDO:0100233', 'LongCOVID')
+                            }}>
+                                <Tag color={guessColor("Disease")}>Disease | LongCOVID</Tag>
+                            </a>
+                            <a onClick={() => {
+                                onSearch('Symptom::MESH:D005221', 'Fatigue')
+                            }}>
+                                <Tag color={guessColor("Symptom")}>Symptom | Fatigue</Tag>
+                            </a>
+                        </span>
+                        <span className='note'>
+                            NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
+                            <br />
+                            Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
+                        </span>
+                    </Col>
+                </Row>
+                <Row className='second-row'>
+                    <Col className='title'>
+                        <h3>Quick Start</h3>
+                    </Col>
+                    <Col className='content'>
+                        {
+                            features.map((feature) => {
+                                return (
+                                    <FeatureCard title={feature.title} description={feature.description} icon={feature.icon} key={feature.title} onClick={feature.onClick} />
+                                );
+                            })
                         }
-                    >
-                        {nodeOptions &&
-                            nodeOptions.map((option: any) => (
-                                <Select.Option key={option.value} value={option.value} disabled={option.disabled}>
-                                    {option.metadata ? (
-                                        <Popover
-                                            mouseEnterDelay={0.5}
-                                            placement="rightTop"
-                                            title={option.label}
-                                            content={EntityCard(option.metadata)}
-                                            trigger="hover"
-                                            getPopupContainer={(triggeredNode: any) => document.body}
-                                            overlayClassName="entity-id-popover"
-                                            autoAdjustOverflow={false}
-                                            destroyTooltipOnHide={true}
-                                            zIndex={1500}
-                                        >
-                                            {option.label}
-                                        </Popover>
-                                    ) : (
-                                        option.label
-                                    )}
-                                </Select.Option>
-                            ))}
-                    </Select>
-                    <span className="desc">
-                        Examples: {' '}
-                        <a onClick={() => {
-                            onSearch('Gene::ENTREZ:3569', 'IL6')
-                        }}>
-                            <Tag color={guessColor("Gene")}>Gene | IL6</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Compound::DrugBank:DB00028', 'Human immunoglobulin G')
-                        }}>
-                            <Tag color={guessColor("Gene")}>Gene | Human immunoglobulin G</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Pathway::WikiPathways:WP1742', 'TP53 Network')
-                        }}>
-                            <Tag color={guessColor("Pathway")}>Pathway | TP53 Network</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Disease::MONDO:0005404', 'ME/CFS')
-                        }}>
-                            <Tag color={guessColor("Disease")}>Disease | Chronic Fatigue Syndrome</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Disease::MONDO:0100233', 'LongCOVID')
-                        }}>
-                            <Tag color={guessColor("Disease")}>Disease | LongCOVID</Tag>
-                        </a>
-                        <a onClick={() => {
-                            onSearch('Symptom::MESH:D005221', 'Fatigue')
-                        }}>
-                            <Tag color={guessColor("Symptom")}>Symptom | Fatigue</Tag>
-                        </a>
-                    </span>
-                    <span style={{ textAlign: 'center', color: 'red', fontWeight: 'bold' }}>
-                        NOTE: If you cannot find the node you are looking for, this may be due to the lack of knowledges in the current version of the platform.
-                        <br />
-                        Please give us feedback or check the <a href={`https://${window.location.host}/#/about`}>About</a> page for more information.
-                    </span>
-                </Col>
-                <Row className="statistics" gutter={16}>
+                    </Col>
+                </Row>
+                <Row className="statistics" gutter={16} style={{ display: 'none' }}>
                     <Row style={{ width: '80%', maxWidth: '1800px', margin: '0 auto' }}>
                         <Col className="data-stat">
                             <p className="desc" style={{ textAlign: 'justify' }}>

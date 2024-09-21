@@ -11,7 +11,7 @@ struct TaskConfig {
 }
 
 // Task information structure, including task name and execution function
-struct Task {
+pub struct Task {
     name: String,
     func: Arc<Box<dyn Fn() -> Result<(), String> + Send + Sync>>, // Task function, return Result
     config: TaskConfig,
