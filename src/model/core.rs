@@ -1795,32 +1795,35 @@ impl KeySentenceCuration {
             .bind(&self.description)
             .bind(&payload)
             .bind(&annotation)
-            .fetch_one(pool)
+            .fetch_one(&mut tx)
             .await?;
 
-        let id = key_sentence_curation.id.to_string().clone();
-        match Embedding::insert_record(
-            &mut tx,
-            &self.key_sentence,
-            "key_sentence",
-            "key_sentence",
-            &id,
-            &self.curator,
-            None,
-            None,
-        ).await {
-            Ok(_) => {
-                info!("Insert embedding record successfully");
+        tx.commit().await?;
 
-                tx.commit().await?;
-            }
-            Err(e) => {
-                error!("Failed to insert embedding record: {}", e);
-                tx.rollback().await?;
+        // TODO: We need a more efficient way to insert the embedding record. It's slow using insert_record function.
+        // let id = key_sentence_curation.id.to_string().clone();
+        // match Embedding::insert_record(
+        //     &mut tx,
+        //     &self.key_sentence,
+        //     "key_sentence",
+        //     "key_sentence",
+        //     &id,
+        //     &self.curator,
+        //     None,
+        //     None,
+        // ).await {
+        //     Ok(_) => {
+        //         info!("Insert embedding record successfully");
 
-                return Err(anyhow::anyhow!("Failed to insert embedding record: {}", e));
-            }
-        }
+        //         tx.commit().await?;
+        //     }
+        //     Err(e) => {
+        //         error!("Failed to insert embedding record: {}", e);
+        //         tx.rollback().await?;
+
+        //         return Err(anyhow::anyhow!("Failed to insert embedding record: {}", e));
+        //     }
+        // }
 
         AnyOk(key_sentence_curation)
     }

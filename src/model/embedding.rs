@@ -169,6 +169,11 @@ impl Embedding {
     ) -> Result<(), anyhow::Error> {
         let query = "INSERT INTO biomedgps_text_embedding (text, model_name, text_source_type, text_source_field, text_source_id, payload, owner, groups) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
 
+        let groups = match groups {
+            Some(groups) => groups,
+            None => vec![],
+        };
+
         sqlx::query(&query)
             .bind(text)
             .bind(EMBEDDING_DEFAULT_MODEL_NAME)
