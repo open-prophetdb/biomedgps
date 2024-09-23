@@ -53,7 +53,7 @@ pub struct Workspace {
     payload: Option<JsonValue>,
 
     owner: String,
-    group: String,
+    groups: Vec<String>,
 }
 
 impl Workspace {
@@ -62,8 +62,8 @@ impl Workspace {
         return self;
     }
 
-    pub fn update_group(&mut self, group: String) -> &Self {
-        self.group = group;
+    pub fn update_groups(&mut self, groups: Vec<String>) -> &Self {
+        self.groups = groups;
         return self;
     }
 
@@ -124,7 +124,7 @@ impl Workspace {
         let where_str = format!("owner = $1 AND ({})", query_str);
 
         let sql_str = format!(
-            "SELECT id, workspace_name, description, created_time, updated_time, archived_time, payload, owner, group FROM biomedgps_workspace WHERE {} {} {}",
+            "SELECT id, workspace_name, description, created_time, updated_time, archived_time, payload, owner, groups FROM biomedgps_workspace WHERE {} {} {}",
             where_str, order_by_str, pagination_str
         );
 
@@ -155,7 +155,7 @@ impl CheckData for Workspace {
             "archived_time".to_string(),
             "payload".to_string(),
             "owner".to_string(),
-            "group".to_string(),
+            "groups".to_string(),
         ]
     }
 }
@@ -250,7 +250,7 @@ pub struct Task {
     labels: JsonValue,
     status: String,
     owner: String,
-    group: String,
+    groups: Vec<String>,
 }
 
 impl CheckData for Task {
@@ -276,7 +276,7 @@ impl CheckData for Task {
             "labels".to_string(),
             "status".to_string(),
             "owner".to_string(),
-            "group".to_string(),
+            "groups".to_string(),
         ]
     }
 }

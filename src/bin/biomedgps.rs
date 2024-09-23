@@ -9,6 +9,7 @@ use biomedgps::model::core::EntityMetadata;
 use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::llm::init_prompt_templates;
 use biomedgps::model::util::update_existing_colors;
+use biomedgps::model::embedding::Embedding;
 use biomedgps::proxy::website::{
     proxy_website, proxy_website_data, PROXY_DATA_PREFIX, PROXY_PREFIX,
 };
@@ -255,6 +256,18 @@ async fn main() -> Result<(), std::io::Error> {
         Err(err) => {
             error!("Check database version failed, {}", err);
             std::process::exit(1);
+        }
+    };
+
+    // Initialize embeddings.
+    match Embedding::upcreate_table(&arc_pool).await {
+        Ok(_) => {
+            info!("Initialize embeddings table successfully.");
+            Some(())
+        }
+        Err(err) => {
+            error!("Initialize embeddings table failed, {}", err);
+            None
         }
     };
 

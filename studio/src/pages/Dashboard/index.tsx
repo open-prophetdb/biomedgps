@@ -232,7 +232,7 @@ const HomePage: React.FC = () => {
     const features = [
         {
             title: 'Predict Drugs',
-            description: 'Predict new drug indications and understand disease mechanisms.',
+            description: 'Predict new drug for your queried disease.',
             icon: <IconFont className="icon" type="biomedgps-drug" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
             onClick: () => {
                 history.push('/predict-explain/predict-model?prediction_type=Compound&model_name=Disease');
@@ -240,15 +240,15 @@ const HomePage: React.FC = () => {
         },
         {
             title: 'Predict Targets',
-            description: 'Predict new drug indications and understand disease mechanisms.',
-            icon: <IconFont className="icon" type="biomedgps-drug" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
+            description: 'Predict new targets for your queried disease.',
+            icon: <IconFont className="icon" type="biomedgps-gene" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
             onClick: () => {
                 history.push('/predict-explain/predict-model?prediction_type=Gene&model_name=Disease');
             }
         },
         {
             title: 'Predict Indications',
-            description: 'Predict new drug indications and understand disease mechanisms.',
+            description: 'Predict new indications for your queried drug.',
             icon: <IconFont className="icon" type="biomedgps-disease" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
             onClick: () => {
                 history.push('/predict-explain/predict-model?prediction_type=Disease&model_name=Compound');

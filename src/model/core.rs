@@ -12,13 +12,14 @@ use anyhow::Ok as AnyOk;
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, info, error};
 use sha2::{Digest, Sha256};
 use poem_openapi::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, option::Option, path::PathBuf};
 use validator::Validate;
+use crate::model::embedding::Embedding;
 
 pub const DEFAULT_DATASET_NAME: &str = "biomedgps";
 pub const ENTITY_NAME_MAX_LENGTH: u64 = 255;
@@ -1769,6 +1770,7 @@ impl KeySentenceCuration {
             }
         }
 
+        let mut tx = pool.begin().await?;
         let sql_str = "INSERT INTO biomedgps_key_sentence_curation (fingerprint, curator, key_sentence, description, payload, annotation) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
         let payload = match &self.payload {
             Some(payload) => sqlx::types::Json(Payload {
@@ -1795,6 +1797,30 @@ impl KeySentenceCuration {
             .bind(&annotation)
             .fetch_one(pool)
             .await?;
+
+        let id = key_sentence_curation.id.to_string().clone();
+        match Embedding::insert_record(
+            &mut tx,
+            &self.key_sentence,
+            "key_sentence",
+            "key_sentence",
+            &id,
+            &self.curator,
+            None,
+            None,
+        ).await {
+            Ok(_) => {
+                info!("Insert embedding record successfully");
+
+                tx.commit().await?;
+            }
+            Err(e) => {
+                error!("Failed to insert embedding record: {}", e);
+                tx.rollback().await?;
+
+                return Err(anyhow::anyhow!("Failed to insert embedding record: {}", e));
+            }
+        }
 
         AnyOk(key_sentence_curation)
     }

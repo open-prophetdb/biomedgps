@@ -13,6 +13,7 @@ use crate::model::core::{
     KeySentenceCuration, KnowledgeCuration, RecordResponse, Relation, RelationCount,
     RelationMetadata, Statistics, Subgraph, WebpageMetadata,
 };
+use crate::model::embedding::Embedding;
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
 use crate::model::graph::Graph;
@@ -2103,7 +2104,14 @@ impl BiomedgpsApi {
             }
         };
 
-        let image = match Image::upload(&destdir, &filename, &image_bytes, &mime_type, &upload_image.raw_image_url, &upload_image.raw_image_src) {
+        let image = match Image::upload(
+            &destdir,
+            &filename,
+            &image_bytes,
+            &mime_type,
+            &upload_image.raw_image_url,
+            &upload_image.raw_image_src,
+        ) {
             Ok(image) => image,
             Err(e) => {
                 let err = format!("Failed to upload image: {}", e);
@@ -2182,6 +2190,52 @@ impl BiomedgpsApi {
                 let err = format!("Failed to delete key sentence curation: {}", e);
                 warn!("{}", err);
                 DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/embeddings` with query params to fetch embeddings.
+    #[oai(
+        path = "/embeddings",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchEmbeddings"
+    )]
+    async fn fetch_embeddings(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        question: Query<String>,
+        text_source_type: Query<String>,
+        top_k: Query<usize>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Embedding> {
+        let pool_arc = pool.clone();
+        let question = question.0;
+        let text_source_type = text_source_type.0;
+        let top_k = top_k.0;
+
+        let username = _token.0.username;
+
+        match Embedding::get_records(
+            &pool_arc,
+            &question,
+            &text_source_type,
+            None,
+            &username,
+            top_k,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(RecordResponse {
+                total: records.len() as u64,
+                records: records,
+                page: 1,
+                page_size: top_k as u64,
+            }),
+            Err(e) => {
+                let err = format!("Failed to fetch embeddings: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
             }
         }
     }

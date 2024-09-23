@@ -10,3 +10,4 @@ pub mod entity;
 pub mod entity_attr;
 pub mod publication;
 pub mod workspace;
+pub mod embedding;

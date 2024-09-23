@@ -174,6 +174,21 @@ export async function deleteCuratedKnowledge(
   });
 }
 
+/** Call `/api/v1/embeddings` with query params to fetch embeddings. GET /api/v1/embeddings */
+export async function fetchEmbeddings(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchEmbeddingsParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseEmbedding>('/api/v1/embeddings', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/entities` with query params to fetch entities. GET /api/v1/entities */
 export async function fetchEntities(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

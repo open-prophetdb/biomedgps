@@ -5,12 +5,12 @@ CREATE TABLE
         id VARCHAR(36) PRIMARY KEY,
         workspace_name VARCHAR(64),
         description TEXT,
-        created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_time TIMESTAMP NOT NULL,
-        archived_time TIMESTAMP,
+        created_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_time TIMESTAMPTZ NOT NULL,
+        archived_time TIMESTAMPTZ,
         payload JSONB NOT NULL, -- Any additional information for the workspace.
         owner VARCHAR(32) NOT NULL,
-        group VARCHAR(32) NOT NULL,
+        groups VARCHAR(32)[] NOT NULL,
 
         CONSTRAINT biomedgps_workspace_uniq_key UNIQUE (workspace_name)
     );
@@ -38,14 +38,14 @@ CREATE TABLE
         task_id VARCHAR(36), -- One task has one task_id. We need to generate an uuid for tracking the task from the cromwell server.
         task_name VARCHAR(32) NOT NULL,
         description TEXT,
-        submitted_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        started_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        finished_time TIMESTAMP,
+        submitted_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        started_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        finished_time TIMESTAMPTZ,
         task_params JSONB NOT NULL,
         labels JSONB NOT NULL,
         status VARCHAR(32) NOT NULL, -- The status of the task, such as running, finished, failed, etc.
         owner VARCHAR(32) NOT NULL,
-        group VARCHAR(32) NOT NULL,
+        groups VARCHAR(32)[] NOT NULL,
         CONSTRAINT biomedgps_workflow_uniq_key UNIQUE (workspace_id, task_id)
     );
 

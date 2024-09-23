@@ -212,6 +212,20 @@ declare namespace swagger {
     keyshape?: EdgeKeyShape;
   };
 
+  type Embedding = {
+    text: string;
+    embedding?: number[];
+    created_time: string;
+    model_name: string;
+    text_source_type: string;
+    text_source_field: string;
+    text_source_id: string;
+    payload?: any;
+    owner: string;
+    group: string;
+    distance?: number;
+  };
+
   type Entity = {
     id: string;
     name: string;
@@ -342,6 +356,12 @@ declare namespace swagger {
 
   type fetchEdgesAutoConnectNodesParams = {
     node_ids: string;
+  };
+
+  type fetchEmbeddingsParams = {
+    question: string;
+    text_source_type: string;
+    top_k: number;
   };
 
   type fetchEntitiesParams = {
@@ -755,6 +775,17 @@ declare namespace swagger {
   type RecordResponseConfiguration = {
     /** data */
     records: Configuration[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseEmbedding = {
+    /** data */
+    records: Embedding[];
     /** total num */
     total: number;
     /** current page index */
