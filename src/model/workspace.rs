@@ -14,6 +14,7 @@ use validator::Validate;
 
 const DEFAULT_LENGTH_1: usize = 1;
 const DEFAULT_LENGTH_16: usize = 16;
+const DEFAULT_LENGTH_32: usize = 32;
 const DEFAULT_LENGTH_64: usize = 64;
 const DEFAULT_LENGTH_255: usize = 255;
 
@@ -162,41 +163,63 @@ impl CheckData for Workspace {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Workflow {
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
     id: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_255",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of name should be between 1 and 255."
+    ))]
+    name: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_255",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of version should be between 1 and 255."
+    ))]
+    version: String,
+
+    description: String,
+
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 255."
     ))]
-    workflow_name: String,
+    category: String,
 
-    icon: String,
-    cover: String,
-    description: String,
-    repo_url: String,
+    home: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 255."
+    ))]
+    source: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_255",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 255."
+    ))]
+    short_name: String,
+    icons: JsonValue,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_64",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 64."
     ))]
     author: String,
 
-    #[validate(length(
-        max = "DEFAULT_LENGTH_16",
-        min = "DEFAULT_LENGTH_1",
-        message = "The length of id should be between 1 and 16."
-    ))]
-    rate: String,
-
-    valid: bool,
-
-    #[validate(length(
-        max = "DEFAULT_LENGTH_255",
-        min = "DEFAULT_LENGTH_1",
-        message = "The length of id should be between 1 and 255."
-    ))]
-    version: String,
+    maintainers: Vec<String>,
+    tags: Vec<String>,
+    readme: String,
 }
 
 impl CheckData for Workflow {
@@ -205,20 +228,24 @@ impl CheckData for Workflow {
     }
 
     fn unique_fields() -> Vec<String> {
-        vec!["workflow_name".to_string()]
+        vec!["id".to_string()]
     }
 
     fn fields() -> Vec<String> {
         vec![
-            "workflow_name".to_string(),
-            "icon".to_string(),
-            "cover".to_string(),
-            "description".to_string(),
-            "repo_url".to_string(),
-            "author".to_string(),
-            "rate".to_string(),
-            "valid".to_string(),
+            "id".to_string(),
+            "name".to_string(),
             "version".to_string(),
+            "description".to_string(),
+            "category".to_string(),
+            "home".to_string(),
+            "source".to_string(),
+            "short_name".to_string(),
+            "icons".to_string(),
+            "author".to_string(),
+            "maintainers".to_string(),
+            "tags".to_string(),
+            "readme".to_string(),
         ]
     }
 }

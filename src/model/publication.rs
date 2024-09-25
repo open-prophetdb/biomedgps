@@ -11,7 +11,7 @@ const GUIDESCOPER_PUBLICATIONS_API: &str = "/api/paper_search/";
 const GUIDESCOPER_DETAILS_API: &str = "/api/papers/details/";
 const GUIDESCOPER_SUMMARY_API: &str = "/api/summary/?search_id=";
 const GUIDESCOPER_CONSENSUS_API: &str = "/api/yes_no/?search_id=";
-const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36";
+const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
 pub struct PublicationRecords {

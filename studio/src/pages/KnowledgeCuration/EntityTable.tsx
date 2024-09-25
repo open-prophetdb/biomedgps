@@ -188,12 +188,12 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
     return (
         <Row className="key-sentence-table-container">
             <Table
-                className={props.className + ' key-sentence-table'}
+                className={props.className ? props.className + ' key-sentence-table' : 'key-sentence-table'}
                 style={props.style}
                 size="small"
                 columns={columns}
                 loading={loading}
-                scroll={{ x: props.xScroll || 1000, y: props.yScroll || 'calc(100vh - 240px)' }}
+                scroll={{ x: props.xScroll || 1000, y: props.yScroll || 'calc(100vh - 280px)' }}
                 dataSource={data.data}
                 rowKey={(record) => getRowKey(record)}
                 pagination={{

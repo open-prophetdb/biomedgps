@@ -1,0 +1,49 @@
+.chart-list {
+  height: calc(100vh - 65px);
+  background-color: #fff;
+  border: 1px solid #fff;
+  border-radius: 5px;
+  cursor: pointer;
+
+  .title {
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .ant-list-pagination {
+    margin: 10px;
+  }
+
+  .ant-spin-nested-loading {
+    height: calc(100vh - 120px);
+    overflow: scroll;
+  }
+
+  .chart-item {
+    display: flex !important;
+    flex-direction: row;
+    margin-top: 16px;
+
+    .ant-list-item-meta,
+    .ant-list-item-meta-title {
+      margin-bottom: 0;
+    }
+
+    .ant-list-item-extra {
+      margin-left: 20px;
+    }
+
+    .ant-list-item-action {
+      margin-top: 8px;
+    }
+
+    .description {
+      display: -webkit-box;
+      margin-bottom: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+  }
+}

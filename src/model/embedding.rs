@@ -1,6 +1,6 @@
 //! The embedding model is used to store the information of embeddings which are related to user's personalized knowledge graph. We used two strategies to generate embeddings:
-//! 1. Generate embedding for each text when the text is created.
-//! 2. [Optional] Run a background job to generate embedding for all texts in the system periodically. At least, we need to run it to check whether the embeddings exist for several fields in specified tables.
+//! 1. Generate embedding for each text when the text is created. TODO: This strategy might be not efficient. do we have a better way to do it?
+//! 2. [Optional] Run a background job to generate embedding for all texts in the system periodically. At least, we need to run it to check whether the embeddings exist for several fields in specified tables. TODO: Do we need to run it periodically? How often?
 
 use anyhow::Ok as AnyOk;
 use chrono::{serde::ts_seconds, DateTime, Utc};
@@ -136,12 +136,12 @@ impl Embedding {
 
         let query = format!(
             "
-            SELECT *, pgml.distance_l2(embedding, pgml.embed('{model_name}', $1)) AS distance
-            FROM biomedgps_text_embedding
-            WHERE text_source_type = $2 AND owner = $3 {where_str}
-            ORDER BY distance ASC
-            LIMIT {top_k}
-        ",
+                SELECT *, pgml.distance_l2(embedding, pgml.embed('{model_name}', $1)) AS distance
+                FROM biomedgps_text_embedding
+                WHERE text_source_type = $2 AND owner = $3 {where_str}
+                ORDER BY distance ASC
+                LIMIT {top_k}
+            ",
             model_name = EMBEDDING_DEFAULT_MODEL_NAME,
             where_str = where_str,
             top_k = top_k

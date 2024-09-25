@@ -16,18 +16,49 @@ CREATE TABLE
     );
 
 -- The workflow table is used to store the information of workflows which are installed in the system.
+-- Example:
+-- {
+--   "name": "BarPlot",
+--   "version": "v0.1.0",
+--   "description": "",
+--   "category": "Chart",
+--   "home": "https://github.com/rapex-lab/rapex/tree/master/rapex/src/rapex/tasks",
+--   "source": "Rapex Team",
+--   "short_name": "chart-name",
+--   "icons": [
+--     {
+--       "src": "",
+--       "type": "image/png",
+--       "sizes": "144x144"
+--     }
+--   ],
+--   "author": "Jingcheng Yang",
+--   "maintainers": [
+--     "Jingcheng Yang",
+--     "Tianyuan Cheng"
+--   ],
+--   "tags": [
+--     "R",
+--     "Chart"
+--   ],
+--   "readme": "https://rapex.prophetdb.org/README/barplot.md",
+--   "id": "chart-name"
+-- }
 CREATE TABLE
     IF NOT EXISTS biomedgps_workflow (
         id VARCHAR(32) PRIMARY KEY,
-        workflow_name VARCHAR(255),
-        icon TEXT,
-        cover TEXT,
-        description TEXT,
-        repo_url TEXT,
-        author VARCHAR(255),
-        rate VARCHAR(16),
-        valid BOOLEAN,
+        name VARCHAR(255),
         version VARCHAR(255),
+        description TEXT,
+        category VARCHAR(255),
+        home TEXT,
+        source VARCHAR(255),
+        short_name VARCHAR(255),
+        icons JSONB,
+        author VARCHAR(64),
+        maintainers VARCHAR(255)[],
+        tags VARCHAR(255)[],
+        readme TEXT
     );
 
 CREATE TABLE
