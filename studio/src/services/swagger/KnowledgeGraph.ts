@@ -625,6 +625,21 @@ export async function fetchNodes(
   });
 }
 
+/** Call `/api/v1/notifications` with query params to fetch notifications. GET /api/v1/notifications */
+export async function fetchNotifications(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchNotificationsParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseNotification>('/api/v1/notifications', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/one-step-linked-nodes` with query params to fetch linked nodes with one step. GET /api/v1/one-step-linked-nodes */
 export async function fetchOneStepLinkedNodes(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -868,6 +883,47 @@ export async function deleteSubgraph(
   });
 }
 
+/** Call `/api/v1/tasks` with query params to fetch tasks. GET /api/v1/tasks */
+export async function fetchTasks(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchTasksParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseTask>('/api/v1/tasks', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/tasks` with payload to create a task. POST /api/v1/tasks */
+export async function postTask(body: swagger.Task, options?: { [key: string]: any }) {
+  return request<swagger.Task>('/api/v1/tasks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/tasks/:task_id` with query params to fetch task by task_id. GET /api/v1/tasks/${param0} */
+export async function fetchTaskByTaskId(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchTaskByTaskIdParams,
+  options?: { [key: string]: any },
+) {
+  const { task_id: param0, ...queryParams } = params;
+  return request<swagger.Task>(`/api/v1/tasks/${param0}`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/webpage-metadata` with query params to fetch webpage metadata. GET /api/v1/webpage-metadata */
 export async function fetchWebpageMetadata(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -942,6 +998,50 @@ export async function deleteWebpageMetadata(
   return request<any>(`/api/v1/webpage-metadata/${param0}`, {
     method: 'DELETE',
     params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/workflows` with query params to fetch workflows. GET /api/v1/workflows */
+export async function fetchWorkflows(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchWorkflowsParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseWorkflow>('/api/v1/workflows', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/workflows/:id/schema` with query params to fetch workflow schema. GET /api/v1/workflows/${param0}/schema */
+export async function fetchWorkflowSchema(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchWorkflowSchemaParams,
+  options?: { [key: string]: any },
+) {
+  const { id: param0, ...queryParams } = params;
+  return request<swagger.WorkflowSchema>(`/api/v1/workflows/${param0}/schema`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/workspaces` with query params to fetch workspaces. GET /api/v1/workspaces */
+export async function fetchWorkspaces(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchWorkspacesParams,
+  options?: { [key: string]: any },
+) {
+  return request<swagger.RecordResponseWorkspace>('/api/v1/workspaces', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   });
 }

@@ -23,8 +23,8 @@ export const routes = [
     key: 'analyze-omics-data',
     name: 'Analyze Omics Data',
     icon: 'LineChartOutlined',
-    disabled: true,
-    component: './Home',
+    // disabled: true,
+    component: './OmicsData',
   },
   {
     path: '/predict-explain/knowledge-graph',

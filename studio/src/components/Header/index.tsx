@@ -6,6 +6,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history } from 'umi';
 import jwtDecode from "jwt-decode";
+import { fetchWorkspaces } from '@/services/swagger/KnowledgeGraph';
 
 import styles from './index.less';
 import './extra.less'
@@ -16,10 +17,22 @@ export interface GlobalHeaderRightProps {
   username?: string;
 }
 
+type Workspace = {
+  workspace_name: string;
+  description?: string;
+  created_time: string;
+  updated_time: string;
+  archived_time?: string;
+  payload?: any;
+  owner: string;
+  groups: string[];
+};
+
 const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   const { loginWithRedirect, isAuthenticated, logout, user, getIdTokenClaims, getAccessTokenSilently } = useAuth0();
   const [current, setCurrent] = useState('user');
   const [username, setUsername] = useState(props.username || user?.name || user?.email || user?.nickname || 'Anonymous');
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   useEffect(() => {
     const checkTokenValidity = async () => {
@@ -78,6 +91,16 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         history.push('/dashboard');
       }
     });
+
+    // fetchWorkspaces({
+    //   page: 1,
+    //   page_size: 100,
+    // }).then((res) => {
+    //   setWorkspaces(res.records);
+    // }).catch((err) => {
+    //   console.log('error: ', err);
+    //   setWorkspaces([]);
+    // });
   }, [isAuthenticated]);
 
   useEffect(() => {

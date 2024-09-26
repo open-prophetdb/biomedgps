@@ -222,7 +222,7 @@ declare namespace swagger {
     text_source_id: string;
     payload?: any;
     owner: string;
-    group: string;
+    groups: string[];
     distance?: number;
   };
 
@@ -434,6 +434,12 @@ declare namespace swagger {
     node_ids: string;
   };
 
+  type fetchNotificationsParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
   type fetchOneStepLinkedNodesParams = {
     page?: number;
     page_size?: number;
@@ -497,10 +503,35 @@ declare namespace swagger {
     query_str?: string;
   };
 
+  type fetchTaskByTaskIdParams = {
+    task_id: string;
+  };
+
+  type fetchTasksParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
   type fetchWebpageMetadataParams = {
     page?: number;
     page_size?: number;
     query_str?: string;
+  };
+
+  type fetchWorkflowSchemaParams = {
+    id: string;
+  };
+
+  type fetchWorkflowsParams = {
+    page?: number;
+    page_size?: number;
+    query_str?: string;
+  };
+
+  type fetchWorkspacesParams = {
+    page?: number;
+    page_size?: number;
   };
 
   type GeneralReferences = {
@@ -619,6 +650,16 @@ declare namespace swagger {
     label: Label;
     keyshape: NodeKeyShape;
     icon: Icon;
+  };
+
+  type Notification = {
+    id: string;
+    title: string;
+    description?: string;
+    notification_type: string;
+    created_time: string;
+    status: string;
+    owner: string;
   };
 
   type Organism = {
@@ -860,6 +901,17 @@ declare namespace swagger {
     page_size: number;
   };
 
+  type RecordResponseNotification = {
+    /** data */
+    records: Notification[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
   type RecordResponseRelation = {
     /** data */
     records: Relation[];
@@ -882,9 +934,42 @@ declare namespace swagger {
     page_size: number;
   };
 
+  type RecordResponseTask = {
+    /** data */
+    records: Task[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
   type RecordResponseWebpageMetadata = {
     /** data */
     records: WebpageMetadata[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseWorkflow = {
+    /** data */
+    records: Workflow[];
+    /** total num */
+    total: number;
+    /** current page index */
+    page: number;
+    /** default 10 */
+    page_size: number;
+  };
+
+  type RecordResponseWorkspace = {
+    /** data */
+    records: Workspace[];
     /** total num */
     total: number;
     /** current page index */
@@ -966,6 +1051,20 @@ declare namespace swagger {
     polypeptide?: Polypeptide[];
   };
 
+  type Task = {
+    workspace_id: string;
+    workflow_id: string;
+    task_name: string;
+    description?: string;
+    submitted_time: string;
+    started_time: string;
+    finished_time: string;
+    task_params: any;
+    labels?: string[];
+    owner: string;
+    groups?: string[];
+  };
+
   type WebpageMetadata = {
     id: number;
     fingerprint: string;
@@ -973,5 +1072,36 @@ declare namespace swagger {
     note: string;
     metadata: any;
     created_at: string;
+  };
+
+  type Workflow = {
+    id: string;
+    name: string;
+    version: string;
+    description?: string;
+    category: string;
+    home: string;
+    source: string;
+    short_name: string;
+    icons?: any;
+    author: string;
+    maintainers?: string[];
+    tags?: string[];
+    readme?: string;
+  };
+
+  type WorkflowSchema = {
+    schema: any;
+  };
+
+  type Workspace = {
+    workspace_name: string;
+    description?: string;
+    created_time: string;
+    updated_time: string;
+    archived_time?: string;
+    payload?: any;
+    owner: string;
+    groups: string[];
   };
 }

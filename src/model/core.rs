@@ -1190,17 +1190,6 @@ impl EntityMetadataCuration {
         self.curator = curator.to_string();
     }
 
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<EntityMetadataCuration>, anyhow::Error> {
-        let columns = <EntityMetadataCuration as CheckData>::fields().join(",");
-        let sql_str =
-            format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_entity_metadata_curation");
-        let records = sqlx::query_as::<_, EntityMetadataCuration>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
-    }
-
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
         fingerprint: &str,
@@ -1601,16 +1590,6 @@ impl KeySentenceCuration {
         self.curator = curator.to_string();
     }
 
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<KeySentenceCuration>, anyhow::Error> {
-        let columns = <KeySentenceCuration as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_key_sentence_curation");
-        let records = sqlx::query_as::<_, KeySentenceCuration>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
-    }
-
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
         fingerprint: &str,
@@ -1959,16 +1938,6 @@ impl WebpageMetadata {
         self.curator = curator.to_string();
     }
 
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<WebpageMetadata>, anyhow::Error> {
-        let columns = <WebpageMetadata as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id,created_at,metadata,{columns} FROM biomedgps_webpage_metadata");
-        let records = sqlx::query_as::<_, WebpageMetadata>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
-    }
-
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<WebpageMetadata, anyhow::Error> {
         let sql_str = "SELECT * FROM biomedgps_webpage_metadata WHERE fingerprint = $1 AND curator = $2";
         let record = sqlx::query_as::<_, WebpageMetadata>(sql_str)
@@ -2108,16 +2077,6 @@ pub struct EntityCuration {
 impl EntityCuration {
     pub fn update_curator(&mut self, curator: &str) {
         self.curator = curator.to_string();
-    }
-
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<EntityCuration>, anyhow::Error> {
-        let columns = <EntityCuration as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_entity_curation");
-        let records = sqlx::query_as::<_, EntityCuration>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
     }
 
     pub async fn get_records_by_owner(
@@ -2421,16 +2380,6 @@ pub struct Configuration {
 impl Configuration {
     pub fn update_owner(&mut self, owner: &str) {
         self.owner = owner.to_string();
-    }
-
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Configuration>, anyhow::Error> {
-        let columns = <Configuration as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id,{columns} FROM biomedgps_configuration");
-        let records = sqlx::query_as::<_, Configuration>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
     }
 
     pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Configuration, anyhow::Error> {

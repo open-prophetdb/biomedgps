@@ -1,9 +1,6 @@
 import type { ProFormColumnsType } from '@ant-design/pro-form';
 import { GridContent } from '@ant-design/pro-layout';
 import { Col, message, Row, Spin, Tabs, Form, Empty, Select } from 'antd';
-import type { StaticContext } from 'react-router';
-import type { RouteComponentProps } from 'react-router-dom';
-import { useIntl, useModel } from 'umi';
 
 import {
   CheckCircleOutlined,
@@ -13,42 +10,29 @@ import React, { useEffect, useState } from 'react';
 import './index.less';
 
 // Custom Component
-import ArgumentForm from '@/components/ArgumentForm';
-import MarkdownViewer from '@/components/MarkdownViewer';
-import Resizer from '@/components/Resizer';
+import ArgumentForm from './components/ArgumentForm';
+import MarkdownViewer from './components/MarkdownViewer';
+import Resizer from './components/Resizer';
 import ResultPanel from './components/ResultPanel';
 
 // Custom DataType
 import type { ChartResult, DataItem } from './components/ChartList/data';
-type UIContext = Record<string, any>;
 
 // Custom API
 import {
-  getTasksId as getChartTask,
-  getChartsUiSchemaChartName as getChartUiSchema,
-  postChartChartName as postChart
-} from '@/services/swagger/StatEngine';
-import { GenesQueryParams, GeneDataResponse } from '@/components/GeneSearcher';
-import { getDownload as getFile } from '@/services/swagger/Instance';
-
-// Custom Data
-import { langData } from './lang';
+  fetchTask,
+  fetchWorkflowSchema,
+  postTask,
+} from '../services/swagger/KnowledgeGraph';
 
 const { TabPane } = Tabs;
 
 export type StatEngineProps = {
-  queryGenes: (params: GenesQueryParams) => Promise<GeneDataResponse>;
+  workflowId: string;
 }
 
-const StatEngine: React.FC<StatEngineProps & RouteComponentProps<{}, StaticContext>> = (props) => {
-  const { queryGenes } = props;
-  const intl = useIntl();
+const StatEngine: React.FC<StatEngineProps> = (props) => {
   console.log('StatEngine Props: ', props);
-
-  const uiContext: UIContext = {};
-  Object.keys(langData).forEach((key) => {
-    uiContext[key] = intl.formatMessage(langData[key]);
-  });
 
   const [leftSpan, setLeftSpan] = useState<number>(8);
   const [resizeBtnActive, setResizeBtnActive] = useState<boolean>(false);
@@ -57,21 +41,12 @@ const StatEngine: React.FC<StatEngineProps & RouteComponentProps<{}, StaticConte
   const [currentActiveKey, setCurrentActiveKey] = useState<string>('arguments');
 
   // Chart
-  const { defaultDataset } = useModel('dataset', (ret) => ({
-    defaultDataset: ret.defaultDataset,
-    setDataset: ret.setDataset,
-  }));
   const [currentChart, setCurrentChart] = useState<string | null>('');
   const [markdownLink, setMarkdownLink] = useState<string>('');
   const [argumentColumns, setArgumentColumns] = useState<ProFormColumnsType<DataItem>[] & any>([]);
   const [fieldsValue, setFieldsValue] = useState<any>({});
 
   const [form] = Form.useForm();
-  useEffect(() => {
-    form.setFieldsValue({
-      dataset: defaultDataset
-    })
-  }, [defaultDataset])
 
   const [resultData, setResultData] = useState<ChartResult | undefined>({
     results: [],
@@ -86,6 +61,7 @@ const StatEngine: React.FC<StatEngineProps & RouteComponentProps<{}, StaticConte
   useEffect(() => {
     // More details on https://v3.umijs.org/docs/routing#routing-component-parameters
     const chart = props.chart;
+
     if (chart) {
       setCurrentChart(chart);
     } else {

@@ -2,11 +2,10 @@
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetConsensusResultResponse, GetEntityAttrResponse,
-    GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse, GetPublicationsResponse,
-    GetPublicationsSummaryResponse, GetRecordsResponse, GetRelationCountResponse,
-    GetStatisticsResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
-    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
+    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
+    GetPublicationsResponse, GetRecordResponse, GetRecordsResponse, GetRelationCountResponse,
+    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
+    PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
 };
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
@@ -20,8 +19,9 @@ use crate::model::graph::Graph;
 use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
-use crate::model::publication::Publication;
+use crate::model::publication::{ConsensusResult, Publication, PublicationsSummary};
 use crate::model::util::match_color;
+use crate::model::workspace::{Notification, Task, Workflow, WorkflowSchema, Workspace};
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{
     get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery,
@@ -33,8 +33,6 @@ use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::path::PathBuf;
 use std::sync::Arc;
 use validator::Validate;
-
-use super::schema::GetPublicationDetailResponse;
 
 pub struct BiomedgpsApi;
 
@@ -51,14 +49,14 @@ impl BiomedgpsApi {
         &self,
         search_id: Path<String>,
         _token: CustomSecurityScheme,
-    ) -> GetPublicationsSummaryResponse {
+    ) -> GetRecordResponse<PublicationsSummary> {
         let search_id = search_id.0;
         match Publication::fetch_summary(&search_id).await {
-            Ok(result) => GetPublicationsSummaryResponse::ok(result),
+            Ok(result) => GetRecordResponse::ok(result),
             Err(e) => {
                 let err = format!("Failed to fetch publications summary: {}", e);
                 warn!("{}", err);
-                return GetPublicationsSummaryResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         }
     }
@@ -74,14 +72,14 @@ impl BiomedgpsApi {
         &self,
         search_id: Path<String>,
         _token: CustomSecurityScheme,
-    ) -> GetConsensusResultResponse {
+    ) -> GetRecordResponse<ConsensusResult> {
         let search_id = search_id.0;
         match Publication::fetch_consensus(&search_id).await {
-            Ok(result) => GetConsensusResultResponse::ok(result),
+            Ok(result) => GetRecordResponse::ok(result),
             Err(e) => {
                 let err = format!("Failed to fetch publications consensus: {}", e);
                 warn!("{}", err);
-                return GetConsensusResultResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         }
     }
@@ -99,17 +97,17 @@ impl BiomedgpsApi {
         question: Query<String>,
         pool: Data<&Arc<sqlx::PgPool>>,
         _token: CustomSecurityScheme,
-    ) -> GetPublicationsSummaryResponse {
+    ) -> GetRecordResponse<PublicationsSummary> {
         let question = question.0;
         let publications = publications.0;
         let pool_arc = pool.clone();
         match Publication::fetch_summary_by_chatgpt(&question, &publications, Some(&pool_arc)).await
         {
-            Ok(result) => GetPublicationsSummaryResponse::ok(result),
+            Ok(result) => GetRecordResponse::ok(result),
             Err(e) => {
                 let err = format!("Failed to fetch publications summary: {}", e);
                 warn!("{}", err);
-                return GetPublicationsSummaryResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         }
     }
@@ -121,14 +119,14 @@ impl BiomedgpsApi {
         tag = "ApiTags::KnowledgeGraph",
         operation_id = "fetchPublication"
     )]
-    async fn fetch_publication(&self, id: Path<String>) -> GetPublicationDetailResponse {
+    async fn fetch_publication(&self, id: Path<String>) -> GetRecordResponse<Publication> {
         let id = id.0;
         match Publication::fetch_publication(&id).await {
-            Ok(publication) => GetPublicationDetailResponse::ok(publication),
+            Ok(publication) => GetRecordResponse::ok(publication),
             Err(e) => {
                 let err = format!("Failed to fetch publication: {}", e);
                 warn!("{}", err);
-                return GetPublicationDetailResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         }
     }
@@ -173,7 +171,7 @@ impl BiomedgpsApi {
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
         _token: CustomSecurityScheme,
-    ) -> GetStatisticsResponse {
+    ) -> GetRecordResponse<Statistics> {
         info!("Username: {}", _token.0.username);
         let pool_arc = pool.clone();
 
@@ -182,7 +180,7 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch entity metadata: {}", e);
                 warn!("{}", err);
-                return GetStatisticsResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         };
 
@@ -191,13 +189,13 @@ impl BiomedgpsApi {
             Err(e) => {
                 let err = format!("Failed to fetch relation metadata: {}", e);
                 warn!("{}", err);
-                return GetStatisticsResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         };
 
         let statistics = Statistics::new(entity_metadata, relation_metadata);
 
-        GetStatisticsResponse::ok(statistics)
+        GetRecordResponse::ok(statistics)
     }
 
     /// Call `/api/v1/entity-metadata` with query params to fetch all entity metadata.
@@ -239,7 +237,7 @@ impl BiomedgpsApi {
         page_size: Query<Option<u64>>,
         entity_type: Query<String>,
         _token: CustomSecurityScheme,
-    ) -> GetEntityAttrResponse {
+    ) -> GetRecordResponse<EntityAttr> {
         let pool_arc = pool.clone();
         let entity_type = entity_type.0;
         let page = page.0;
@@ -252,7 +250,7 @@ impl BiomedgpsApi {
                 Err(e) => {
                     let err = format!("Failed to parse query string: {}", e);
                     warn!("{}", err);
-                    return GetEntityAttrResponse::bad_request(err);
+                    return GetRecordResponse::bad_request(err);
                 }
             },
             None => None,
@@ -286,19 +284,19 @@ impl BiomedgpsApi {
                         let resp = EntityAttr {
                             compounds: Some(resp),
                         };
-                        GetEntityAttrResponse::ok(resp)
+                        GetRecordResponse::ok(resp)
                     }
                     Err(e) => {
                         let err = format!("Failed to fetch entity attributes: {}", e);
                         warn!("{}", err);
-                        return GetEntityAttrResponse::bad_request(err);
+                        return GetRecordResponse::bad_request(err);
                     }
                 }
             }
             _ => {
                 let err = format!("Invalid entity type: {}", entity_type);
                 warn!("{}", err);
-                return GetEntityAttrResponse::bad_request(err);
+                return GetRecordResponse::bad_request(err);
             }
         }
     }
@@ -2234,6 +2232,355 @@ impl BiomedgpsApi {
             }),
             Err(e) => {
                 let err = format!("Failed to fetch embeddings: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/workflows` with query params to fetch workflows.
+    #[oai(
+        path = "/workflows",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchWorkflows"
+    )]
+    async fn fetch_workflows(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Workflow> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+        let query_str = query_str.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
+        match RecordResponse::<Workflow>::get_records(
+            &pool_arc,
+            "biomedgps_workflow",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch workflows: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/workflows/:id/schema` with query params to fetch workflow schema.
+    #[oai(
+        path = "/workflows/:id/schema",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchWorkflowSchema"
+    )]
+    async fn fetch_workflow_schema(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordResponse<WorkflowSchema> {
+        let pool_arc = pool.clone();
+        let id = id.0;
+
+        let workflow_dir = match std::env::var("WORKFLOW_DIR") {
+            Ok(workflow_dir) => PathBuf::from(workflow_dir),
+            Err(e) => {
+                let err = format!("The WORKFLOW_DIR environment variable is not set: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::internal_server_error(err);
+            }
+        };
+
+        match Workflow::get_workflow_schema(&pool_arc, &id, &workflow_dir).await {
+            Ok(schema) => GetRecordResponse::ok(schema),
+            Err(e) => {
+                let err = format!("Failed to fetch workflow schema: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::internal_server_error(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/workspaces` with query params to fetch workspaces.
+    #[oai(
+        path = "/workspaces",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchWorkspaces"
+    )]
+    async fn fetch_workspaces(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Workspace> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+        let username = _token.0.username;
+
+        match RecordResponse::<Workspace>::get_records(
+            &pool_arc,
+            "biomedgps_workspace",
+            &None,
+            page,
+            page_size,
+            Some("created_time ASC"),
+            Some(&username),
+        )
+        .await
+        {
+            Ok(resp) => {
+                if resp.records.is_empty() {
+                    // We always want to return at least one workspace for the user.
+                    match Workspace::insert_record(
+                        &pool_arc,
+                        "Default Workspace",
+                        None,
+                        &username,
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(workspace) => GetRecordsResponse::ok(RecordResponse {
+                            total: 1,
+                            records: vec![workspace],
+                            page: 1,
+                            page_size: 10,
+                        }),
+                        Err(e) => {
+                            let err = format!("Failed to insert default workspace: {}", e);
+                            warn!("{}", err);
+                            return GetRecordsResponse::internal_server_error(err);
+                        }
+                    }
+                } else {
+                    GetRecordsResponse::ok(resp)
+                }
+            }
+            Err(e) => {
+                let err = format!("Failed to fetch workspaces: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks` with query params to fetch tasks.
+    #[oai(
+        path = "/tasks",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchTasks"
+    )]
+    async fn fetch_tasks(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Task> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+        let query_str = query_str.0;
+        let username = _token.0.username;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
+        match RecordResponse::<Task>::get_records(
+            &pool_arc,
+            "biomedgps_task",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            Some(&username),
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch tasks: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks/:task_id` with query params to fetch task by task_id.
+    #[oai(
+        path = "/tasks/:task_id",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchTaskByTaskId"
+    )]
+    async fn fetch_task_by_task_id(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        task_id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordResponse<Task> {
+        let pool_arc = pool.clone();
+        let task_id = task_id.0;
+        let username = _token.0.username;
+
+        match Task::get_records_by_id(&pool_arc, &task_id, &username).await {
+            Ok(task) => GetRecordResponse::ok(task),
+            Err(e) => {
+                let err = format!("Failed to fetch task by task_id: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks` with payload to create a task.
+    #[oai(
+        path = "/tasks",
+        method = "post",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "postTask"
+    )]
+    async fn post_task(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        payload: Json<Task>,
+        _token: CustomSecurityScheme,
+    ) -> PostResponse<Task> {
+        let pool_arc = pool.clone();
+        let mut payload = payload.0;
+        let username = _token.0.username;
+        payload.update_owner(username);
+
+        match payload.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to validate task: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+
+        match payload.insert(&pool_arc).await {
+            Ok(task) => PostResponse::created(task),
+            Err(e) => {
+                let err = format!("Failed to insert task: {}", e);
+                warn!("{}", err);
+                return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/notifications` with query params to fetch notifications.
+    #[oai(
+        path = "/notifications",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchNotifications"
+    )]
+    async fn fetch_notifications(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        page: Query<Option<u64>>,
+        page_size: Query<Option<u64>>,
+        query_str: Query<Option<String>>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordsResponse<Notification> {
+        let pool_arc = pool.clone();
+        let page = page.0;
+        let page_size = page_size.0;
+        let query_str = query_str.0;
+
+        match PaginationQuery::new(page.clone(), page_size.clone(), query_str.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                let err = format!("Failed to parse query string: {}", e);
+                warn!("{}", err);
+                return GetRecordsResponse::bad_request(err);
+            }
+        }
+
+        let query = match query_str {
+            Some(query_str) => match ComposeQuery::from_str(&query_str) {
+                Ok(query) => query,
+                Err(e) => {
+                    let err = format!("Failed to parse query string: {}", e);
+                    warn!("{}", err);
+                    return GetRecordsResponse::bad_request(err);
+                }
+            },
+            None => None,
+        };
+
+        match RecordResponse::<Notification>::get_records(
+            &pool_arc,
+            "biomedgps_notification",
+            &query,
+            page,
+            page_size,
+            Some("id ASC"),
+            None,
+        )
+        .await
+        {
+            Ok(records) => GetRecordsResponse::ok(records),
+            Err(e) => {
+                let err = format!("Failed to fetch notifications: {}", e);
                 warn!("{}", err);
                 return GetRecordsResponse::bad_request(err);
             }

@@ -5,14 +5,16 @@ use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
 use crate::model::entity_attr::EntityAttr;
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
+use crate::model::publication::{
+    ConsensusResult, Publication, PublicationRecords, PublicationsSummary,
+};
+use crate::model::workspace::WorkflowSchema;
 use log::warn;
 use poem_openapi::Object;
-use poem_openapi::{payload::Json, ApiResponse, Tags, Multipart, types::multipart::Upload};
+use poem_openapi::{payload::Json, types::multipart::Upload, ApiResponse, Multipart, Tags};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
-
-use crate::model::publication::{Publication, PublicationRecords, PublicationsSummary, ConsensusResult};
 
 #[derive(Tags)]
 pub enum ApiTags {
@@ -142,20 +144,42 @@ impl GetRelationCountResponse {
 }
 
 #[derive(ApiResponse)]
-pub enum GetStatisticsResponse {
+pub enum GetRecordResponse<
+    S: Serialize
+        + std::fmt::Debug
+        + std::marker::Unpin
+        + Send
+        + Sync
+        + poem_openapi::types::Type
+        + poem_openapi::types::ParseFromJSON
+        + poem_openapi::types::ToJSON,
+> {
     #[oai(status = 200)]
-    Ok(Json<Statistics>),
+    Ok(Json<S>),
 
     #[oai(status = 400)]
     BadRequest(Json<ErrorMessage>),
 
     #[oai(status = 404)]
     NotFound(Json<ErrorMessage>),
+
+    #[oai(status = 500)]
+    InternalServerError(Json<ErrorMessage>),
 }
 
-impl GetStatisticsResponse {
-    pub fn ok(statistics: Statistics) -> Self {
-        Self::Ok(Json(statistics))
+impl<
+        S: Serialize
+            + std::fmt::Debug
+            + std::marker::Unpin
+            + Send
+            + Sync
+            + poem_openapi::types::Type
+            + poem_openapi::types::ParseFromJSON
+            + poem_openapi::types::ToJSON,
+    > GetRecordResponse<S>
+{
+    pub fn ok(record_response: S) -> Self {
+        Self::Ok(Json(record_response))
     }
 
     pub fn bad_request(msg: String) -> Self {
@@ -164,6 +188,10 @@ impl GetStatisticsResponse {
 
     pub fn not_found(msg: String) -> Self {
         Self::NotFound(Json(ErrorMessage { msg }))
+    }
+
+    pub fn internal_server_error(msg: String) -> Self {
+        Self::InternalServerError(Json(ErrorMessage { msg }))
     }
 }
 
@@ -203,110 +231,6 @@ impl<
 {
     pub fn ok(vec_t: Vec<T>) -> Self {
         Self::Ok(Json(vec_t))
-    }
-
-    pub fn bad_request(msg: String) -> Self {
-        Self::BadRequest(Json(ErrorMessage { msg }))
-    }
-
-    pub fn not_found(msg: String) -> Self {
-        Self::NotFound(Json(ErrorMessage { msg }))
-    }
-}
-
-#[derive(ApiResponse)]
-pub enum GetPublicationsSummaryResponse {
-    #[oai(status = 200)]
-    Ok(Json<PublicationsSummary>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-impl GetPublicationsSummaryResponse {
-    pub fn ok(publications_summary: PublicationsSummary) -> Self {
-        Self::Ok(Json(publications_summary))
-    }
-
-    pub fn bad_request(msg: String) -> Self {
-        Self::BadRequest(Json(ErrorMessage { msg }))
-    }
-
-    pub fn not_found(msg: String) -> Self {
-        Self::NotFound(Json(ErrorMessage { msg }))
-    }
-}
-
-#[derive(ApiResponse)]
-pub enum GetConsensusResultResponse {
-    #[oai(status = 200)]
-    Ok(Json<ConsensusResult>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-impl GetConsensusResultResponse {
-    pub fn ok(consensus_result: ConsensusResult) -> Self {
-        Self::Ok(Json(consensus_result))
-    }
-
-    pub fn bad_request(msg: String) -> Self {
-        Self::BadRequest(Json(ErrorMessage { msg }))
-    }
-
-    pub fn not_found(msg: String) -> Self {
-        Self::NotFound(Json(ErrorMessage { msg }))
-    }
-}
-
-#[derive(ApiResponse)]
-pub enum GetPublicationDetailResponse {
-    #[oai(status = 200)]
-    Ok(Json<Publication>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-impl GetPublicationDetailResponse {
-    pub fn ok(publication_detail: Publication) -> Self {
-        Self::Ok(Json(publication_detail))
-    }
-
-    pub fn bad_request(msg: String) -> Self {
-        Self::BadRequest(Json(ErrorMessage { msg }))
-    }
-
-    pub fn not_found(msg: String) -> Self {
-        Self::NotFound(Json(ErrorMessage { msg }))
-    }
-}
-
-#[derive(ApiResponse)]
-pub enum GetEntityAttrResponse {
-    #[oai(status = 200)]
-    Ok(Json<EntityAttr>),
-
-    #[oai(status = 400)]
-    BadRequest(Json<ErrorMessage>),
-
-    #[oai(status = 404)]
-    NotFound(Json<ErrorMessage>),
-}
-
-impl GetEntityAttrResponse {
-    pub fn ok(entity_attr: EntityAttr) -> Self {
-        Self::Ok(Json(entity_attr))
     }
 
     pub fn bad_request(msg: String) -> Self {
@@ -364,6 +288,9 @@ pub enum GetRecordsResponse<
 
     #[oai(status = 404)]
     NotFound(Json<ErrorMessage>),
+
+    #[oai(status = 500)]
+    InternalServerError(Json<ErrorMessage>),
 }
 
 impl<
@@ -388,6 +315,10 @@ impl<
 
     pub fn not_found(msg: String) -> Self {
         Self::NotFound(Json(ErrorMessage { msg }))
+    }
+
+    pub fn internal_server_error(msg: String) -> Self {
+        Self::InternalServerError(Json(ErrorMessage { msg }))
     }
 }
 

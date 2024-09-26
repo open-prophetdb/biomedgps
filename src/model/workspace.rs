@@ -15,6 +15,7 @@ use validator::Validate;
 const DEFAULT_LENGTH_1: usize = 1;
 const DEFAULT_LENGTH_16: usize = 16;
 const DEFAULT_LENGTH_32: usize = 32;
+const DEFAULT_LENGTH_36: usize = 36;
 const DEFAULT_LENGTH_64: usize = 64;
 const DEFAULT_LENGTH_255: usize = 255;
 
@@ -66,17 +67,6 @@ impl Workspace {
     pub fn update_groups(&mut self, groups: Vec<String>) -> &Self {
         self.groups = groups;
         return self;
-    }
-
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Workspace>, anyhow::Error> {
-        let columns = <Workspace as CheckData>::fields().join(",");
-        let sql_str =
-            format!("SELECT id,created_at,payload,annotation,{columns} FROM biomedgps_workspace");
-        let records = sqlx::query_as::<_, Workspace>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
     }
 
     pub async fn get_records_by_owner(
@@ -136,6 +126,34 @@ impl Workspace {
 
         AnyOk(records)
     }
+
+    pub async fn insert_record(
+        pool: &sqlx::PgPool,
+        name: &str,
+        description: Option<&str>,
+        owner: &str,
+        groups: Option<Vec<&str>>,
+    ) -> Result<Workspace, anyhow::Error> {
+        let groups = match groups {
+            Some(groups) => groups,
+            None => vec![],
+        };
+
+        let sql_str = "
+        INSERT INTO biomedgps_workspace (workspace_name, description, owner, groups) 
+        VALUES ($1, $2, $3, $4)
+        RETURNING *"; // Add RETURNING to get the inserted row
+
+        let workspace = sqlx::query_as::<_, Workspace>(sql_str)
+            .bind(name)
+            .bind(description)
+            .bind(owner)
+            .bind(groups) // Ensure PostgreSQL can handle Option<Vec<&str>> appropriately
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(workspace)
+    }
 }
 
 impl CheckData for Workspace {
@@ -151,9 +169,6 @@ impl CheckData for Workspace {
         vec![
             "workspace_name".to_string(),
             "description".to_string(),
-            "created_time".to_string(),
-            "updated_time".to_string(),
-            "archived_time".to_string(),
             "payload".to_string(),
             "owner".to_string(),
             "groups".to_string(),
@@ -184,7 +199,7 @@ pub struct Workflow {
     ))]
     version: String,
 
-    description: String,
+    description: Option<String>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
@@ -208,7 +223,8 @@ pub struct Workflow {
         message = "The length of id should be between 1 and 255."
     ))]
     short_name: String,
-    icons: JsonValue,
+
+    icons: Option<JsonValue>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_64",
@@ -217,9 +233,9 @@ pub struct Workflow {
     ))]
     author: String,
 
-    maintainers: Vec<String>,
-    tags: Vec<String>,
-    readme: String,
+    maintainers: Option<Vec<String>>,
+    tags: Option<Vec<String>>,
+    readme: Option<String>,
 }
 
 impl CheckData for Workflow {
@@ -250,34 +266,113 @@ impl CheckData for Workflow {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
+pub struct WorkflowSchema {
+    schema: JsonValue,
+}
+
 impl Workflow {
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Workflow>, anyhow::Error> {
-        let columns = <Workflow as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT {columns} FROM biomedgps_workflow");
-        let records = sqlx::query_as::<_, Workflow>(sql_str.as_str())
-            .fetch_all(pool)
+    pub async fn get_workflow_schema(
+        pool: &sqlx::PgPool,
+        id: &str,
+        workflow_dir: &PathBuf,
+    ) -> Result<WorkflowSchema, anyhow::Error> {
+        let sql_str = format!("SELECT payload FROM biomedgps_workflow WHERE id = $1");
+        let workflow = sqlx::query_as::<_, Workflow>(sql_str.as_str())
+            .bind(id)
+            .fetch_one(pool)
             .await?;
 
-        AnyOk(records)
+        let workflow_name = format!("{}-{}", workflow.short_name, workflow.version);
+        let workflow_path = workflow_dir.join(workflow_name);
+        let schema_path = workflow_path.join("schema.json");
+        let schema = std::fs::read_to_string(schema_path)?;
+        let schema: JsonValue = serde_json::from_str(&schema)?;
+
+        AnyOk(WorkflowSchema { schema })
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Task {
-    id: String,
+    // Ignore this field when deserialize from json
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    #[oai(skip)]
+    id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_36",
+        min = "DEFAULT_LENGTH_36",
+        message = "The length of id should be 36."
+    ))]
     workspace_id: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_36",
+        min = "DEFAULT_LENGTH_36",
+        message = "The length of id should be 36."
+    ))]
     workflow_id: String,
+
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    #[oai(skip)]
     task_id: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
     task_name: String,
-    description: String,
+
+    description: Option<String>,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
     submitted_time: DateTime<Utc>,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
     started_time: DateTime<Utc>,
+
+    #[serde(skip_deserializing)]
+    #[serde(with = "ts_seconds")]
+    #[oai(read_only)]
     finished_time: DateTime<Utc>,
+
     task_params: JsonValue,
-    labels: JsonValue,
-    status: String,
+
+    #[oai(skip_serializing_if_is_none)]
+    labels: Option<Vec<String>>,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    #[oai(skip)]
+    status: Option<String>,
+
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    #[oai(skip)]
+    log_message: Option<String>,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
     owner: String,
-    groups: Vec<String>,
+
+    #[oai(skip_serializing_if_is_none)]
+    groups: Option<Vec<String>>,
 }
 
 impl CheckData for Task {
@@ -303,77 +398,52 @@ impl CheckData for Task {
             "labels".to_string(),
             "status".to_string(),
             "owner".to_string(),
+            "log_message".to_string(),
             "groups".to_string(),
         ]
     }
 }
 
 impl Task {
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Task>, anyhow::Error> {
-        let columns = <Task as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT {columns} FROM biomedgps_task");
-        let records = sqlx::query_as::<_, Task>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
+    pub fn update_owner(&mut self, owner: String) -> &Self {
+        self.owner = owner;
+        return self;
     }
 
-    pub async fn get_records_by_workspace_id(
-        pool: &sqlx::PgPool,
-        workspace_id: &str,
-        owner: &str,
-        query: Option<ComposeQuery>,
-        page: Option<u64>,
-        page_size: Option<u64>,
-        order_by: Option<&str>,
-    ) -> Result<Vec<Task>, anyhow::Error> {
-        let mut query_str = match query {
-            Some(ComposeQuery::QueryItem(item)) => item.format(),
-            Some(ComposeQuery::ComposeQueryItem(item)) => item.format(),
-            None => "".to_string(),
-        };
+    pub async fn insert(&self, pool: &sqlx::PgPool) -> Result<Task, anyhow::Error> {
+        let sql_str = "INSERT INTO biomedgps_task (workspace_id, workflow_id, task_id, task_name, description, task_params, labels, owner, groups) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *";
 
-        if query_str.is_empty() {
-            query_str = "1=1".to_string();
-        };
+        let task_id = Uuid::new_v4().to_string();
 
-        let where_str = format!("workspace_id = $1 AND owner = $2 AND ({})", query_str);
-
-        let order_by_str = if order_by.is_none() {
-            "".to_string()
-        } else {
-            format!("ORDER BY {}", order_by.unwrap())
-        };
-
-        let pagination_str = if page.is_none() && page_size.is_none() {
-            "LIMIT 10 OFFSET 0".to_string()
-        } else {
-            let page = match page {
-                Some(page) => page,
-                None => 1,
-            };
-
-            let page_size = match page_size {
-                Some(page_size) => page_size,
-                None => 10,
-            };
-
-            format!("LIMIT {} OFFSET {}", page_size, (page - 1) * page_size)
-        };
-
-        let sql_str = format!(
-            "SELECT * FROM biomedgps_task WHERE {} {} {}",
-            where_str, order_by_str, pagination_str
-        );
-
-        let records = sqlx::query_as::<_, Task>(sql_str.as_str())
-            .bind(workspace_id)
-            .bind(owner)
-            .fetch_all(pool)
+        let task = sqlx::query_as::<_, Task>(sql_str)
+            .bind(&self.workspace_id)
+            .bind(&self.workflow_id)
+            .bind(task_id)
+            .bind(&self.task_name)
+            .bind(&self.description)
+            .bind(&self.task_params)
+            .bind(&self.labels)
+            .bind(&self.owner)
+            .bind(&self.groups)
+            .fetch_one(pool)
             .await?;
 
-        AnyOk(records)
+        AnyOk(task)
+    }
+
+    pub async fn get_records_by_id(
+        pool: &sqlx::PgPool,
+        task_id: &str,
+        owner: &str,
+    ) -> Result<Task, anyhow::Error> {
+        let sql_str = "SELECT * FROM biomedgps_task WHERE task_id = $1 AND owner = $2";
+        let task = sqlx::query_as::<_, Task>(sql_str)
+            .bind(task_id)
+            .bind(owner)
+            .fetch_one(pool)
+            .await?;
+
+        AnyOk(task)
     }
 }
 
@@ -381,7 +451,7 @@ impl Task {
 pub struct Notification {
     id: String,
     title: String,
-    description: String,
+    description: Option<String>,
     notification_type: String,
     created_time: DateTime<Utc>,
     status: String,
@@ -410,16 +480,6 @@ impl CheckData for Notification {
 }
 
 impl Notification {
-    pub async fn get_records(pool: &sqlx::PgPool) -> Result<Vec<Notification>, anyhow::Error> {
-        let columns = <Notification as CheckData>::fields().join(",");
-        let sql_str = format!("SELECT id, {columns} FROM biomedgps_notification");
-        let records = sqlx::query_as::<_, Notification>(sql_str.as_str())
-            .fetch_all(pool)
-            .await?;
-
-        AnyOk(records)
-    }
-
     pub async fn get_records_by_owner(
         pool: &sqlx::PgPool,
         owner: &str,

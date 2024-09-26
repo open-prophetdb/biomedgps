@@ -12,7 +12,7 @@ CREATE TABLE
         owner VARCHAR(32) NOT NULL,
         groups VARCHAR(32)[] NOT NULL,
 
-        CONSTRAINT biomedgps_workspace_uniq_key UNIQUE (workspace_name)
+        CONSTRAINT biomedgps_workspace_uniq_key UNIQUE (workspace_name, owner)
     );
 
 -- The workflow table is used to store the information of workflows which are installed in the system.
@@ -46,43 +46,47 @@ CREATE TABLE
 -- }
 CREATE TABLE
     IF NOT EXISTS biomedgps_workflow (
-        id VARCHAR(32) PRIMARY KEY,
-        name VARCHAR(255),
-        version VARCHAR(255),
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        version VARCHAR(255) NOT NULL,
         description TEXT,
-        category VARCHAR(255),
-        home TEXT,
-        source VARCHAR(255),
-        short_name VARCHAR(255),
+        category VARCHAR(255) NOT NULL,
+        home TEXT NOT NULL,
+        source VARCHAR(255) NOT NULL,
+        short_name VARCHAR(255) NOT NULL,
         icons JSONB,
-        author VARCHAR(64),
+        author VARCHAR(64) NOT NULL,
         maintainers VARCHAR(255)[],
         tags VARCHAR(255)[],
-        readme TEXT
+        readme TEXT,
+
+        CONSTRAINT biomedgps_workflow_uniq_key UNIQUE (name, version, author)
     );
 
 CREATE TABLE
     IF NOT EXISTS biomedgps_task (
-        id VARCHAR(36) PRIMARY KEY,
+        id BIGSERIAL PRIMARY KEY,
         workspace_id VARCHAR(36) NOT NULL, -- One workspace has many tasks.
         workflow_id VARCHAR(36) NOT NULL, -- One workflow has many tasks.
         task_id VARCHAR(36), -- One task has one task_id. We need to generate an uuid for tracking the task from the cromwell server.
         task_name VARCHAR(32) NOT NULL,
         description TEXT,
         submitted_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        started_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        started_time TIMESTAMPTZ,
         finished_time TIMESTAMPTZ,
         task_params JSONB NOT NULL,
-        labels JSONB NOT NULL,
-        status VARCHAR(32) NOT NULL, -- The status of the task, such as running, finished, failed, etc.
+        labels VARCHAR(32)[],
+        status VARCHAR(32), -- The status of the task, such as Running, Finished, Failed, etc.
+        log_message TEXT,
         owner VARCHAR(32) NOT NULL,
-        groups VARCHAR(32)[] NOT NULL,
-        CONSTRAINT biomedgps_workflow_uniq_key UNIQUE (workspace_id, task_id)
+        groups VARCHAR(32)[],
+
+        CONSTRAINT biomedgps_task_uniq_key UNIQUE (workspace_id, workflow_id, task_id, owner)
     );
 
 CREATE TABLE
     IF NOT EXISTS biomedgps_notification (
-        id SERIAL NOT NULL,
+        id BIGSERIAL NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         notification_type VARCHAR(32) NOT NULL,
