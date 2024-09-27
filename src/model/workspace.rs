@@ -337,14 +337,12 @@ pub struct Task {
     submitted_time: DateTime<Utc>,
 
     #[serde(skip_deserializing)]
-    #[serde(with = "ts_seconds")]
     #[oai(read_only)]
-    started_time: DateTime<Utc>,
+    started_time: Option<DateTime<Utc>>,
 
     #[serde(skip_deserializing)]
-    #[serde(with = "ts_seconds")]
     #[oai(read_only)]
-    finished_time: DateTime<Utc>,
+    finished_time: Option<DateTime<Utc>>,
 
     task_params: JsonValue,
 
@@ -439,6 +437,8 @@ impl ExpandedTask {
                 biomedgps_task.status,
                 biomedgps_task.owner,
                 biomedgps_task.groups,
+                biomedgps_task.results,
+                biomedgps_task.log_message,
                 biomedgps_workflow.id AS workflow_id,
                 biomedgps_workflow.name AS workflow_name,
                 biomedgps_workflow.version,
@@ -516,18 +516,15 @@ impl ExpandedTask {
                 && expand_results
             {
                 let workflow_short_name = &workflow.short_name;
-                // We expect all workflows have a task named "output", and the output directory is call-output in the workflow directory. such as:
-                // <ROOT_DIR>/myWorkflow/<TASK_ID>/
-                //   |- call-output/
+                // We expect all workflows have a task named "<workflow.short_name>", and the output directory is call-<workflow.short_name> in the workflow directory. Each workflow only has one such task. The task name is same as the workflow short name. such as:
+                // <ROOT_DIR>/<workflow.short_name>/<TASK_ID>/
+                //   |- call-<workflow.short_name>/
                 //   |      |- out.txt
                 //   |      |- output.json
-                //   |- call-task1/
-                //   |- call-task2/
-                //   |- ...
                 //
                 // NOTE:
                 // 1. The execution directory might exist or not, if not, the output files will be in the same directory as the task directory.
-                // 2. We also expect all workflows can output a file named `output.json`, which contains the information of all output files. such as:
+                // 2. We also expect all workflows can output a file named `metadata.json`, which contains the information of all output files. such as:
                 //    {
                 //      "files": [
                 //        {"filelink": "out.txt", "filetype": "tsv", ...other fields...},
@@ -537,14 +534,14 @@ impl ExpandedTask {
                 //        {"filelink": "chart.png", "filetype": "png", ...other fields...}
                 //      ]
                 //    }
-                // 3. We also expect all output files can be copied to the directory of the output task. such as: <ROOT_DIR>/myWorkflow/<TASK_ID>/call-output/out.txt
-                let output_task_dir_name = "call-output";
+                // 3. We also expect all output files can be copied to the directory of the output task. such as: <ROOT_DIR>/<workflow.short_name>/<TASK_ID>/call-<workflow.short_name>/out.txt
+                let output_task_dir_name = format!("call-{}", workflow_short_name);
                 let task_id = &task.task_id;
                 let output_task_dir = task_root_dir
                     .join(workflow_short_name)
                     .join(task_id)
                     .join(output_task_dir_name);
-                let output_metadata_file = output_task_dir.join("output.json");
+                let output_metadata_file = output_task_dir.join("metadata.json");
 
                 if output_metadata_file.exists() {
                     let metadata = std::fs::read_to_string(output_metadata_file)?;
@@ -564,6 +561,40 @@ impl ExpandedTask {
         }
     }
 
+    pub async fn get_log(
+        pool: &sqlx::PgPool,
+        owner: &str,
+        task_root_dir: &PathBuf,
+        task_id: &str,
+    ) -> Result<String, anyhow::Error> {
+        let expanded_task = ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir, false).await?;
+        
+        let workflow_short_name = &expanded_task.workflow.short_name;
+        let task_dir = task_root_dir
+            .join(workflow_short_name)
+            .join(task_id)
+            .join(format!("call-{}", workflow_short_name));
+
+        // TODO: We assume the log file is named "stderr" and "stdout" in the task directory. In the current implementation, we don't support files on the cloud storage.
+        let stderr_log_file = task_dir.join("stderr");
+        let stdout_log_file = task_dir.join("stdout");
+
+        let mut log_content = String::new();
+        if stderr_log_file.exists() {
+            log_content += &std::fs::read_to_string(stderr_log_file)?;
+        }
+        
+        if stdout_log_file.exists() {
+            log_content += &std::fs::read_to_string(stdout_log_file)?;
+        }
+
+        if log_content.is_empty() {
+            return Err(anyhow::anyhow!("Log file not found in the task directory: {}", task_id));
+        }
+
+        AnyOk(log_content)
+    }
+
     pub async fn get_file(
         pool: &sqlx::PgPool,
         owner: &str,
@@ -578,8 +609,9 @@ impl ExpandedTask {
         let task_dir = task_root_dir
             .join(workflow_short_name)
             .join(task_id)
-            .join("call-output");
+            .join(format!("call-{}", workflow_short_name));
 
+        // TODO: In the current implementation, we don't support files on the cloud storage.
         let possible_file_paths = vec![
             task_dir.join(file_name),
             task_dir.join("execution").join(file_name),
@@ -634,12 +666,41 @@ impl Task {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct Notification {
-    id: String,
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
+    id: i64,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_255",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of title should be between 1 and 255."
+    ))]
     title: String,
+
     description: Option<String>,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
     notification_type: String,
+
+    #[serde(with = "ts_seconds")]
     created_time: DateTime<Utc>,
-    status: String,
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
+    status: String, // "Unread" or "Read"
+
+    #[validate(length(
+        max = "DEFAULT_LENGTH_32",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 32."
+    ))]
     owner: String,
 }
 

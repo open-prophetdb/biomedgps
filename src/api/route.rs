@@ -5,7 +5,7 @@ use crate::api::schema::{
     ApiTags, DeleteResponse, FileResponse, GetEntityColorMapResponse, GetGraphResponse,
     GetPromptResponse, GetPublicationsResponse, GetRecordResponse, GetRecordsResponse,
     GetRelationCountResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
-    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
+    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage, LogMessage
 };
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
@@ -2496,6 +2496,42 @@ impl BiomedgpsApi {
             Ok(task) => GetRecordResponse::ok(task),
             Err(e) => {
                 let err = format!("Failed to fetch task by task_id: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks/:task_id/log` with query params to fetch log by task_id.
+    #[oai(
+        path = "/tasks/:task_id/log",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchLogByTaskId"
+    )]
+    async fn fetch_log_by_task_id(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        task_id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetRecordResponse<LogMessage> {
+        let pool_arc = pool.clone();
+        let task_id = task_id.0;
+        let username = _token.0.username;
+
+        let task_root_dir = match std::env::var("TASK_ROOT_DIR") {
+            Ok(task_root_dir) => PathBuf::from(task_root_dir),
+            Err(e) => {
+                let err = format!("The TASK_ROOT_DIR environment variable is not set: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::internal_server_error(err);
+            }
+        };
+
+        match ExpandedTask::get_log(&pool_arc, &username, &task_root_dir, &task_id).await {
+            Ok(log) => GetRecordResponse::ok(LogMessage::new(log)),
+            Err(e) => {
+                let err = format!("Failed to fetch log by task_id: {}", e);
                 warn!("{}", err);
                 return GetRecordResponse::bad_request(err);
             }

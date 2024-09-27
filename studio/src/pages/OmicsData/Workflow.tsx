@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Pagination, Empty, Input } from 'antd';
-import { Workflow, WorkflowTableData } from './typings.t';
+import { Workflow, WorkflowTableData } from '../../StatEngine/components/WorkflowList/data';
 import { fetchWorkflows } from '@/services/swagger/KnowledgeGraph';
 import { AppstoreOutlined } from '@ant-design/icons';
 
@@ -26,16 +26,21 @@ const WorkflowPanel: React.FC<WorkflowProps> = (props) => {
     const [searchStr, setSearchStr] = useState<string>('');
 
     useEffect(() => {
-        setLoading(true);
-        fetchWorkflows({
+        let params: any = {
             page: page,
             page_size: pageSize,
-            query_str: JSON.stringify({
+        };
+
+        if (searchStr && searchStr.trim() !== '') {
+            params["query_str"] = JSON.stringify({
                 field: 'name',
                 value: `%${searchStr}%`,
                 operator: 'ilike'
             })
-        }).then((data) => {
+        }
+
+        setLoading(true);
+        fetchWorkflows(params).then((data) => {
             setLoading(false);
             setWorkflowTableData({
                 data: data.records,
@@ -67,7 +72,7 @@ const WorkflowPanel: React.FC<WorkflowProps> = (props) => {
                             alignItems: 'center',
                             borderRadius: '5px',
                         }}>
-                            {icon ? <img src={icon.src} alt={icon.type || ''} /> : <AppstoreOutlined style={{ color: '#fff' }} />}
+                            {icon ? <img src={icon.src} alt={icon.type || ''} width={'100%'} height={'100%'} /> : <AppstoreOutlined style={{ color: '#fff' }} />}
                         </div>
                     </Col>
                     <Col>
@@ -92,9 +97,9 @@ const WorkflowPanel: React.FC<WorkflowProps> = (props) => {
             </Col>
             <Col className='workflow-cards-content'>
                 {
-                    workflowTableData.total > 0 ? workflowTableData.data.map((workflow) => {
+                    workflowTableData.total > 0 ? workflowTableData.data.map((workflow: Workflow) => {
                         return (
-                            <WorkflowCard title={workflow.name} description={workflow.description || ''} icon={workflow.icons && workflow.icons.length > 0 ? workflow.icons[0] : null} key={workflow.name} onClick={() => {
+                            <WorkflowCard title={workflow.name} description={workflow.description || ''} icon={workflow.icons || null} key={workflow.name} onClick={() => {
                                 props.onWorkflowClick && props.onWorkflowClick(workflow);
                              }} />
                         );

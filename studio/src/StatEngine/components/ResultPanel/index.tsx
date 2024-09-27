@@ -7,7 +7,7 @@ import {
   // SnippetsOutlined,
   DatabaseOutlined
 } from '@ant-design/icons';
-import { Button, Col, Drawer, Row, Space, Tabs, Tooltip, message } from 'antd';
+import { Button, Col, Drawer, Row, Space, Tabs, Tooltip, message, Badge } from 'antd';
 import React, { memo, useEffect, useState } from 'react';
 
 import WorkflowList from '../WorkflowList';
@@ -34,6 +34,7 @@ export type ResultPanelProps = {
   results: string[];
   charts: string[];
   workflow: Workflow;
+  taskStatus: 'Succeeded' | 'Running' | 'Failed' | 'Unknown' | null;
   responsiveKey: number | string;
 };
 
@@ -104,8 +105,31 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
     }
   }, [logLink]);
 
+  const formatTaskStatus = (status: string | null) => {
+    switch (status) {
+      case 'Running':
+        return 'processing';
+      case 'Succeeded':
+        return 'success';
+      case 'Failed':
+        return 'error';
+      case 'Unknown':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  }
+
   const resultOperations = (
     <Space>
+      {
+        props.taskStatus !== null ?
+          <Tooltip title='Update status automatically'>
+            <Button>
+              <Badge status={formatTaskStatus(props.taskStatus)} text={props.taskStatus} />
+            </Button>
+          </Tooltip> : null
+      }
       <Tooltip title="Edit the Chart">
         <Button
           disabled={!editBtnActive}
@@ -197,7 +221,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           <LogViewer getFile={fetchFileByFileName} height="calc(100vh - 200px)" taskId={taskId} url={logLink} />
         </TabPane>
         {
-          plotData ? (<TabPane
+          plotData ? <TabPane
             tab={
               <span>
                 <DatabaseOutlined />
@@ -212,22 +236,27 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
               Download Data
             </CSVLink>
             <JsonViewer value={plotData} />
-          </TabPane>) : null}
-        {chartTask ? (<TabPane
-          tab={
-            <span>
-              <IssuesCloseOutlined />
-              Metadata
-            </span>
-          }
-          key="metadata"
-        >
-          <a className="button" onClick={() => { downloadAsJSON(chartTask, "download-anchor") }}>
-            Download Metadata
-          </a>
-          <a id="download-anchor" style={{ display: 'none' }}></a>
-          <JsonViewer value={chartTask} />
-        </TabPane>) : null}
+          </TabPane> : null
+        }
+        {
+          chartTask ?
+            <TabPane
+              tab={
+                <span>
+                  <IssuesCloseOutlined />
+                  Metadata
+                </span>
+              }
+              key="metadata"
+            >
+              <a className="button" onClick={() => { downloadAsJSON(chartTask, "download-anchor") }}>
+                Download Metadata
+              </a>
+              <a id="download-anchor" style={{ display: 'none' }}></a>
+              <JsonViewer value={chartTask} />
+            </TabPane> :
+            null
+        }
       </Tabs>
       <Drawer
         title="Chart Store"

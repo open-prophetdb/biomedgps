@@ -6,7 +6,7 @@ CREATE TABLE
         workspace_name VARCHAR(64),
         description TEXT,
         created_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_time TIMESTAMPTZ NOT NULL,
+        updated_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         archived_time TIMESTAMPTZ,
         payload JSONB NOT NULL, -- Any additional information for the workspace.
         owner VARCHAR(32) NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE
         id BIGSERIAL PRIMARY KEY,
         workspace_id VARCHAR(36) NOT NULL, -- One workspace has many tasks.
         workflow_id VARCHAR(36) NOT NULL, -- One workflow has many tasks.
-        task_id VARCHAR(36), -- One task has one task_id. We need to generate an uuid for tracking the task from the cromwell server.
+        task_id VARCHAR(36) NOT NULL, -- One task has one task_id. We need to generate an uuid for tracking the task from the cromwell server.
         task_name VARCHAR(32) NOT NULL,
         description TEXT,
         submitted_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -77,6 +77,7 @@ CREATE TABLE
         task_params JSONB NOT NULL,
         labels VARCHAR(32)[],
         status VARCHAR(32), -- The status of the task, such as Running, Finished, Failed, etc.
+        results JSONB,
         log_message TEXT,
         owner VARCHAR(32) NOT NULL,
         groups VARCHAR(32)[],

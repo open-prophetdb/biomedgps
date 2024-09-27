@@ -26,6 +26,17 @@ pub struct ErrorMessage {
     msg: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Object)]
+pub struct LogMessage {
+    msg: String,
+}
+
+impl LogMessage {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate, Object)]
 
 pub struct PromptList {

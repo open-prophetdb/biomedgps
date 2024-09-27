@@ -1,7 +1,7 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { TaskHistory, TaskHistoryTableData } from './typings.t';
+import { TaskHistory, TaskHistoryTableData } from '../../StatEngine/components/WorkflowList/data';
 import { fetchTasks } from '@/services/swagger/KnowledgeGraph';
 
 type TaskHistoryTableProps = {
@@ -101,8 +101,8 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
             width: 220,
             render: (text, record) => {
                 return <Button.Group>
-                    <Button type="primary" disabled={!isFinished(record)} onClick={() => { props.onTaskHistoryClick?.(record) }}>View</Button>
-                    <Button disabled>Log</Button>
+                    <Button type="primary" onClick={() => { props.onTaskHistoryClick?.(record) }}>View</Button>
+                    <Button disabled={!isFinished(record)}>Log</Button>
                     <Button danger disabled>Delete</Button>
                 </Button.Group>
             },

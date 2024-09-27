@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Row, Col, Menu, Button, Empty } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Row, Col, Menu, Button, Empty, message } from 'antd';
 import { MenuUnfoldOutlined, MenuFoldOutlined, TableOutlined, HistoryOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import Workflow from './Workflow';
 import { Workflow as WorkflowData, TaskHistory as TaskHistoryData } from '../../StatEngine/components/WorkflowList/data';
@@ -18,7 +18,7 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
         {
             label: 'Workflows',
             key: 'workflows',
-            icon: <TableOutlined />,
+            icon: <AppstoreOutlined />,
             onClick: () => {
                 setMenuKey('workflows');
             }
@@ -38,7 +38,16 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
 
     const [menuItems, setMenuItems] = useState<any[]>(defaultMenuItems);
     const [menuKey, setMenuKey] = useState<string>('workflows');
+    const [workflows, setWorkflows] = useState<WorkflowData[]>([]);
     const [collapsed, setCollapsed] = useState<boolean>(false);
+
+    useEffect(() => {
+        fetchWorkflows({ page: 1, page_size: 100 }).then((workflows) => {
+            setWorkflows(workflows.records);
+        }).catch((err) => {
+            console.log('error: ', err);
+        });
+    }, []);
 
     const onWorkflowClick = (workflow: WorkflowData) => {
         console.log(workflow);
@@ -57,8 +66,13 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
         setCollapsed(true);
     };
 
-    const onTaskHistoryClick = (taskHistory: TaskHistoryData) => {
-        console.log(taskHistory);
+    const onTaskHistoryClick = async (taskHistory: TaskHistoryData) => {
+        console.log('onTaskHistoryClick: ', taskHistory);
+
+        if (!workflows.length || !taskHistory.workflow_id || workflows.find((workflow) => workflow.id === taskHistory.workflow_id) === undefined) {
+            message.error('No workflows found');
+            return;
+        }
 
         setMenuItems([
             ...defaultMenuItems,
@@ -85,13 +99,14 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
             console.log("whichPanel in OmicsData: ", data, menuKey);
 
             if (data.task_id) {
-                fetchWorkflows({ page: 1, page_size: 1, query_str: JSON.stringify({ field: 'id', value: data.workflow_id, operator: '=' }) }).then((workflows) => {
-                    // It's a task
-                    return <StatEngine workflow={workflows.records[0]} task={data} workflowId={data.id} />;
-                }).catch((err) => {
-                    console.log('error: ', err);
+                const workflow = workflows.find((workflow) => workflow.id === data.workflow_id);
+                if (!workflow) {
+                    message.error('No workflow found');
                     return <Empty className='empty-omics-data-container' description='No workflow with this task' />;
-                });
+                }
+
+                // It's a task
+                return <StatEngine workflow={workflow} task={data} workflowId={data.workflow_id} />;
             } else {
                 // It's a workflow
                 return <StatEngine workflow={data} workflowId={data.id} />;

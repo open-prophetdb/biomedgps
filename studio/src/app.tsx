@@ -59,21 +59,21 @@ export const request: RequestConfig = {
   // More details on ./config/proxy.ts or ./config/config.cloud.ts
   baseURL: apiPrefix,
   errorConfig: {
-    errorHandler: (resData) => {
-      console.log("errorHandler: ", resData);
+    // errorHandler: (resData) => {
+    //   console.log("errorHandler: ", resData);
 
-      // @ts-ignore
-      // if (resData.response && (resData.response.status === 401 || resData.response.status === 0)) {
-      //   logoutWithRedirect();
-      // }
+    //   // @ts-ignore
+    //   // if (resData.response && (resData.response.status === 401 || resData.response.status === 0)) {
+    //   //   logoutWithRedirect();
+    //   // }
 
-      return {
-        ...resData,
-        success: false,
-        showType: 0,
-        errorMessage: resData.message,
-      };
-    },
+    //   return {
+    //     ...resData,
+    //     success: false,
+    //     showType: 0,
+    //     errorMessage: resData.message,
+    //   };
+    // },
   },
   requestInterceptors: [(url: string, options) => {
     // How to get a jwt_access_token from the cookie?

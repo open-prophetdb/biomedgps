@@ -39,8 +39,10 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   console.log('StatEngine Props: ', props);
 
   const [taskName, setTaskName] = useState<string>(props.task?.task_name || '');
+  const [taskNameWarning, setTaskNameWarning] = useState<string | null>(null);
   const [taskDescription, setTaskDescription] = useState<string>(props.task?.description || '');
   const [workflowInfoVisible, setWorkflowInfoVisible] = useState<boolean>(false);
+  const [taskStatus, setTaskStatus] = useState<'Running' | 'Succeeded' | 'Failed' | 'Unknown' | null>(null);
 
   const [leftSpan, setLeftSpan] = useState<number>(8);
   const [resizeBtnActive, setResizeBtnActive] = useState<boolean>(false);
@@ -51,7 +53,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   // Chart
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [argumentColumns, setArgumentColumns] = useState<ProFormColumnsType<DataItem>[] & any>([]);
-  const [fieldsValue, setFieldsValue] = useState<any>({});
+  const [fieldsValue, setFieldsValue] = useState<Record<string, any>>(props.task?.task_params || {});
 
   const [resultData, setResultData] = useState<ChartResult | undefined>({
     results: [],
@@ -131,7 +133,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                 log: task.log_message,
                 task_id: task.task_id,
               });
-              setResultLoading(false);
+              setTaskStatus('Succeeded');
               message.success('Load chart...');
               clearInterval(interval);
             } else if (task.status === 'Failed') {
@@ -141,25 +143,34 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                 log: task.log_message,
                 task_id: task.task_id,
               });
-              setResultLoading(false);
+              setTaskStatus('Failed');
               message.error('Something wrong, please check the log for more details.');
               clearInterval(interval);
+            } else {
+              setTaskStatus('Running');
             }
           })
           .catch((error) => {
             console.log('Get Task Error: ', error);
             clearInterval(interval);
+            setTaskStatus('Unknown');
           });
       }
-    }, 1000);
+    }, 5000);
   };
 
   const onSubmit = (values: Pick<TaskHistory, 'task_params'>): Promise<TaskHistory> => {
+    if (taskName.length === 0) {
+      setTaskNameWarning("Please enter your task name.");
+      return Promise.reject(new Error('Please enter your task name.'));
+    }
+
     console.log('onSubmit Chart: ', values);
     values = {
       ...values,
     }
 
+    // @ts-ignore, we don't need more fields for now
     const task: TaskHistory = {
       // TODO: Change to the real workspace id
       workspace_id: '00000000-0000-0000-0000-000000000000',
@@ -168,11 +179,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
       description: taskDescription,
       task_params: values,
       // Just a placeholder for avoiding boring TypeScript compiler
-      task_id: '',
-      owner: '',
-      submitted_time: '',
-      started_time: '',
-      finished_time: '',
+      owner: ''
     }
 
     return new Promise<TaskHistory>((resolve, reject) => {
@@ -205,10 +212,17 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   return (
     <GridContent>
       <Row className="stat-engine-header">
-        <Input placeholder='Enter Your Task Name' value={taskName} onChange={(e) => setTaskName(e.target.value)} allowClear
-          disabled={props.task !== undefined} size='large' style={{ width: '40%', marginRight: '10px' }} />
-        <Input placeholder='Enter Your Task Description' value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} allowClear
-          disabled={props.task !== undefined} size='large' style={{ width: 'calc(60% - 100px)' }} />
+        <Form.Item validateStatus={taskNameWarning ? 'error' : ''} help={taskNameWarning} style={{ width: '40%', marginRight: '10px' }}>
+          <Input placeholder='Enter Your Task Name' value={taskName} onChange={(e) => {
+            setTaskNameWarning(null);
+            setTaskName(e.target.value)
+          }} allowClear
+            disabled={props.task !== undefined} size='large' />
+        </Form.Item>
+        <Form.Item style={{ width: 'calc(60% - 100px)' }}>
+          <Input placeholder='Enter Your Task Description' value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} allowClear
+            disabled={props.task !== undefined} size='large' />
+        </Form.Item>
         <Popover content={
           <Descriptions title="Workflow Summary" column={2} bordered>
             <Descriptions.Item label="Name">{props.workflow.name}</Descriptions.Item>
@@ -248,6 +262,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                     key="arguments"
                   >
                     <ArgumentForm
+                      readonly={props.task !== undefined}
                       contextData={{}}
                       fieldsValue={fieldsValue}
                       labelSpan={24}
@@ -288,6 +303,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
           >
             <Row className="right__content">
               <ResultPanel
+                taskStatus={taskStatus}
                 workflow={props.workflow}
                 results={resultData?.results || []}
                 charts={resultData?.charts || []}

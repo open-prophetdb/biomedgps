@@ -23,6 +23,7 @@ export type ArgumentProps = {
   height?: string;
   labelSpan?: number;
   onSubmit?: (values: any) => Promise<TaskHistory>;
+  readonly?: boolean;
 };
 
 const ArgumentForm: React.FC<ArgumentProps> = (props) => {
@@ -53,7 +54,7 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
     if (fieldsValue) {
       form.setFieldsValue(fieldsValue)
     }
-  }, [fieldsValue])
+  }, [fieldsValue, columns])
 
   console.log('ArgumentForm updated');
 
@@ -112,6 +113,7 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
           className="schema-form vertical"
           trigger={activateBtn}
           style={{ height }}
+          disabled={props.readonly}
           span={labelSpan}
           form={form}
           defaultCollapsed={false}
