@@ -2317,16 +2317,16 @@ impl BiomedgpsApi {
         let pool_arc = pool.clone();
         let id = id.0;
 
-        let workflow_dir = match std::env::var("WORKFLOW_DIR") {
-            Ok(workflow_dir) => PathBuf::from(workflow_dir),
+        let workflow_root_dir = match std::env::var("WORKFLOW_ROOT_DIR") {
+            Ok(workflow_root_dir) => PathBuf::from(workflow_root_dir),
             Err(e) => {
-                let err = format!("The WORKFLOW_DIR environment variable is not set: {}", e);
+                let err = format!("The WORKFLOW_ROOT_DIR environment variable is not set: {}", e);
                 warn!("{}", err);
                 return GetRecordResponse::internal_server_error(err);
             }
         };
 
-        match Workflow::get_workflow_schema(&pool_arc, &id, &workflow_dir).await {
+        match Workflow::get_workflow_schema(&pool_arc, &id, &workflow_root_dir).await {
             Ok(schema) => GetRecordResponse::ok(schema),
             Err(e) => {
                 let err = format!("Failed to fetch workflow schema: {}", e);

@@ -251,15 +251,15 @@ async fn main() -> Result<(), std::io::Error> {
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
 
-    // Check WORKFLOW_DIR and TASK_ROOT_DIR environment variables.
-    match std::env::var("WORKFLOW_DIR") {
+    // Check WORKFLOW_ROOT_DIR and TASK_ROOT_DIR environment variables.
+    match std::env::var("WORKFLOW_ROOT_DIR") {
         Ok(v) => {
             if v.is_empty() {
-                warn!("WORKFLOW_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+                warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
             }
         }
         Err(_) => {
-            warn!("WORKFLOW_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+            warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
         }
     }
 

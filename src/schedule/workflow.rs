@@ -1,8 +1,11 @@
 use super::task_manager::TaskManager;
 use crate::model::workspace::Task as WorkflowTask;
-use cromwell_api_rs::CromwellClient;
+use crate::model::workspace::{Task, Workflow};
+use cromwell_api_rs::{render_workflow_metadata, CromwellClient};
 use log::{error, info};
 use sqlx::PgPool;
+use sqlx::Row;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -118,6 +121,164 @@ pub async fn sync_log_message(
     Ok(())
 }
 
+pub async fn submit_workflow(
+    pool: &Arc<PgPool>,
+    cromwell_client_url: &str,
+) -> Result<(), anyhow::Error> {
+    let cromwell_client = CromwellClient::new(cromwell_client_url);
+
+    let sql_str = "
+        SELECT 
+            biomedgps_task.id,
+            biomedgps_task.workspace_id,
+            biomedgps_task.workflow_id,
+            biomedgps_task.task_id,
+            biomedgps_task.task_name,
+            biomedgps_task.description,
+            biomedgps_task.submitted_time,
+            biomedgps_task.started_time,
+            biomedgps_task.finished_time,
+            biomedgps_task.task_params,
+            biomedgps_task.labels,
+            biomedgps_task.status,
+            biomedgps_task.owner,
+            biomedgps_task.groups,
+            biomedgps_task.results,
+            biomedgps_task.log_message,
+            biomedgps_workflow.id AS workflow_id,
+            biomedgps_workflow.name AS workflow_name,
+            biomedgps_workflow.version,
+            biomedgps_workflow.description AS workflow_description,
+            biomedgps_workflow.category,
+            biomedgps_workflow.home,
+            biomedgps_workflow.source,
+            biomedgps_workflow.short_name,
+            biomedgps_workflow.icons,
+            biomedgps_workflow.author,
+            biomedgps_workflow.maintainers,
+            biomedgps_workflow.tags,
+            biomedgps_workflow.readme
+        FROM biomedgps_task 
+        JOIN biomedgps_workflows ON biomedgps_tasks.workflow_id = biomedgps_workflows.id 
+        WHERE biomedgps_tasks.status IS NULL AND biomedgps_tasks.started_time IS NULL
+    ";
+    let mut conn = pool.acquire().await?;
+    let rows = match sqlx::query(sql_str).fetch_all(&mut conn).await {
+        Ok(rows) => rows,
+        Err(sqlx::Error::RowNotFound) => return Err(anyhow::anyhow!("No task or workflow found")),
+        Err(e) => return Err(anyhow::anyhow!("Failed to get expanded task: {}", e)),
+    };
+
+    for row in rows {
+        let task = Task {
+            id: row.get("id"),
+            workspace_id: row.get("workspace_id"),
+            workflow_id: row.get("workflow_id"),
+            task_id: row.get("task_id"),
+            task_name: row.get("task_name"),
+            description: row.get("description"),
+            submitted_time: row.get("submitted_time"),
+            started_time: row.get("started_time"),
+            finished_time: row.get("finished_time"),
+            task_params: row.get("task_params"),
+            labels: row.get("labels"),
+            status: row.get("status"),
+            results: row.get("results"),
+            log_message: row.get("log_message"),
+            owner: row.get("owner"),
+            groups: row.get("groups"),
+        };
+
+        let workflow = Workflow {
+            id: row.get("workflow_id"),
+            name: row.get("workflow_name"),
+            version: row.get("version"),
+            description: row.get("workflow_description"),
+            category: row.get("category"),
+            home: row.get("home"),
+            source: row.get("source"),
+            short_name: row.get("short_name"),
+            icons: row.get("icons"),
+            author: row.get("author"),
+            maintainers: row.get("maintainers"),
+            tags: row.get("tags"),
+            readme: row.get("readme"),
+        };
+
+        let workflow_root_dir = match std::env::var("WORKFLOW_ROOT_DIR") {
+            Ok(workflow_root_dir) => PathBuf::from(workflow_root_dir),
+            Err(e) => {
+                error!(
+                    "The WORKFLOW_ROOT_DIR environment variable is not set: {}",
+                    e
+                );
+                return Err(anyhow::anyhow!(e));
+            }
+        };
+
+        let workflow_dir = Workflow::get_workflow_installation_path(
+            &workflow_root_dir,
+            &Workflow::get_workflow_dirname(&workflow.short_name, &workflow.version),
+        );
+        let task_template_dir = Workflow::get_task_template_dir(&workflow_root_dir, &task.task_id);
+        let input_json_file = workflow_dir.join("inputs.json");
+
+        if std::path::Path::new(&input_json_file).exists() {
+            let task_params = task.task_params;
+
+            match render_workflow_metadata(&input_json_file, &task_params, &task_template_dir) {
+                Ok(rendered_input_json_file) => {
+                    let workflow_file = workflow_dir.join("workflow.wdl");
+
+                    match cromwell_client
+                        .submit_workflow(
+                            Some(workflow_file.as_path()),
+                            Some(rendered_input_json_file.as_path()),
+                            None,
+                            None,
+                            None,
+                            Some(&task.task_id),
+                        )
+                        .await
+                    {
+                        Ok(workflow_status) => {
+                            info!("Workflow submitted: {:?}", workflow_status);
+                            match sqlx::query("UPDATE biomedgps_tasks SET status = $1, started_time = $2 WHERE task_id = $3")
+                                .bind(workflow_status.status.to_string())
+                                .bind(chrono::Utc::now().naive_utc())
+                                .bind(task.task_id)
+                                .execute(&mut conn)
+                                .await
+                            {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    error!("Failed to update task status: {}", e);
+                                    // TODO: Rollback the workflow submission
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to submit workflow: {}", e);
+                            return Err(anyhow::anyhow!(e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to render workflow metadata: {}", e);
+                    return Err(anyhow::anyhow!(e));
+                }
+            }
+        } else {
+            error!(
+                "Input json file not found at {}, it might be a invalid workflow.",
+                input_json_file.display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn register_tasks(
     task_manager: &mut TaskManager,
     pool: &Arc<PgPool>,
@@ -143,7 +304,7 @@ pub async fn register_tasks(
             })
         },
         Duration::from_secs(5),
-        3,
+        0,
         Duration::from_secs(10),
     );
 
@@ -167,8 +328,32 @@ pub async fn register_tasks(
             })
         },
         Duration::from_secs(10),
-        3,
+        0,
         Duration::from_secs(15),
+    );
+
+    let pool3 = pool.clone();
+    let cromwell_client_url3 = cromwell_client_url.to_string();
+    // 注册任务 submit_workflow
+    task_manager.register_task(
+        "submit_workflow",
+        move || {
+            let pool_clone = pool3.clone();
+            let cromwell_client_url_clone = cromwell_client_url3.clone();
+
+            tokio::spawn(async move {
+                match submit_workflow(&pool_clone, &cromwell_client_url_clone).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        error!("Failed to submit workflow: {}", e);
+                        Err(e.to_string())
+                    }
+                }
+            })
+        },
+        Duration::from_secs(3),
+        0,
+        Duration::from_secs(8),
     );
 
     Ok(())

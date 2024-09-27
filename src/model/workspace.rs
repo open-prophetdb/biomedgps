@@ -185,59 +185,59 @@ pub struct Workflow {
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 32."
     ))]
-    id: String,
+    pub id: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of name should be between 1 and 255."
     ))]
-    name: String,
+    pub name: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of version should be between 1 and 255."
     ))]
-    version: String,
+    pub version: String,
 
-    description: Option<String>,
-
-    #[validate(length(
-        max = "DEFAULT_LENGTH_255",
-        min = "DEFAULT_LENGTH_1",
-        message = "The length of id should be between 1 and 255."
-    ))]
-    category: String,
-
-    home: String,
+    pub description: Option<String>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 255."
     ))]
-    source: String,
+    pub category: String,
+
+    pub home: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_255",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 255."
     ))]
-    short_name: String,
+    pub source: String,
 
-    icons: Option<JsonValue>,
+    #[validate(length(
+        max = "DEFAULT_LENGTH_255",
+        min = "DEFAULT_LENGTH_1",
+        message = "The length of id should be between 1 and 255."
+    ))]
+    pub short_name: String,
+
+    pub icons: Option<JsonValue>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_64",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 64."
     ))]
-    author: String,
+    pub author: String,
 
-    maintainers: Option<Vec<String>>,
-    tags: Option<Vec<String>>,
-    readme: Option<String>,
+    pub maintainers: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
+    pub readme: Option<String>,
 }
 
 impl CheckData for Workflow {
@@ -278,7 +278,7 @@ impl Workflow {
     pub async fn get_workflow_schema(
         pool: &sqlx::PgPool,
         id: &str,
-        workflow_dir: &PathBuf,
+        workflow_root_dir: &PathBuf,
     ) -> Result<WorkflowSchema, anyhow::Error> {
         let sql_str = format!("SELECT * FROM biomedgps_workflow WHERE id = $1");
         let workflow = sqlx::query_as::<_, Workflow>(sql_str.as_str())
@@ -286,13 +286,25 @@ impl Workflow {
             .fetch_one(pool)
             .await?;
 
-        let workflow_name = format!("{}-{}", workflow.short_name, workflow.version);
-        let workflow_path = workflow_dir.join(workflow_name);
+        let workflow_name = Self::get_workflow_dirname(&workflow.short_name, &workflow.version);
+        let workflow_path = Self::get_workflow_installation_path(workflow_root_dir, &workflow_name);
         let schema_path = workflow_path.join("schema.json");
         let schema = std::fs::read_to_string(schema_path)?;
         let schema: WorkflowSchema = serde_json::from_str(&schema)?;
 
         AnyOk(schema)
+    }
+
+    pub fn get_workflow_dirname(workflow_short_name: &str, workflow_version: &str) -> String {
+        format!("{}-{}", workflow_short_name, workflow_version)
+    }
+
+    pub fn get_workflow_installation_path(workflow_root_dir: &PathBuf, workflow_name: &str) -> PathBuf {
+        workflow_root_dir.join("workflows").join(workflow_name)
+    }
+
+    pub fn get_task_template_dir(workflow_root_dir: &PathBuf, task_id: &str) -> PathBuf {
+        workflow_root_dir.join("tasks").join(task_id)
     }
 }
 
@@ -302,21 +314,21 @@ pub struct Task {
     #[serde(skip_deserializing)]
     #[oai(read_only)]
     #[oai(skip)]
-    id: i64,
+    pub id: i64,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_36",
         min = "DEFAULT_LENGTH_36",
         message = "The length of id should be 36."
     ))]
-    workspace_id: String,
+    pub workspace_id: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_36",
         min = "DEFAULT_LENGTH_36",
         message = "The length of id should be 36."
     ))]
-    workflow_id: String,
+    pub workflow_id: String,
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
@@ -327,27 +339,27 @@ pub struct Task {
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 32."
     ))]
-    task_name: String,
+    pub task_name: String,
 
-    description: Option<String>,
+    pub description: Option<String>,
 
     #[serde(skip_deserializing)]
     #[serde(with = "ts_seconds")]
     #[oai(read_only)]
-    submitted_time: DateTime<Utc>,
+    pub submitted_time: DateTime<Utc>,
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    started_time: Option<DateTime<Utc>>,
+    pub started_time: Option<DateTime<Utc>>,
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    finished_time: Option<DateTime<Utc>>,
+    pub finished_time: Option<DateTime<Utc>>,
 
-    task_params: JsonValue,
+    pub task_params: JsonValue,
 
     #[oai(skip_serializing_if_is_none)]
-    labels: Option<Vec<String>>,
+    pub labels: Option<Vec<String>>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_32",
@@ -360,21 +372,21 @@ pub struct Task {
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "text/plain"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
+    pub results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "text/plain"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    log_message: Option<String>,
+    pub log_message: Option<String>,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_32",
         min = "DEFAULT_LENGTH_1",
         message = "The length of id should be between 1 and 32."
     ))]
-    owner: String,
+    pub owner: String,
 
     #[oai(skip_serializing_if_is_none)]
-    groups: Option<Vec<String>>,
+    pub groups: Option<Vec<String>>,
 }
 
 impl CheckData for Task {

@@ -1,10 +1,12 @@
+use anyhow;
+use log::{error, info};
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
-use log::{error, info};
+use std::path::{Path, PathBuf};
+use tera::{Context, Tera};
 
 const VERSION: &str = "v1";
 
@@ -159,7 +161,6 @@ pub enum WorkflowLogFiles {
     LogFileNotReady(LogFileNotReady),
     LogFileNotFound(LogFileNotFound),
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CromwellError {
@@ -523,6 +524,47 @@ pub fn print_status(status: &StatusResponse) {
                 }
             }
         }
+    }
+}
+
+pub fn render_workflow_metadata(
+    input_file: &Path,
+    metadata: &serde_json::Value,
+    dest_dir: &Path,
+) -> Result<PathBuf, anyhow::Error> {
+    if !dest_dir.exists() {
+        return Err(anyhow::anyhow!(
+            "Destination directory does not exist: {}",
+            dest_dir.display()
+        ));
+    }
+
+    let dir = match input_file.parent() {
+        Some(dir) => dir,
+        None => {
+            return Err(anyhow::anyhow!(
+                "No parent directory for input file: {}",
+                input_file.display()
+            ))
+        }
+    };
+
+    let tera = match Tera::new(dir.join("*.json").to_str().unwrap()) {
+        Ok(tera) => tera,
+        Err(e) => return Err(anyhow::anyhow!("Failed to create Tera instance: {}", e)),
+    };
+
+    let mut context = Context::new();
+    context.insert("metadata", metadata);
+
+    let filename = input_file.file_name().unwrap();
+    let dest_file = dest_dir.join(filename);
+    match tera.render(filename.to_str().unwrap(), &context) {
+        Ok(rendered) => {
+            std::fs::write(&dest_file, rendered)?;
+            Ok(dest_file)
+        }
+        Err(e) => return Err(anyhow::anyhow!("Failed to render template: {}", e)),
     }
 }
 
