@@ -63,9 +63,9 @@ export const request: RequestConfig = {
       console.log("errorHandler: ", resData);
 
       // @ts-ignore
-      if (resData.response && (resData.response.status === 401 || resData.response.status === 0)) {
-        logoutWithRedirect();
-      }
+      // if (resData.response && (resData.response.status === 401 || resData.response.status === 0)) {
+      //   logoutWithRedirect();
+      // }
 
       return {
         ...resData,

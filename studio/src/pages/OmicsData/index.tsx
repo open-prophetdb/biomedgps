@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Row, Col, Menu, Button, Empty } from 'antd';
 import { MenuUnfoldOutlined, MenuFoldOutlined, TableOutlined, HistoryOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import Workflow from './Workflow';
-import { Workflow as WorkflowData, TaskHistory as TaskHistoryData } from './typings.t';
+import { Workflow as WorkflowData, TaskHistory as TaskHistoryData } from '../../StatEngine/components/WorkflowList/data';
 import TaskHistory from './TaskHistory';
+import StatEngine from '../../StatEngine';
 
 import './index.less';
+import { fetchWorkflows } from '@/services/swagger/KnowledgeGraph';
 
 export type OmicsDataProps = {
 
@@ -47,6 +49,7 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
                 key: workflow.id,
                 icon: <AppstoreOutlined />,
                 danger: true,
+                data: workflow,
             }
         ])
 
@@ -56,17 +59,19 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
 
     const onTaskHistoryClick = (taskHistory: TaskHistoryData) => {
         console.log(taskHistory);
+
         setMenuItems([
             ...defaultMenuItems,
             {
                 label: `Task: ${taskHistory.task_name}`,
-                key: taskHistory.id,
+                key: taskHistory.task_id,
                 icon: <ClockCircleOutlined />,
                 danger: true,
+                data: taskHistory,
             }
         ])
 
-        setMenuKey(taskHistory.id);
+        setMenuKey(taskHistory.task_id);
         setCollapsed(true);
     };
 
@@ -76,7 +81,22 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
         } else if (menuKey === 'task-history') {
             return <TaskHistory className='task-history-container' onTaskHistoryClick={onTaskHistoryClick} />;
         } else {
-            return <Empty className='empty-omics-data-container' />;
+            const data = menuItems.find((item) => item.key === menuKey)?.data;
+            console.log("whichPanel in OmicsData: ", data, menuKey);
+
+            if (data.task_id) {
+                fetchWorkflows({ page: 1, page_size: 1, query_str: JSON.stringify({ field: 'id', value: data.workflow_id, operator: '=' }) }).then((workflows) => {
+                    // It's a task
+                    return <StatEngine workflow={workflows.records[0]} task={data} workflowId={data.id} />;
+                }).catch((err) => {
+                    console.log('error: ', err);
+                    return <Empty className='empty-omics-data-container' description='No workflow with this task' />;
+                });
+            } else {
+                // It's a workflow
+                return <StatEngine workflow={data} workflowId={data.id} />;
+            }
+            // return <Empty className='empty-omics-data-container' />;
         }
     };
 

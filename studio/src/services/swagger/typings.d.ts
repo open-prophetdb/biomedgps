@@ -309,6 +309,11 @@ declare namespace swagger {
     target: Entity;
   };
 
+  type ExpandedTask = {
+    task: Task;
+    workflow: Workflow;
+  };
+
   type ExperimentalProperty = {
     property: Property[];
   };
@@ -412,6 +417,11 @@ declare namespace swagger {
     page?: number;
     page_size?: number;
     query_str?: string;
+  };
+
+  type fetchFileByFileNameParams = {
+    task_id: string;
+    file_name: string;
   };
 
   type fetchKeySentenceCurationByOwnerParams = {
@@ -1054,6 +1064,7 @@ declare namespace swagger {
   type Task = {
     workspace_id: string;
     workflow_id: string;
+    task_id: string;
     task_name: string;
     description?: string;
     submitted_time: string;
@@ -1061,6 +1072,9 @@ declare namespace swagger {
     finished_time: string;
     task_params: any;
     labels?: string[];
+    status?: string;
+    results?: any;
+    log_message?: string;
     owner: string;
     groups?: string[];
   };

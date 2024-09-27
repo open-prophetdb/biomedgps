@@ -6,9 +6,11 @@ import type { ProColumns, ActionType } from '@ant-design/pro-table';
 import ProTable from '@ant-design/pro-table';
 import type { ProDescriptionsItemProps } from '@ant-design/pro-descriptions';
 import ProDescriptions from '@ant-design/pro-descriptions';
-import { getTasks } from '@/services/swagger/StatEngine';
+import { fetchTasks } from '../../../services/swagger/KnowledgeGraph';
 import type { SortOrder } from 'antd/es/table/interface';
-import { ChartResult } from '../ChartList/data';
+import { ChartResult } from '../WorkflowList/data';
+import type { Workflow, TaskHistoryTableData, TaskHistory } from '../WorkflowList/data';
+
 import './index.less';
 
 type PageParams = {
@@ -17,42 +19,13 @@ type PageParams = {
   status?: string;
 };
 
-export type TaskListItem = {
-  response: {
-    log?: string;
-    results?: string[];
-    charts?: string[];
-    response_type?: string;
-    task_id?: string;
-  };
-  description: string;
-  finished_time: any;
-  plugin_name: string;
-  payload: Record<string, any>;
-  name: string;
-  plugin_type: string;
-  percentage: number;
-  status: string;
-  id: string;
-  started_time: number;
-  plugin_version: string;
-  owner: any;
-};
-
 export type HistoryTableProps = {
-  onClickItem?: (chart: string, result?: ChartResult, task?: TaskListItem) => void;
-  pluginName?: string;
+  onClickItem?: (chart: string, result?: ChartResult, task?: TaskHistory) => void;
+  workflow?: Workflow;
   forceUpdateKey?: string;
 };
 
-type TaskListResponse = {
-  total: number;
-  page: number;
-  page_size: number;
-  data: TaskListItem[];
-};
-
-function formatResponse(response: TaskListResponse): Promise<Partial<TaskListResponse>> {
+function formatResponse(response: TaskHistoryTableData): Promise<Partial<TaskHistoryTableData>> {
   return Promise.resolve({
     ...response,
     success: true,
@@ -60,7 +33,7 @@ function formatResponse(response: TaskListResponse): Promise<Partial<TaskListRes
 }
 
 const TableList: React.FC<HistoryTableProps> = (props) => {
-  const { onClickItem, pluginName, forceUpdateKey } = props;
+  const { onClickItem, workflow, forceUpdateKey } = props;
 
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [, setForceUpdate] = useState<string>();
@@ -70,8 +43,8 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
   }, [forceUpdateKey])
 
   const actionRef = useRef<ActionType>();
-  const [currentRow, setCurrentRow] = useState<TaskListItem>();
-  // const [selectedRowsState, setSelectedRows] = useState<TaskListItem[]>([]);
+  const [currentRow, setCurrentRow] = useState<TaskHistory>();
+  // const [selectedRowsState, setSelectedRows] = useState<TaskHistory[]>([]);
 
   const listTasks = async (
     params: PageParams,
@@ -81,29 +54,57 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
     const queryParams = {
       page: params.current,
       pape_size: params.pageSize,
-    }
+    } as Record<string, any>;
 
-    if (pluginName) {
-      queryParams['plugin_name'] = pluginName
+    let queryStrPayload: any[] = [];
+
+    if (workflow) {
+      queryStrPayload.push({
+        field: 'workflow_id',
+        value: workflow.id,
+        operator: '='
+      })
     }
 
     if (filter.status) {
-      queryParams['status'] = filter.status
+      queryStrPayload.push({
+        field: 'status',
+        value: filter.status,
+        operator: '='
+      })
     }
 
     if (params.status) {
-      queryParams['status'] = params.status
+      queryStrPayload.push({
+        field: 'status',
+        value: params.status,
+        operator: '='
+      })
     }
 
-    console.log("List Tasks: ", queryParams, params);
+    if (queryStrPayload.length > 1) {
+      queryParams['query_str'] = JSON.stringify({
+        operator: 'and',
+        items: queryStrPayload
+      })
+    } else if (queryStrPayload.length === 1) {
+      queryParams['query_str'] = JSON.stringify(queryStrPayload[0]);
+    }
 
-    return await getTasks(queryParams)
+    console.log("List Tasks: ", queryParams, queryStrPayload);
+
+    return await fetchTasks(queryParams)
       .then((response) => {
-        return formatResponse(response);
+        return formatResponse({
+          total: response.total,
+          page: response.page,
+          pageSize: response.page_size,
+          data: response.records,
+        });
       })
       .catch((error) => {
         console.log('requestDEGs Error: ', error);
-        return formatResponse({ total: 0, page: 1, page_size: 10, data: [] });
+        return formatResponse({ total: 0, page: 1, pageSize: 10, data: [] });
       });
   }
 
@@ -113,11 +114,11 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
    * */
   const intl = useIntl();
 
-  const columns: ProColumns<TaskListItem>[] = [
+  const columns: ProColumns<TaskHistory>[] = [
     {
       title: <FormattedMessage id="stat-engine.history-table.id" defaultMessage="Task ID" />,
       dataIndex: 'id',
-      tip: 'The task id is the unique key',
+      tooltip: 'The task id is the unique key',
       hideInTable: false,
       hideInSearch: true,
       hideInForm: true,
@@ -126,7 +127,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
           <a
             onClick={() => {
               if (onClickItem) {
-                onClickItem(entity.plugin_name, entity.response, entity)
+                // TODO: Implement onClickItem
               }
             }}
           >
@@ -136,12 +137,12 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       }
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.taskName" defaultMessage="Task Name" />,
+      title: 'Task Name',
       dataIndex: 'name',
       hideInSearch: true,
       hideInForm: true,
       hideInTable: true,
-      tip: 'The task name is the unique key',
+      tooltip: 'The task name is the unique key',
       render: (dom, entity) => {
         return (
           <a
@@ -156,7 +157,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       },
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.pluginName" defaultMessage="Chart Name" />,
+      title: 'Chart Name',
       dataIndex: 'plugin_name',
       valueType: 'text',
       render: (dom, entity) => {
@@ -173,14 +174,14 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       },
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.pluginVersion" defaultMessage="Version" />,
+      title: 'Version',
       dataIndex: 'plugin_version',
       hideInSearch: true,
       hideInForm: true,
       valueType: 'text',
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.percentage" defaultMessage="Percentage" />,
+      title: 'Percentage',
       dataIndex: 'percentage',
       hideInSearch: true,
       hideInForm: true,
@@ -189,7 +190,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       valueType: 'progress',
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.status" defaultMessage="Status" />,
+      title: 'Status',
       dataIndex: 'status',
       hideInForm: true,
       valueEnum: {
@@ -208,7 +209,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       },
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.startedAt" defaultMessage="Started" />,
+      title: 'Started',
       // sorter: true,
       dataIndex: 'started_time',
       hideInSearch: true,
@@ -218,7 +219,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       },
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.finishedAt" defaultMessage="Finished" />,
+      title: 'Finished',
       // sorter: true,
       hideInSearch: true,
       dataIndex: 'finished_time',
@@ -228,7 +229,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
       },
     },
     {
-      title: <FormattedMessage id="stat-engine.history-table.payload" defaultMessage="Payload" />,
+      title: 'Payload',
       dataIndex: 'payload',
       hideInSearch: true,
       hideInForm: true,
@@ -244,7 +245,7 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
 
   return (
     <PageContainer className="history-table-page-container">
-      <ProTable<TaskListItem, PageParams>
+      <ProTable<TaskHistory, PageParams>
         className="history-table"
         headerTitle={intl.formatMessage({
           id: 'stat-engine.history-table.title',
@@ -275,17 +276,17 @@ const TableList: React.FC<HistoryTableProps> = (props) => {
         }}
         closable={false}
       >
-        {currentRow?.name && (
-          <ProDescriptions<TaskListItem>
+        {currentRow?.task_name && (
+          <ProDescriptions<TaskHistory>
             column={1}
-            title={currentRow?.name}
+            title={currentRow?.task_name}
             request={async () => ({
               data: currentRow || {},
             })}
             params={{
-              id: currentRow?.name,
+              id: currentRow?.id,
             }}
-            columns={columns as ProDescriptionsItemProps<TaskListItem>[]}
+            columns={columns as ProDescriptionsItemProps<TaskHistory>[]}
           />
         )}
       </Drawer>

@@ -7,36 +7,33 @@ import {
   // SnippetsOutlined,
   DatabaseOutlined
 } from '@ant-design/icons';
-import { FormattedMessage } from 'umi';
 import { Button, Col, Drawer, Row, Space, Tabs, Tooltip, message } from 'antd';
 import React, { memo, useEffect, useState } from 'react';
-import { useIntl } from 'umi';
 
-import ChartList from '../ChartList';
-import LogViewer from '@/components/LogViewer/indexLog';
+import WorkflowList from '../WorkflowList';
+import LogViewer from '../LogViewer/indexLog';
 // import MarkdownViewer from '../MarkdownViewer';
-import PlotlyViewer from '@/components/PlotlyViewer/indexClass';
+import PlotlyViewer from 'biominer-components/dist/PlotlyViewer/indexClass';
 import HistoryTable from '../HistoryTable';
-import { TaskListItem } from '../HistoryTable';
 import { JsonViewer } from '@textea/json-viewer';
 import { CSVLink } from "react-csv";
 
-import { getDownload as getFile } from '@/services/swagger/Instance';
-import type { ChartResult } from '../ChartList/data';
-import type { PlotlyChart } from '@/components/PlotlyViewer/data';
+import type { ChartResult } from '../WorkflowList/data';
+import type { PlotlyChart } from 'biominer-components/dist/PlotlyViewer/data';
+import { fetchFileByFileName } from '../../../services/swagger/KnowledgeGraph';
+import type { Workflow, TaskHistory } from '../WorkflowList/data';
 
 import './index.less';
-import { langData } from './lang';
 
 const { TabPane } = Tabs;
 
 export type ResultPanelProps = {
-  onClickItem: (chart: string, result?: ChartResult, fieldsValue?: Record<string, any>) => void;
+  onClickItem: (workflowName: string, result?: ChartResult, fieldsValue?: Record<string, any>) => void;
   taskId: string;
   logLink: string;
   results: string[];
   charts: string[];
-  currentChart: string | null;
+  workflow: Workflow;
   responsiveKey: number | string;
 };
 
@@ -54,19 +51,10 @@ export const downloadAsJSON = function (data: any, elementId: string) {
   console.log(`Download ${elementId}`)
 }
 
-type UIContext = Record<string, any>;
-
 const ResultPanel: React.FC<ResultPanelProps> = (props) => {
-  const intl = useIntl();
+  const { onClickItem, logLink, responsiveKey, taskId, results, charts } = props;
 
-  const uiContext: UIContext = {};
-  Object.keys(langData).forEach((key) => {
-    uiContext[key] = intl.formatMessage(langData[key]);
-  });
-
-  const { onClickItem, logLink, responsiveKey, currentChart, taskId, results, charts } = props;
-
-  const [chartTask, setChartTask] = useState<TaskListItem | undefined>(undefined);
+  const [chartTask, setChartTask] = useState<TaskHistory | undefined>(undefined);
   const [plotlyEditorMode, setPlotlyEditorMode] = useState<string>('Plotly');
   const [chartsVisible, setChartsVisible] = useState<boolean>(false);
   const [editBtnActive, setEditBtnActive] = useState<boolean>(false);
@@ -79,14 +67,17 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
   useEffect(() => {
     if (charts.length > 0) {
       console.log('Chart Task: ', taskId);
-      getFile({ filelink: charts[0] }).then((response: any) => {
+      fetchFileByFileName({
+        task_id: taskId,
+        file_name: charts[0]
+      }).then((response: any) => {
         setPlotlyData({
           data: response.data,
           layout: response.layout,
           frames: response.frames || undefined
         });
       }).catch(error => {
-        message.warn("Cannot fetch the result, please retry later.")
+        message.warning("Cannot fetch the result, please retry later.")
       });
     }
   }, [charts]);
@@ -94,10 +85,13 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
   useEffect(() => {
     if (results.length > 0) {
       console.log('Data: ', taskId);
-      getFile({ filelink: results[0] }).then((response: any) => {
+      fetchFileByFileName({
+        task_id: taskId,
+        file_name: results[0]
+      }).then((response: any) => {
         setPlotData(response)
       }).catch(error => {
-        message.warn("Cannot fetch the result, please retry later.")
+        message.warning("Cannot fetch the result, please retry later.")
       });
     }
   }, [results])
@@ -122,7 +116,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             setPlotlyEditorMode('PlotlyEditor');
           }}
         >
-          {uiContext.edit}
+          Edit
         </Button>
       </Tooltip>
       <Tooltip title="List all charts">
@@ -133,7 +127,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           }}
           icon={<BarChartOutlined />}
         >
-          {uiContext.charts}
+          Charts
         </Button>
       </Tooltip>
       <Tooltip title="List all history">
@@ -143,7 +137,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           }}
           icon={<HistoryOutlined />}
         >
-          {uiContext.history}
+          History
         </Button>
       </Tooltip>
     </Space>
@@ -162,7 +156,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           tab={
             <span>
               <BarChartOutlined />
-              {uiContext.figure}
+              Figure
             </span>
           }
           key="chart"
@@ -195,19 +189,19 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           tab={
             <span>
               <IssuesCloseOutlined />
-              {uiContext.log}
+              Log
             </span>
           }
           key="log"
         >
-          <LogViewer getFile={getFile} height="calc(100vh - 200px)" url={logLink} />
+          <LogViewer getFile={fetchFileByFileName} height="calc(100vh - 200px)" taskId={taskId} url={logLink} />
         </TabPane>
         {
           plotData ? (<TabPane
             tab={
               <span>
                 <DatabaseOutlined />
-                {uiContext.data}
+                Data
               </span>
             }
             key="data"
@@ -215,7 +209,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             <CSVLink data={plotData}
               filename="data.csv"
               className="button">
-              {uiContext.download} {uiContext.data}
+              Download Data
             </CSVLink>
             <JsonViewer value={plotData} />
           </TabPane>) : null}
@@ -223,13 +217,13 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
           tab={
             <span>
               <IssuesCloseOutlined />
-              {uiContext.metadata}
+              Metadata
             </span>
           }
           key="metadata"
         >
           <a className="button" onClick={() => { downloadAsJSON(chartTask, "download-anchor") }}>
-            {uiContext.download} {uiContext.metadata}
+            Download Metadata
           </a>
           <a id="download-anchor" style={{ display: 'none' }}></a>
           <JsonViewer value={chartTask} />
@@ -243,17 +237,17 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
         onClose={() => {
           setChartsVisible(false);
         }}
-        visible={chartsVisible}
+        open={chartsVisible}
       >
-        <ChartList
-          onClickItem={(chart, result, fieldsValue) => {
-            onClickItem(chart.short_name, result, fieldsValue);
+        <WorkflowList
+          onClickItem={(workflow: Workflow, fieldsValue?: Record<string, any>) => {
+            onClickItem(workflow.short_name, undefined, fieldsValue);
             setChartsVisible(false);
           }}
-        ></ChartList>
+        />
       </Drawer>
 
-      <Drawer
+      {/* <Drawer
         title="Chart History"
         placement="right"
         closable
@@ -273,7 +267,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             setChartTask(taskListItem)
           }}
         ></HistoryTable>
-      </Drawer>
+      </Drawer> */}
     </Row>
   );
 };

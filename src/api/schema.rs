@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use crate::model::core::{RecordResponse, RelationCount, Statistics};
+use crate::model::core::{RecordResponse, RelationCount};
 use crate::model::core::{JSON_REGEX, SUBGRAPH_UUID_REGEX};
-use crate::model::entity_attr::EntityAttr;
 use crate::model::graph::Graph;
 use crate::model::graph::{COMPOSED_ENTITIES_REGEX, COMPOSED_ENTITY_REGEX, RELATION_TYPE_REGEX};
-use crate::model::publication::{
-    ConsensusResult, Publication, PublicationRecords, PublicationsSummary,
-};
-use crate::model::workspace::WorkflowSchema;
+use crate::model::publication::PublicationRecords;
 use log::warn;
 use poem_openapi::Object;
-use poem_openapi::{payload::Json, types::multipart::Upload, ApiResponse, Multipart, Tags};
+use poem_openapi::{
+    payload::{Binary, Json},
+    types::multipart::Upload,
+    ApiResponse, Multipart, Tags,
+};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator::ValidationErrors;
@@ -614,4 +614,34 @@ pub struct UploadImage {
     pub raw_image_src: String,
     pub name: String,
     pub image: Upload,
+}
+
+#[derive(ApiResponse)]
+pub enum FileResponse {
+    #[oai(status = 200)]
+    File(Binary<Vec<u8>>),
+    #[oai(status = 500)]
+    InternalServerError(Json<ErrorMessage>),
+    #[oai(status = 400)]
+    BadRequest(Json<ErrorMessage>),
+    #[oai(status = 404)]
+    NotFound(Json<ErrorMessage>),
+}
+
+impl FileResponse {
+    pub fn file(file: Vec<u8>) -> Self {
+        Self::File(Binary(file))
+    }
+
+    pub fn internal_server_error(msg: String) -> Self {
+        Self::InternalServerError(Json(ErrorMessage { msg }))
+    }
+
+    pub fn bad_request(msg: String) -> Self {
+        Self::BadRequest(Json(ErrorMessage { msg }))
+    }
+
+    pub fn not_found(msg: String) -> Self {
+        Self::NotFound(Json(ErrorMessage { msg }))
+    }
 }

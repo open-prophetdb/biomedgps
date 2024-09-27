@@ -1,10 +1,11 @@
 import type { ProFormColumnsType } from '@ant-design/pro-form';
 import { GridContent } from '@ant-design/pro-layout';
-import { Col, message, Row, Spin, Tabs, Form, Empty, Select } from 'antd';
+import { Col, message, Row, Spin, Tabs, Form, Empty, Select, Input, Button, Popover, Descriptions } from 'antd';
 
 import {
   CheckCircleOutlined,
   InfoCircleOutlined,
+  QuestionCircleFilled,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import './index.less';
@@ -16,11 +17,12 @@ import Resizer from './components/Resizer';
 import ResultPanel from './components/ResultPanel';
 
 // Custom DataType
-import type { ChartResult, DataItem } from './components/ChartList/data';
+import type { ChartResult, DataItem } from './components/WorkflowList/data';
+import type { Workflow, TaskHistory } from './components/WorkflowList/data';
 
 // Custom API
 import {
-  fetchTask,
+  fetchTaskByTaskId,
   fetchWorkflowSchema,
   postTask,
 } from '../services/swagger/KnowledgeGraph';
@@ -29,10 +31,16 @@ const { TabPane } = Tabs;
 
 export type StatEngineProps = {
   workflowId: string;
+  workflow: Workflow;
+  task?: TaskHistory;
 }
 
 const StatEngine: React.FC<StatEngineProps> = (props) => {
   console.log('StatEngine Props: ', props);
+
+  const [taskName, setTaskName] = useState<string>(props.task?.task_name || '');
+  const [taskDescription, setTaskDescription] = useState<string>(props.task?.description || '');
+  const [workflowInfoVisible, setWorkflowInfoVisible] = useState<boolean>(false);
 
   const [leftSpan, setLeftSpan] = useState<number>(8);
   const [resizeBtnActive, setResizeBtnActive] = useState<boolean>(false);
@@ -41,12 +49,9 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   const [currentActiveKey, setCurrentActiveKey] = useState<string>('arguments');
 
   // Chart
-  const [currentChart, setCurrentChart] = useState<string | null>('');
-  const [markdownLink, setMarkdownLink] = useState<string>('');
+  const [markdown, setMarkdown] = useState<string | null>(null);
   const [argumentColumns, setArgumentColumns] = useState<ProFormColumnsType<DataItem>[] & any>([]);
   const [fieldsValue, setFieldsValue] = useState<any>({});
-
-  const [form] = Form.useForm();
 
   const [resultData, setResultData] = useState<ChartResult | undefined>({
     results: [],
@@ -58,25 +63,25 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   // Result
   const [resultLoading, setResultLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    // More details on https://v3.umijs.org/docs/routing#routing-component-parameters
-    const chart = props.chart;
+  // useEffect(() => {
+  //   // More details on https://v3.umijs.org/docs/routing#routing-component-parameters
+  //   const chart = props.chart;
 
-    if (chart) {
-      setCurrentChart(chart);
-    } else {
-      setCurrentChart('boxplot');
-    }
-  }, [props.chart]);
+  //   if (chart) {
+  //     setCurrentChart(chart);
+  //   } else {
+  //     setCurrentChart('boxplot');
+  //   }
+  // }, [props.chart]);
 
-  const setChart = (dataset: string, chart: string, fieldsValue?: Record<string, any>) => {
-    getChartUiSchema({ chart_name: chart, dataset: dataset }).then((response) => {
+  const setChart = (workflowId: string, fieldsValue?: Record<string, any>) => {
+    fetchWorkflowSchema({ id: workflowId }).then((response) => {
       const schema = {
         ...response.schema,
       };
 
       // Reset README
-      setMarkdownLink(`${response.readme}?=${(Math.random() + 1).toString(36).substring(7)}`);
+      setMarkdown(schema.readme);
 
       // Reset Argument
       setArgumentColumns(schema.fields);
@@ -92,7 +97,6 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
     console.log("Restore Chart: ", chart, result, fieldsValue);
     if (fieldsValue) {
       setFieldsValue(fieldsValue);
-      setCurrentChart(chart);
     }
 
     if (result) {
@@ -106,32 +110,36 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
     setCurrentActiveKey(key);
   };
 
-  // For debug
-  // useEffect(() => {
-  //   autoFetchTask("f318ff50-4ad3-11ed-a5b3-c6aea7bb5ffb")
-  // }, true)
+  useEffect(() => {
+    if (props.task) {
+      autoFetchTask(props.task.task_id || "");
+    }
+  }, [props.task]);
 
   const autoFetchTask = (taskId: string) => {
     const interval = setInterval(() => {
       if (taskId.length > 0) {
-        getChartTask({ id: taskId })
+        fetchTaskByTaskId({ task_id: taskId })
           .then((resp) => {
-            if (resp.status === 'Finished') {
+            const { task, workflow } = resp;
+            const results: { files: Record<string, any>[], charts: Record<string, any>[] } | null = task.results;
+
+            if (task.status === 'Succeeded') {
               setResultData({
-                results: resp.response.results,
-                charts: resp.response.charts,
-                log: resp.response.log,
-                task_id: resp.response.task_id,
+                results: results?.files.map((file) => file.filelink) || [],
+                charts: results?.charts.map((chart) => chart.filelink) || [],
+                log: task.log_message,
+                task_id: task.task_id,
               });
               setResultLoading(false);
               message.success('Load chart...');
               clearInterval(interval);
-            } else if (resp.status === 'Failed') {
+            } else if (task.status === 'Failed') {
               setResultData({
-                results: resp.response.results,
-                charts: resp.response.charts,
-                log: resp.response.log,
-                task_id: resp.response.task_id,
+                results: results?.files.map((file) => file.filelink) || [],
+                charts: results?.charts.map((chart) => chart.filelink) || [],
+                log: task.log_message,
+                task_id: task.task_id,
               });
               setResultLoading(false);
               message.error('Something wrong, please check the log for more details.');
@@ -146,24 +154,38 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
     }, 1000);
   };
 
-  const onSubmit = (values: any) => {
-    const chartName: string = currentChart || '';
-    console.log('onSubmit Chart: ', currentChart, values);
+  const onSubmit = (values: Pick<TaskHistory, 'task_params'>): Promise<TaskHistory> => {
+    console.log('onSubmit Chart: ', values);
     values = {
       ...values,
-      dataset: defaultDataset
     }
-    return new Promise<{ task_id: string }>((resolve, reject) => {
-      postChart({ chart_name: chartName }, values)
+
+    const task: TaskHistory = {
+      // TODO: Change to the real workspace id
+      workspace_id: '00000000-0000-0000-0000-000000000000',
+      workflow_id: props.workflowId,
+      task_name: taskName,
+      description: taskDescription,
+      task_params: values,
+      // Just a placeholder for avoiding boring TypeScript compiler
+      task_id: '',
+      owner: '',
+      submitted_time: '',
+      started_time: '',
+      finished_time: '',
+    }
+
+    return new Promise<TaskHistory>((resolve, reject) => {
+      postTask(task, values)
         .then((response) => {
           console.log('Post Chart: ', response);
-          message.success(`Create the chart ${chartName} successfully.`);
+          message.success(`Create the ${taskName} successfully.`);
           setResultLoading(true);
           autoFetchTask(response.task_id);
           resolve(response);
         })
         .catch((error) => {
-          message.warn('Unknown error, please retry later.');
+          message.warning('Unknown error, please retry later.');
           console.log('Post Chart Error: ', error);
           reject(error);
         });
@@ -175,13 +197,34 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   };
 
   useEffect(() => {
-    if (currentChart && defaultDataset) {
-      setChart(defaultDataset, currentChart, fieldsValue);
+    if (props.workflowId) {
+      setChart(props.workflowId, fieldsValue);
     }
-  }, [currentChart, defaultDataset]);
+  }, [props.workflowId]);
 
   return (
     <GridContent>
+      <Row className="stat-engine-header">
+        <Input placeholder='Enter Your Task Name' value={taskName} onChange={(e) => setTaskName(e.target.value)} allowClear
+          disabled={props.task !== undefined} size='large' style={{ width: '40%', marginRight: '10px' }} />
+        <Input placeholder='Enter Your Task Description' value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} allowClear
+          disabled={props.task !== undefined} size='large' style={{ width: 'calc(60% - 100px)' }} />
+        <Popover content={
+          <Descriptions title="Workflow Summary" column={2} bordered>
+            <Descriptions.Item label="Name">{props.workflow.name}</Descriptions.Item>
+            <Descriptions.Item label="Short Name">{props.workflow.short_name}</Descriptions.Item>
+            <Descriptions.Item label="Category">{props.workflow.category}</Descriptions.Item>
+            <Descriptions.Item label="Author">{props.workflow.author}</Descriptions.Item>
+            <Descriptions.Item label="Maintainers">{props.workflow.maintainers}</Descriptions.Item>
+            <Descriptions.Item label="Tags">{props.workflow.tags}</Descriptions.Item>
+            <Descriptions.Item label="Version">{props.workflow.version}</Descriptions.Item>
+            <Descriptions.Item label="Created Time">{props.workflow.source}</Descriptions.Item>
+            <Descriptions.Item label="Description" span={2}>{props.workflow.description}</Descriptions.Item>
+          </Descriptions>
+        } open={workflowInfoVisible} onOpenChange={setWorkflowInfoVisible} mouseEnterDelay={0.5} trigger='click'>
+          <Button icon={<QuestionCircleFilled />} size='large' shape='default' style={{ marginTop: '10px' }} />
+        </Popover>
+      </Row>
       <Spin spinning={resultLoading} style={{ marginTop: '50px' }}>
         <Row className="stat-engine" gutter={8}>
           <Col className="left" xxl={leftSpan} xl={leftSpan} lg={leftSpan} md={24} sm={24} xs={24}>
@@ -199,43 +242,13 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                     tab={
                       <span>
                         <CheckCircleOutlined />
-                        {uiContext.arguments}
+                        Arguments
                       </span>
                     }
                     key="arguments"
                   >
-                    <Form layout={"vertical"} form={form}>
-                      <Form.Item
-                        shouldUpdate
-                        label="Data Set"
-                        name="dataset"
-                        initialValue={defaultDataset}
-                        rules={[{ required: true, message: 'Please select a dataset!' }]}
-                      >
-                        <Select
-                          allowClear
-                          showSearch
-                          placeholder={"Select a dataset"}
-                          defaultActiveFirstOption={false}
-                          showArrow={true}
-                          filterOption={false}
-                          options={
-                            [
-                              {
-                                value: `${defaultDataset}`,
-                                label: `${defaultDataset}`,
-                              },
-                            ]
-                          }
-                          disabled
-                          notFoundContent={<Empty description="No Dataset" />}
-                        >
-                        </Select>
-                      </Form.Item>
-                    </Form>
                     <ArgumentForm
-                      defaultDataset={defaultDataset}
-                      queryGenes={queryGenes}
+                      contextData={{}}
                       fieldsValue={fieldsValue}
                       labelSpan={24}
                       height="calc(100% - 10px)"
@@ -247,12 +260,12 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                     tab={
                       <span>
                         <InfoCircleOutlined />
-                        {uiContext.summary}
+                        Help Document
                       </span>
                     }
-                    key="summary"
+                    key="help"
                   >
-                    <MarkdownViewer getFile={getFile} url={markdownLink} />
+                    <MarkdownViewer markdownContent={markdown || 'No help document available.'} />
                   </TabPane>
                 </Tabs>
               </Col>
@@ -275,7 +288,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
           >
             <Row className="right__content">
               <ResultPanel
-                currentChart={currentChart}
+                workflow={props.workflow}
                 results={resultData?.results || []}
                 charts={resultData?.charts || []}
                 taskId={resultData?.task_id || ''}

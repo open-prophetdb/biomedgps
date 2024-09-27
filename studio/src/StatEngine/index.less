@@ -1,72 +1,96 @@
 // Header Height + Top Padding
-@header-height-offset: 48px + 10px;
+@header-height-offset: 138px;
 @left-panel-height-offset: @header-height-offset + 10px;
 @right-tabs-height-offset: @header-height-offset + 10px;
 
-.stat-engine {
-  display: flex;
-  flex-wrap: wrap;
-  min-height: calc(100vh - @header-height-offset);
+.ant-pro-grid-content-children {
+  padding: 10px 30px;
+  width: 100%;
+  height: calc(100vh - @header-height-offset);
 
-  .ant-tabs-tab .anticon {
-    margin-right: 6px;
-  }
-
-  .ant-btn>.anticon+span,
-  .ant-btn>span+.anticon {
-    margin-left: 0;
-  }
-
-  .left .left__content,
-  .right .right__content {
+  .stat-engine-header {
     display: flex;
     flex-direction: row;
-    margin-bottom: 5px;
-    padding: 0 10px;
-    background-color: #fff;
-    border: 1px solid #d6d6d6;
-    border-radius: 5px;
-  }
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
 
-  .left {
-    .left__content {
-      .left__tabs {
-        width: calc(100% - 2px);
-        height: calc(100vh - @left-panel-height-offset);
+    .ant-input-affix-wrapper {
+      margin-top: 10px;
+      border: unset;
+      border-bottom: 1px solid #d6d6d6;
+      border-radius: unset;
+    }
 
-        .left__tabs__arguments {
-          width: 100%;
-          height: 100%;
-
-          .markdown-viewer,
-          .ant-tabs-content {
-            height: 100%;
-            overflow: scroll;
-          }
-
-          .ant-tabs-tabpane {
-            overflow: scroll;
-          }
-        }
-      }
-
-      .left__divider {
-        position: absolute;
-        top: 0;
-        right: -4px;
-      }
+    .ant-popover-inner-content {
+      width: 50%;
     }
   }
 
-  .right {
-    // Make the PlotlyEditor FullScreen
-    position: unset !important;
+  .stat-engine {
+    display: flex;
+    flex-wrap: wrap;
 
-    .right__content {
-      .result-panel {
-        // Make the PlotlyEditor FullScreen
-        position: unset !important;
-        height: calc(100vh - @right-tabs-height-offset);
+    .ant-tabs-tab .anticon {
+      margin-right: 6px;
+    }
+
+    .ant-btn>.anticon+span,
+    .ant-btn>span+.anticon {
+      margin-left: 0;
+    }
+
+    .left .left__content,
+    .right .right__content {
+      display: flex;
+      flex-direction: row;
+      margin-bottom: 5px;
+      padding: 0 10px;
+      background-color: #fff;
+      border: 1px solid #d6d6d6;
+      border-radius: 5px;
+    }
+
+    .left {
+      .left__content {
+        .left__tabs {
+          width: calc(100% - 2px);
+          height: calc(100vh - @left-panel-height-offset);
+
+          .left__tabs__arguments {
+            width: 100%;
+            height: 100%;
+
+            .markdown-viewer,
+            .ant-tabs-content {
+              height: 100%;
+              overflow: scroll;
+            }
+
+            .ant-tabs-tabpane {
+              overflow: scroll;
+            }
+          }
+        }
+
+        .left__divider {
+          position: absolute;
+          top: 0;
+          right: -4px;
+        }
+      }
+    }
+
+    .right {
+      // Make the PlotlyEditor FullScreen
+      position: unset !important;
+
+      .right__content {
+        .result-panel {
+          // Make the PlotlyEditor FullScreen
+          position: unset !important;
+          height: calc(100vh - @right-tabs-height-offset);
+        }
       }
     }
   }

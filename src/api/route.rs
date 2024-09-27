@@ -2,10 +2,10 @@
 
 use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
-    ApiTags, DeleteResponse, GetEntityColorMapResponse, GetGraphResponse, GetPromptResponse,
-    GetPublicationsResponse, GetRecordResponse, GetRecordsResponse, GetRelationCountResponse,
-    GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery, PostResponse,
-    PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
+    ApiTags, DeleteResponse, FileResponse, GetEntityColorMapResponse, GetGraphResponse,
+    GetPromptResponse, GetPublicationsResponse, GetRecordResponse, GetRecordsResponse,
+    GetRelationCountResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
+    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
 };
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
@@ -21,17 +21,19 @@ use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
 use crate::model::publication::{ConsensusResult, Publication, PublicationsSummary};
 use crate::model::util::match_color;
-use crate::model::workspace::{Notification, Task, Workflow, WorkflowSchema, Workspace};
+use crate::model::workspace::{
+    ExpandedTask, Notification, Task, Workflow, WorkflowSchema, Workspace,
+};
 use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{
     get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery,
 };
 use log::{debug, info, warn};
-
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::io::AsyncReadExt;
 use validator::Validate;
 
 pub struct BiomedgpsApi;
@@ -2474,17 +2476,85 @@ impl BiomedgpsApi {
         pool: Data<&Arc<sqlx::PgPool>>,
         task_id: Path<String>,
         _token: CustomSecurityScheme,
-    ) -> GetRecordResponse<Task> {
+    ) -> GetRecordResponse<ExpandedTask> {
         let pool_arc = pool.clone();
         let task_id = task_id.0;
         let username = _token.0.username;
 
-        match Task::get_records_by_id(&pool_arc, &task_id, &username).await {
+        let task_root_dir = match std::env::var("TASK_ROOT_DIR") {
+            Ok(task_root_dir) => PathBuf::from(task_root_dir),
+            Err(e) => {
+                let err = format!("The TASK_DIR environment variable is not set: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::internal_server_error(err);
+            }
+        };
+
+        match ExpandedTask::get_records_by_id(&pool_arc, &task_id, &username, &task_root_dir, true)
+            .await
+        {
             Ok(task) => GetRecordResponse::ok(task),
             Err(e) => {
                 let err = format!("Failed to fetch task by task_id: {}", e);
                 warn!("{}", err);
                 return GetRecordResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks/:task_id/file` with query params to fetch file by file_name.
+    #[oai(
+        path = "/tasks/:task_id/file",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchFileByFileName"
+    )]
+    async fn fetch_file_by_file_name(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        task_id: Path<String>,
+        file_name: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> FileResponse {
+        let pool_arc = pool.clone();
+        let task_id = task_id.0;
+        let file_name = file_name.0;
+        let username = _token.0.username;
+
+        let task_root_dir = match std::env::var("TASK_ROOT_DIR") {
+            Ok(task_root_dir) => PathBuf::from(task_root_dir),
+            Err(e) => {
+                let err = format!("The TASK_ROOT_DIR environment variable is not set: {}", e);
+                warn!("{}", err);
+                return FileResponse::internal_server_error(err);
+            }
+        };
+
+        match ExpandedTask::get_file(&pool_arc, &username, &task_root_dir, &task_id, &file_name)
+            .await
+        {
+            Ok(file_path) => {
+                let mut buffer = Vec::new();
+                let mut file = match tokio::fs::File::open(file_path).await {
+                    Ok(file) => file,
+                    Err(e) => {
+                        let err = format!("Failed to open file: {}", e);
+                        warn!("{}", err);
+                        return FileResponse::internal_server_error(err);
+                    }
+                };
+
+                if let Err(e) = file.read_to_end(&mut buffer).await {
+                    let err = format!("Failed to read file: {}", e);
+                    warn!("{}", err);
+                    return FileResponse::internal_server_error(err);
+                }
+
+                FileResponse::file(buffer)
+            }
+            Err(e) => {
+                warn!("{}", e);
+                FileResponse::bad_request(e.to_string())
             }
         }
     }

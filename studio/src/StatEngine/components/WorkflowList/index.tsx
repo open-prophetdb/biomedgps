@@ -2,50 +2,38 @@ import { DislikeOutlined, FunctionOutlined, LikeOutlined } from '@ant-design/ico
 import { List, Space, Tag } from 'antd';
 import { filter } from 'lodash';
 import React, { memo, useEffect, useState } from 'react';
-import { useHistory } from 'react-router-dom';
-import { useIntl } from 'umi';
+import { history } from 'umi';
 
 // API Endpoint
-import { getCharts } from '@/services/swagger/StatEngine';
+import { fetchWorkflows } from '../../../services/swagger/KnowledgeGraph';
 
-import type { ChartMetaData, ChartResult, Icon } from './data';
+import type { Workflow, WorkflowTableData, Icon } from './data';
 import './index.less';
 
 // Custom Data
-import { langData } from './lang';
-type UIContext = Record<string, any>;
 
-export type ChartListProps = {
-  onClickItem?: (chart: ChartMetaData, result?: ChartResult, fieldsValue?: Record<string, any>) => void;
+export type WorkflowListProps = {
+  onClickItem?: (workflow: Workflow, fieldsValue?: Record<string, any>) => void;
 };
 
-const ChartList: React.FC<ChartListProps> = (props) => {
+const WorkflowList: React.FC<WorkflowListProps> = (props) => {
   const { onClickItem } = props;
 
-  const [charts, setCharts] = useState<ChartMetaData[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [total, setTotal] = useState<number>(0);
 
-  const history = useHistory();
-
-  const intl = useIntl();
-
-  const uiContext: UIContext = {};
-  Object.keys(langData).forEach((key) => {
-    uiContext[key] = intl.formatMessage(langData[key]);
-  });
-
   useEffect(() => {
-    getCharts({}).then((response) => {
-      const chartList = filter(response.data, (item) => {
-        return item.category === 'Chart';
+    fetchWorkflows({}).then((response) => {
+      const workflowList = filter(response.records, (item) => {
+        return item.category === 'Workflow';
       });
 
-      setCharts(chartList);
-      setTotal(chartList.length);
+      setWorkflows(workflowList);
+      setTotal(workflowList.length);
     });
   }, []);
 
-  const IconText = ({ icon, text }) => (
+  const IconText = ({ icon, text }: { icon: any, text: string }) => (
     <Space>
       {React.createElement(icon)}
       {text}
@@ -53,7 +41,7 @@ const ChartList: React.FC<ChartListProps> = (props) => {
   );
 
   const showTotal = (num: number) => {
-    return `${uiContext.totalItems}: ${num}`;
+    return `Total ${num} workflows`;
   };
 
   const getLogo = (icons: Icon[]): string => {
@@ -64,7 +52,7 @@ const ChartList: React.FC<ChartListProps> = (props) => {
     return <a className="title">{`${name}- ${version}`}</a>;
   };
 
-  console.log('ChartList updated');
+  console.log('WorkflowList updated');
 
   return (
     <List
@@ -89,18 +77,18 @@ const ChartList: React.FC<ChartListProps> = (props) => {
         showSizeChanger: true,
         showQuickJumper: true,
       }}
-      dataSource={charts}
+      dataSource={workflows}
       renderItem={(item) => (
         <List.Item
           className="chart-item"
           onClick={() => {
             if (onClickItem) {
-              onClickItem(item, undefined, undefined);
+              onClickItem(item, undefined);
             } else {
-              history.push('/stat-engine/index', {
-                chart: item,
-                result: null,
-              });
+              // history.push('/stat-engine/index', {
+              //   workflow: item,
+              //   result: null,
+              // });
             }
           }}
           key={item.short_name}
@@ -116,7 +104,7 @@ const ChartList: React.FC<ChartListProps> = (props) => {
             description={item.maintainers}
           />
           <span className="description">{item.description}</span>
-          {item.tags.map((tag) => {
+          {item.tags && item.tags.map((tag) => {
             return <Tag key={tag}>{tag}</Tag>;
           })}
         </List.Item>
@@ -125,4 +113,4 @@ const ChartList: React.FC<ChartListProps> = (props) => {
   );
 };
 
-export default memo(ChartList);
+export default memo(WorkflowList);

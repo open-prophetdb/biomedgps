@@ -4,9 +4,11 @@ use crate::model::core::CheckData;
 use crate::query_builder::sql_builder::ComposeQuery;
 use anyhow::Ok as AnyOk;
 use chrono::{serde::ts_seconds, DateTime, Utc};
+use log::warn;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use sqlx::Row;
 use std::error::Error;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -268,6 +270,7 @@ impl CheckData for Workflow {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
 pub struct WorkflowSchema {
+    readme: String,
     schema: JsonValue,
 }
 
@@ -277,7 +280,7 @@ impl Workflow {
         id: &str,
         workflow_dir: &PathBuf,
     ) -> Result<WorkflowSchema, anyhow::Error> {
-        let sql_str = format!("SELECT payload FROM biomedgps_workflow WHERE id = $1");
+        let sql_str = format!("SELECT * FROM biomedgps_workflow WHERE id = $1");
         let workflow = sqlx::query_as::<_, Workflow>(sql_str.as_str())
             .bind(id)
             .fetch_one(pool)
@@ -287,9 +290,9 @@ impl Workflow {
         let workflow_path = workflow_dir.join(workflow_name);
         let schema_path = workflow_path.join("schema.json");
         let schema = std::fs::read_to_string(schema_path)?;
-        let schema: JsonValue = serde_json::from_str(&schema)?;
+        let schema: WorkflowSchema = serde_json::from_str(&schema)?;
 
-        AnyOk(WorkflowSchema { schema })
+        AnyOk(schema)
     }
 }
 
@@ -317,7 +320,6 @@ pub struct Task {
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    #[oai(skip)]
     task_id: String,
 
     #[validate(length(
@@ -356,12 +358,14 @@ pub struct Task {
     ))]
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    #[oai(skip)]
     status: Option<String>,
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    #[oai(skip)]
+    results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "csv"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
+
+    #[serde(skip_deserializing)]
+    #[oai(read_only)]
     log_message: Option<String>,
 
     #[validate(length(
@@ -404,9 +408,205 @@ impl CheckData for Task {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow)]
+pub struct ExpandedTask {
+    task: Task,
+    workflow: Workflow,
+}
+
+impl ExpandedTask {
+    pub async fn get_records_by_id(
+        pool: &sqlx::PgPool,
+        task_id: &str,
+        owner: &str,
+        task_root_dir: &PathBuf,
+        expand_results: bool,
+    ) -> Result<ExpandedTask, anyhow::Error> {
+        // Updated query to explicitly select columns from both tables
+        let sql_str = "
+            SELECT 
+                biomedgps_task.id,
+                biomedgps_task.workspace_id,
+                biomedgps_task.workflow_id,
+                biomedgps_task.task_id,
+                biomedgps_task.task_name,
+                biomedgps_task.description,
+                biomedgps_task.submitted_time,
+                biomedgps_task.started_time,
+                biomedgps_task.finished_time,
+                biomedgps_task.task_params,
+                biomedgps_task.labels,
+                biomedgps_task.status,
+                biomedgps_task.owner,
+                biomedgps_task.groups,
+                biomedgps_workflow.id AS workflow_id,
+                biomedgps_workflow.name AS workflow_name,
+                biomedgps_workflow.version,
+                biomedgps_workflow.description AS workflow_description,
+                biomedgps_workflow.category,
+                biomedgps_workflow.home,
+                biomedgps_workflow.source,
+                biomedgps_workflow.short_name,
+                biomedgps_workflow.icons,
+                biomedgps_workflow.author,
+                biomedgps_workflow.maintainers,
+                biomedgps_workflow.tags,
+                biomedgps_workflow.readme
+            FROM biomedgps_task 
+            JOIN biomedgps_workflow 
+            ON biomedgps_task.workflow_id = biomedgps_workflow.id
+            WHERE biomedgps_task.task_id = $1 
+            AND biomedgps_task.owner = $2
+        ";
+
+        let rows = match sqlx::query(sql_str)
+            .bind(task_id)
+            .bind(owner)
+            .fetch_all(pool)
+            .await
+        {
+            Ok(rows) => rows,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(anyhow::anyhow!("No task or workflow found"))
+            }
+            Err(e) => return Err(anyhow::anyhow!("Failed to get expanded task: {}", e)),
+        };
+
+        if rows.len() == 1 {
+            let row = &rows[0];
+
+            let mut task = Task {
+                id: row.get("id"),
+                workspace_id: row.get("workspace_id"),
+                workflow_id: row.get("workflow_id"),
+                task_id: row.get("task_id"),
+                task_name: row.get("task_name"),
+                description: row.get("description"),
+                submitted_time: row.get("submitted_time"),
+                started_time: row.get("started_time"),
+                finished_time: row.get("finished_time"),
+                task_params: row.get("task_params"),
+                labels: row.get("labels"),
+                status: row.get("status"),
+                results: row.get("results"),
+                log_message: row.get("log_message"),
+                owner: row.get("owner"),
+                groups: row.get("groups"),
+            };
+
+            let workflow = Workflow {
+                id: row.get("workflow_id"),
+                name: row.get("workflow_name"),
+                version: row.get("version"),
+                description: row.get("workflow_description"),
+                category: row.get("category"),
+                home: row.get("home"),
+                source: row.get("source"),
+                short_name: row.get("short_name"),
+                icons: row.get("icons"),
+                author: row.get("author"),
+                maintainers: row.get("maintainers"),
+                tags: row.get("tags"),
+                readme: row.get("readme"),
+            };
+
+            // The status of the task contains Succeeded, Submitted, Failed, Running, Pending, etc in Cromwell server.
+            if task.status.is_some()
+                && task.status == Some("Succeeded".to_string())
+                && expand_results
+            {
+                let workflow_short_name = &workflow.short_name;
+                // We expect all workflows have a task named "output", and the output directory is call-output in the workflow directory. such as:
+                // <ROOT_DIR>/myWorkflow/<TASK_ID>/
+                //   |- call-output/
+                //   |      |- out.txt
+                //   |      |- output.json
+                //   |- call-task1/
+                //   |- call-task2/
+                //   |- ...
+                //
+                // NOTE:
+                // 1. The execution directory might exist or not, if not, the output files will be in the same directory as the task directory.
+                // 2. We also expect all workflows can output a file named `output.json`, which contains the information of all output files. such as:
+                //    {
+                //      "files": [
+                //        {"filelink": "out.txt", "filetype": "tsv", ...other fields...},
+                //        {"filelink": "output.json", "filetype": "json", ...other fields...}
+                //      ],
+                //      "charts": [
+                //        {"filelink": "chart.png", "filetype": "png", ...other fields...}
+                //      ]
+                //    }
+                // 3. We also expect all output files can be copied to the directory of the output task. such as: <ROOT_DIR>/myWorkflow/<TASK_ID>/call-output/out.txt
+                let output_task_dir_name = "call-output";
+                let task_id = &task.task_id;
+                let output_task_dir = task_root_dir
+                    .join(workflow_short_name)
+                    .join(task_id)
+                    .join(output_task_dir_name);
+                let output_metadata_file = output_task_dir.join("output.json");
+
+                if output_metadata_file.exists() {
+                    let metadata = std::fs::read_to_string(output_metadata_file)?;
+                    let metadata: JsonValue = serde_json::from_str(&metadata)?;
+
+                    task.update_results(Some(metadata));
+                } else {
+                    let msg = format!("Output metadata file not found: {}, it might not a valid workflow or the task is not finished.", output_metadata_file.display());
+                    warn!("{}", msg);
+                    return Err(anyhow::anyhow!(msg));
+                }
+            }
+
+            AnyOk(ExpandedTask { task, workflow })
+        } else {
+            Err(anyhow::anyhow!("No task or workflow found"))
+        }
+    }
+
+    pub async fn get_file(
+        pool: &sqlx::PgPool,
+        owner: &str,
+        task_root_dir: &PathBuf,
+        task_id: &str,
+        file_name: &str,
+    ) -> Result<PathBuf, anyhow::Error> {
+        let expanded_task =
+            ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir, false).await?;
+
+        let workflow_short_name = &expanded_task.workflow.short_name;
+        let task_dir = task_root_dir
+            .join(workflow_short_name)
+            .join(task_id)
+            .join("call-output");
+
+        let possible_file_paths = vec![
+            task_dir.join(file_name),
+            task_dir.join("execution").join(file_name),
+            // TODO: add more possible file paths based on the cromwell doc
+        ];
+
+        for path in possible_file_paths {
+            if path.exists() {
+                return Ok(path);
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "File not found in the task directory: {}",
+            task_id
+        ))
+    }
+}
+
 impl Task {
     pub fn update_owner(&mut self, owner: String) -> &Self {
         self.owner = owner;
+        return self;
+    }
+
+    pub fn update_results(&mut self, results: Option<JsonValue>) -> &Self {
+        self.results = results;
         return self;
     }
 
@@ -425,21 +625,6 @@ impl Task {
             .bind(&self.labels)
             .bind(&self.owner)
             .bind(&self.groups)
-            .fetch_one(pool)
-            .await?;
-
-        AnyOk(task)
-    }
-
-    pub async fn get_records_by_id(
-        pool: &sqlx::PgPool,
-        task_id: &str,
-        owner: &str,
-    ) -> Result<Task, anyhow::Error> {
-        let sql_str = "SELECT * FROM biomedgps_task WHERE task_id = $1 AND owner = $2";
-        let task = sqlx::query_as::<_, Task>(sql_str)
-            .bind(task_id)
-            .bind(owner)
             .fetch_one(pool)
             .await?;
 

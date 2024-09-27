@@ -917,9 +917,25 @@ export async function fetchTaskByTaskId(
   options?: { [key: string]: any },
 ) {
   const { task_id: param0, ...queryParams } = params;
-  return request<swagger.Task>(`/api/v1/tasks/${param0}`, {
+  return request<swagger.ExpandedTask>(`/api/v1/tasks/${param0}`, {
     method: 'GET',
     params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/tasks/:task_id/file` with query params to fetch file by file_name. GET /api/v1/tasks/${param0}/file */
+export async function fetchFileByFileName(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchFileByFileNameParams,
+  options?: { [key: string]: any },
+) {
+  const { task_id: param0, ...queryParams } = params;
+  return request<string>(`/api/v1/tasks/${param0}/file`, {
+    method: 'GET',
+    params: {
+      ...queryParams,
+    },
     ...(options || {}),
   });
 }
