@@ -1,0 +1,19 @@
+{
+    "name": "Hello World",
+    "short_name": "hello_world",
+    "description": "An example workflow.",
+    "home": "https://drugs.3steps.cn/yjcyxky/hello_world",
+    "hidden": false,
+    "icons": {
+        "src": "workflows/hello_world-v0.1.0/logo.png",
+        "type": "image/png",
+        "sizes": "512x512"
+    },
+    "category": "Pipeline",
+    "source": "PGx",
+    "author": "yjcyxky",
+    "maintainers": ["exo-team"],
+    "tags": ["hello", "world"],
+    "readme": "workflows/hello_world-v0.1.0/README.md",
+    "version": "0.1.0"
+}

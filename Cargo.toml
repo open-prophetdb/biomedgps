@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "wasm"
+    "wasm",
+    "cromwell-api-rs"
 ]
 
 [package]
@@ -86,3 +87,6 @@ kiddo = "4.2.0" # for KNN
 polars = { version = "0.33.2", features = ["csv", "lazy"] }
 plotly = "0.9.0"
 once_cell = "1"
+
+# Workflow
+cromwell-api-rs = { path = "cromwell-api-rs" }

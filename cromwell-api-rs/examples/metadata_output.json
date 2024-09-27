@@ -1,0 +1,104 @@
+{
+    "workflowName": "myWorkflow",
+    "workflowProcessingEvents": [
+        {
+            "cromwellId": "cromid-6fcd4c7",
+            "description": "PickedUp",
+            "timestamp": "2024-09-20T17:39:58.730Z",
+            "cromwellVersion": "86"
+        },
+        {
+            "cromwellId": "cromid-6fcd4c7",
+            "description": "Finished",
+            "timestamp": "2024-09-20T17:40:14.062Z",
+            "cromwellVersion": "86"
+        }
+    ],
+    "actualWorkflowLanguageVersion": "1.0",
+    "submittedFiles": {
+        "workflow": "# Example workflow\n# Declare WDL version 1.0 if working in Terra\nversion 1.0\nworkflow myWorkflow {\n    call myTask\n}\n\ntask myTask {\n    command <<<\n        echo \"hello world\"\n    >>>\n    output {\n        String out = read_string(stdout())\n    }\n}\n",
+        "root": "",
+        "options": "{\n\n}",
+        "inputs": "{}",
+        "workflowUrl": "",
+        "labels": "{}"
+    },
+    "calls": {
+        "myWorkflow.myTask": [
+            {
+                "executionStatus": "Done",
+                "stdout": "/Users/jy006/Downloads/cromwell-executions/myWorkflow/5f4b80fd-4a54-4948-82a7-99b046330940/call-myTask/execution/stdout",
+                "backendStatus": "Done",
+                "commandLine": "echo \"hello world\"",
+                "shardIndex": -1,
+                "outputs": {
+                    "out": "hello world"
+                },
+                "runtimeAttributes": {
+                    "maxRetries": "0",
+                    "failOnStderr": "false",
+                    "continueOnReturnCode": "0"
+                },
+                "callCaching": {
+                    "allowResultReuse": false,
+                    "effectiveCallCachingMode": "CallCachingOff"
+                },
+                "inputs": {},
+                "returnCode": 0,
+                "jobId": "94520",
+                "backend": "Local",
+                "end": "2024-09-20T17:40:13.828Z",
+                "start": "2024-09-20T17:39:59.780Z",
+                "stderr": "/Users/jy006/Downloads/cromwell-executions/myWorkflow/5f4b80fd-4a54-4948-82a7-99b046330940/call-myTask/execution/stderr",
+                "callRoot": "/Users/jy006/Downloads/cromwell-executions/myWorkflow/5f4b80fd-4a54-4948-82a7-99b046330940/call-myTask",
+                "attempt": 1,
+                "executionEvents": [
+                    {
+                        "startTime": "2024-09-20T17:40:07.975Z",
+                        "description": "RunningJob",
+                        "endTime": "2024-09-20T17:40:12.842Z"
+                    },
+                    {
+                        "startTime": "2024-09-20T17:40:07.968Z",
+                        "description": "PreparingJob",
+                        "endTime": "2024-09-20T17:40:07.975Z"
+                    },
+                    {
+                        "startTime": "2024-09-20T17:39:59.781Z",
+                        "description": "RequestingExecutionToken",
+                        "endTime": "2024-09-20T17:40:07.967Z"
+                    },
+                    {
+                        "startTime": "2024-09-20T17:40:07.967Z",
+                        "description": "WaitingForValueStore",
+                        "endTime": "2024-09-20T17:40:07.968Z"
+                    },
+                    {
+                        "startTime": "2024-09-20T17:39:59.780Z",
+                        "description": "Pending",
+                        "endTime": "2024-09-20T17:39:59.781Z"
+                    },
+                    {
+                        "startTime": "2024-09-20T17:40:12.842Z",
+                        "description": "UpdatingJobStore",
+                        "endTime": "2024-09-20T17:40:13.828Z"
+                    }
+                ]
+            }
+        ]
+    },
+    "outputs": {
+        "myWorkflow.myTask.out": "hello world"
+    },
+    "workflowRoot": "/Users/jy006/Downloads/cromwell-executions/myWorkflow/5f4b80fd-4a54-4948-82a7-99b046330940",
+    "actualWorkflowLanguage": "WDL",
+    "status": "Succeeded",
+    "end": "2024-09-20T17:40:14.061Z",
+    "start": "2024-09-20T17:39:58.734Z",
+    "id": "5f4b80fd-4a54-4948-82a7-99b046330940",
+    "inputs": {},
+    "labels": {
+        "cromwell-workflow-id": "cromwell-5f4b80fd-4a54-4948-82a7-99b046330940"
+    },
+    "submission": "2024-09-20T17:39:40.087Z"
+}

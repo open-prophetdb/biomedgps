@@ -320,7 +320,7 @@ pub struct Task {
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    task_id: String,
+    pub task_id: String,
 
     #[validate(length(
         max = "DEFAULT_LENGTH_32",
@@ -356,11 +356,11 @@ pub struct Task {
     ))]
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    status: Option<String>,
+    pub status: Option<String>, // Succeeded, Submitted, Failed, Running, Pending, etc in Cromwell server.
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "csv"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
+    results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "text/plain"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
@@ -516,9 +516,9 @@ impl ExpandedTask {
                 && expand_results
             {
                 let workflow_short_name = &workflow.short_name;
-                // We expect all workflows have a task named "<workflow.short_name>", and the output directory is call-<workflow.short_name> in the workflow directory. Each workflow only has one such task. The task name is same as the workflow short name. such as:
+                // We expect all workflows have a task named "<workflow.short_name>", and the output directory is call-<workflow.short_name>_task in the workflow directory. Each workflow only has one such task. The task name is same as the workflow short name. such as:
                 // <ROOT_DIR>/<workflow.short_name>/<TASK_ID>/
-                //   |- call-<workflow.short_name>/
+                //   |- call-<workflow.short_name>_task/
                 //   |      |- out.txt
                 //   |      |- output.json
                 //
@@ -527,15 +527,15 @@ impl ExpandedTask {
                 // 2. We also expect all workflows can output a file named `metadata.json`, which contains the information of all output files. such as:
                 //    {
                 //      "files": [
-                //        {"filelink": "out.txt", "filetype": "tsv", ...other fields...},
+                //        {"filelink": "out.txt", "filetype": "text/plain", ...other fields...},
                 //        {"filelink": "output.json", "filetype": "json", ...other fields...}
                 //      ],
                 //      "charts": [
-                //        {"filelink": "chart.png", "filetype": "png", ...other fields...}
+                //        {"filelink": "chart.png", "filetype": "image/png", ...other fields...}
                 //      ]
                 //    }
-                // 3. We also expect all output files can be copied to the directory of the output task. such as: <ROOT_DIR>/<workflow.short_name>/<TASK_ID>/call-<workflow.short_name>/out.txt
-                let output_task_dir_name = format!("call-{}", workflow_short_name);
+                // 3. We also expect all output files can be copied to the directory of the output task. such as: <ROOT_DIR>/<workflow.short_name>/<TASK_ID>/call-<workflow.short_name>_task/out.txt
+                let output_task_dir_name = Self::make_task_dir_name(workflow_short_name);
                 let task_id = &task.task_id;
                 let output_task_dir = task_root_dir
                     .join(workflow_short_name)
@@ -561,6 +561,10 @@ impl ExpandedTask {
         }
     }
 
+    fn make_task_dir_name(workflow_short_name: &str) -> String {
+        format!("call-{}_task", workflow_short_name)
+    }
+
     pub async fn get_log(
         pool: &sqlx::PgPool,
         owner: &str,
@@ -573,7 +577,7 @@ impl ExpandedTask {
         let task_dir = task_root_dir
             .join(workflow_short_name)
             .join(task_id)
-            .join(format!("call-{}", workflow_short_name));
+            .join(Self::make_task_dir_name(workflow_short_name));
 
         // TODO: We assume the log file is named "stderr" and "stdout" in the task directory. In the current implementation, we don't support files on the cloud storage.
         let stderr_log_file = task_dir.join("stderr");
@@ -609,7 +613,7 @@ impl ExpandedTask {
         let task_dir = task_root_dir
             .join(workflow_short_name)
             .join(task_id)
-            .join(format!("call-{}", workflow_short_name));
+            .join(Self::make_task_dir_name(workflow_short_name));
 
         // TODO: In the current implementation, we don't support files on the cloud storage.
         let possible_file_paths = vec![

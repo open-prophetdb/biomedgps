@@ -6,13 +6,15 @@ extern crate lazy_static;
 use biomedgps::api::auth::fetch_and_store_jwks;
 use biomedgps::api::route::BiomedgpsApi;
 use biomedgps::model::core::EntityMetadata;
+use biomedgps::model::embedding::Embedding;
 use biomedgps::model::kge::init_kge_models;
 use biomedgps::model::llm::init_prompt_templates;
 use biomedgps::model::util::update_existing_colors;
-use biomedgps::model::embedding::Embedding;
 use biomedgps::proxy::website::{
     proxy_website, proxy_website_data, PROXY_DATA_PREFIX, PROXY_PREFIX,
 };
+use biomedgps::schedule::task_manager::TaskManager;
+use biomedgps::schedule::workflow::register_tasks;
 use biomedgps::{check_db_version, connect_db, connect_graph_db, init_logger};
 use dotenv::dotenv;
 use itertools::Itertools;
@@ -30,7 +32,6 @@ use poem::{
 use poem_openapi::OpenApiService;
 use rust_embed::RustEmbed;
 use std::sync::Arc;
-
 use structopt::StructOpt;
 
 /// BioMedGPS backend server.
@@ -249,6 +250,46 @@ async fn main() -> Result<(), std::io::Error> {
     let pool = connect_db(&database_url, pool_size).await;
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
+
+    // Check WORKFLOW_DIR and TASK_ROOT_DIR environment variables.
+    match std::env::var("WORKFLOW_DIR") {
+        Ok(v) => {
+            if v.is_empty() {
+                warn!("WORKFLOW_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+            }
+        }
+        Err(_) => {
+            warn!("WORKFLOW_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
+    }
+
+    match std::env::var("TASK_ROOT_DIR") {
+        Ok(v) => {
+            if v.is_empty() {
+                warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+            }
+        }
+        Err(_) => {
+            warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
+    }
+
+    // Register tasks.
+    let mut task_manager = TaskManager::new();
+    match std::env::var("CROMWELL_API_SERVER") {
+        Ok(v) => match register_tasks(&mut task_manager, &arc_pool, &v).await {
+            Ok(_) => {
+                info!("Register tasks successfully.");
+            }
+            Err(err) => {
+                error!("Register tasks failed, {}", err);
+                std::process::exit(1);
+            }
+        },
+        Err(_) => {
+            warn!("{}", "CROMWELL_API_SERVER is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
+    };
 
     // Check the environment, such as database version.
     match check_db_version(&arc_pool.clone()).await {
