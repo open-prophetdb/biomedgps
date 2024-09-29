@@ -160,6 +160,10 @@ declare namespace swagger {
     id: string;
   };
 
+  type deleteTaskParams = {
+    task_id: string;
+  };
+
   type deleteWebpageMetadataByFingerprintParams = {
     fingerprint: string;
   };
@@ -440,6 +444,10 @@ declare namespace swagger {
     query_str?: string;
   };
 
+  type fetchLogByTaskIdParams = {
+    task_id: string;
+  };
+
   type fetchNodesParams = {
     node_ids: string;
   };
@@ -615,6 +623,10 @@ declare namespace swagger {
     created_at: string;
   };
 
+  type LogMessage = {
+    msg: string;
+  };
+
   type Manufacturer = {
     text: string;
     generic: string;
@@ -663,7 +675,7 @@ declare namespace swagger {
   };
 
   type Notification = {
-    id: string;
+    id: number;
     title: string;
     description?: string;
     notification_type: string;
@@ -1068,8 +1080,8 @@ declare namespace swagger {
     task_name: string;
     description?: string;
     submitted_time: string;
-    started_time: string;
-    finished_time: string;
+    started_time?: string;
+    finished_time?: string;
     task_params: any;
     labels?: string[];
     status?: string;
@@ -1105,6 +1117,7 @@ declare namespace swagger {
   };
 
   type WorkflowSchema = {
+    readme: string;
     schema: any;
   };
 

@@ -2,7 +2,7 @@ use super::task_manager::TaskManager;
 use crate::model::workspace::Task as WorkflowTask;
 use crate::model::workspace::{Task, Workflow};
 use cromwell_api_rs::{render_workflow_metadata, CromwellClient};
-use log::{error, info};
+use log::{debug, error, info};
 use sqlx::PgPool;
 use sqlx::Row;
 use std::path::PathBuf;
@@ -13,7 +13,10 @@ pub async fn sync_task_status(
     pool: &Arc<PgPool>,
     cromwell_client_url: String,
 ) -> Result<(), anyhow::Error> {
-    let sql_str = "SELECT * FROM biomedgps_tasks WHERE (status IS NULL OR (status != 'Failed' AND status != 'Succeeded')) AND finished_time IS NULL";
+    // started_time and status are null, means the workflow is not submitted to Cromwell
+    // finished_time is null and started_time is not null, means the workflow is submitted to Cromwell but not finished
+    let sql_str =
+        "SELECT * FROM biomedgps_task WHERE finished_time IS NULL AND started_time IS NOT NULL";
 
     let mut conn = pool.acquire().await?;
     let cromwell_client = CromwellClient::new(&cromwell_client_url);
@@ -22,7 +25,7 @@ pub async fn sync_task_status(
         .await?;
 
     for task in tasks {
-        info!("Syncing task status: {}", task.task_id);
+        debug!("Syncing task status: {}", task.task_id);
         let task_id = task.task_id;
 
         let metadata = match cromwell_client.get_workflow_metadata(&task_id).await {
@@ -34,12 +37,10 @@ pub async fn sync_task_status(
         };
 
         let status = metadata.status;
-        let started_time = metadata.start;
         let finished_time = metadata.end;
 
-        match sqlx::query("UPDATE biomedgps_tasks SET status = $1, started_time = $2, finished_time = $3 WHERE task_id = $4")
+        match sqlx::query("UPDATE biomedgps_task SET status = $1, finished_time = $2::timestamptz WHERE task_id = $3")
             .bind(status)
-            .bind(started_time)
             .bind(finished_time)
             .bind(task_id)
             .execute(&mut conn)
@@ -59,7 +60,8 @@ pub async fn sync_log_message(
     pool: &Arc<PgPool>,
     cromwell_client_url: String,
 ) -> Result<(), anyhow::Error> {
-    let sql_str = "SELECT * FROM biomedgps_tasks WHERE (status IS NULL OR (status != 'Failed' AND status != 'Succeeded')) AND finished_time IS NULL";
+    let sql_str =
+        "SELECT * FROM biomedgps_task WHERE (finished_time IS NULL AND started_time IS NOT NULL) OR log_message IS NULL";
 
     let mut conn = pool.acquire().await?;
     let cromwell_client = CromwellClient::new(&cromwell_client_url);
@@ -68,7 +70,7 @@ pub async fn sync_log_message(
         .await?;
 
     for task in tasks {
-        info!("Syncing log message: {}", task.task_id);
+        debug!("Syncing log message: {}", task.task_id);
         let task_id = task.task_id;
 
         let log = match cromwell_client.get_workflow_logfiles(&task_id).await {
@@ -92,12 +94,12 @@ pub async fn sync_log_message(
                     let stdout = logmap.stderr.clone();
 
                     if std::path::Path::new(&stdout).exists() {
-                        message.push_str("\nStdout:\n");
+                        message.push_str("\n\nStdout:\n");
                         message.push_str(&std::fs::read_to_string(stdout).unwrap());
                     }
 
                     if std::path::Path::new(&stderr).exists() {
-                        message.push_str("\nStderr:\n");
+                        message.push_str("\n\nStderr:\n");
                         message.push_str(&std::fs::read_to_string(stderr).unwrap());
                     }
                 }
@@ -105,7 +107,7 @@ pub async fn sync_log_message(
             }
         }
 
-        match sqlx::query("UPDATE biomedgps_tasks SET log_message = $1 WHERE task_id = $2")
+        match sqlx::query("UPDATE biomedgps_task SET log_message = $1 WHERE task_id = $2")
             .bind(message)
             .bind(task_id)
             .execute(&mut conn)
@@ -159,8 +161,8 @@ pub async fn submit_workflow(
             biomedgps_workflow.tags,
             biomedgps_workflow.readme
         FROM biomedgps_task 
-        JOIN biomedgps_workflows ON biomedgps_tasks.workflow_id = biomedgps_workflows.id 
-        WHERE biomedgps_tasks.status IS NULL AND biomedgps_tasks.started_time IS NULL
+        JOIN biomedgps_workflow ON biomedgps_task.workflow_id = biomedgps_workflow.id 
+        WHERE biomedgps_task.status IS NULL AND biomedgps_task.started_time IS NULL
     ";
     let mut conn = pool.acquire().await?;
     let rows = match sqlx::query(sql_str).fetch_all(&mut conn).await {
@@ -226,6 +228,11 @@ pub async fn submit_workflow(
         if std::path::Path::new(&input_json_file).exists() {
             let task_params = task.task_params;
 
+            if !task_template_dir.exists() {
+                // Create task template directory
+                std::fs::create_dir_all(&task_template_dir)?;
+            }
+
             match render_workflow_metadata(&input_json_file, &task_params, &task_template_dir) {
                 Ok(rendered_input_json_file) => {
                     let workflow_file = workflow_dir.join("workflow.wdl");
@@ -242,24 +249,30 @@ pub async fn submit_workflow(
                         .await
                     {
                         Ok(workflow_status) => {
-                            info!("Workflow submitted: {:?}", workflow_status);
-                            match sqlx::query("UPDATE biomedgps_tasks SET status = $1, started_time = $2 WHERE task_id = $3")
-                                .bind(workflow_status.status.to_string())
-                                .bind(chrono::Utc::now().naive_utc())
-                                .bind(task.task_id)
-                                .execute(&mut conn)
-                                .await
-                            {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    error!("Failed to update task status: {}", e);
-                                    // TODO: Rollback the workflow submission
-                                }
-                            }
+                            debug!("Workflow submitted: {:?}", workflow_status);
                         }
                         Err(e) => {
-                            error!("Failed to submit workflow: {}", e);
-                            return Err(anyhow::anyhow!(e));
+                            if e.response_type == "DuplicateWorkflowId" {
+                                // We assume the workflow id is globally unique, so if the workflow id is duplicated, the submission is successful
+                                debug!("Workflow submitted: {:?}", e);
+                            } else {
+                                error!("Failed to submit workflow: {:?}", e);
+                                return Err(anyhow::anyhow!(e));
+                            };
+                        }
+                    }
+
+                    match sqlx::query("UPDATE biomedgps_task SET status = $1, started_time = $2::timestamptz WHERE task_id = $3")
+                        .bind("Submitted")
+                        .bind(chrono::Utc::now())
+                        .bind(task.task_id)
+                        .execute(&mut conn)
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Failed to update task status: {:?}", e);
+                            // TODO: Rollback the workflow submission
                         }
                     }
                 }
@@ -286,7 +299,7 @@ pub async fn register_tasks(
 ) -> Result<(), anyhow::Error> {
     let pool1 = pool.clone();
     let cromwell_client_url1 = cromwell_client_url.to_string();
-    // 注册任务 sync_task_status
+    // Register task sync_task_status
     task_manager.register_task(
         "sync_task_status",
         move || {
@@ -310,7 +323,7 @@ pub async fn register_tasks(
 
     let pool2 = pool.clone();
     let cromwell_client_url2 = cromwell_client_url.to_string();
-    // 注册任务 sync_log_message
+    // Register task sync_log_message
     task_manager.register_task(
         "sync_log_message",
         move || {
@@ -334,7 +347,7 @@ pub async fn register_tasks(
 
     let pool3 = pool.clone();
     let cromwell_client_url3 = cromwell_client_url.to_string();
-    // 注册任务 submit_workflow
+    // Register task submit_workflow
     task_manager.register_task(
         "submit_workflow",
         move || {

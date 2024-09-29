@@ -4,8 +4,8 @@ use crate::api::auth::{CustomSecurityScheme, USERNAME_PLACEHOLDER};
 use crate::api::schema::{
     ApiTags, DeleteResponse, FileResponse, GetEntityColorMapResponse, GetGraphResponse,
     GetPromptResponse, GetPublicationsResponse, GetRecordResponse, GetRecordsResponse,
-    GetRelationCountResponse, GetWholeTableResponse, NodeIdsQuery, Pagination, PaginationQuery,
-    PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage, LogMessage
+    GetRelationCountResponse, GetWholeTableResponse, LogMessage, NodeIdsQuery, Pagination,
+    PaginationQuery, PostResponse, PredictedNodeQuery, PromptList, SubgraphIdQuery, UploadImage,
 };
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
@@ -2320,7 +2320,10 @@ impl BiomedgpsApi {
         let workflow_root_dir = match std::env::var("WORKFLOW_ROOT_DIR") {
             Ok(workflow_root_dir) => PathBuf::from(workflow_root_dir),
             Err(e) => {
-                let err = format!("The WORKFLOW_ROOT_DIR environment variable is not set: {}", e);
+                let err = format!(
+                    "The WORKFLOW_ROOT_DIR environment variable is not set: {}",
+                    e
+                );
                 warn!("{}", err);
                 return GetRecordResponse::internal_server_error(err);
             }
@@ -2450,7 +2453,7 @@ impl BiomedgpsApi {
             &query,
             page,
             page_size,
-            Some("id ASC"),
+            Some("submitted_time DESC"),
             Some(&username),
         )
         .await
@@ -2490,8 +2493,7 @@ impl BiomedgpsApi {
             }
         };
 
-        match ExpandedTask::get_records_by_id(&pool_arc, &task_id, &username, &task_root_dir, true)
-            .await
+        match ExpandedTask::get_records_by_id(&pool_arc, &task_id, &username, &task_root_dir).await
         {
             Ok(task) => GetRecordResponse::ok(task),
             Err(e) => {
@@ -2628,6 +2630,33 @@ impl BiomedgpsApi {
                 let err = format!("Failed to insert task: {}", e);
                 warn!("{}", err);
                 return PostResponse::bad_request(err);
+            }
+        }
+    }
+
+    /// Call `/api/v1/tasks/:task_id` with payload to delete a task.
+    #[oai(
+        path = "/tasks/:task_id",
+        method = "delete",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "deleteTask"
+    )]
+    async fn delete_task(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        task_id: Path<String>,
+        _token: CustomSecurityScheme,
+    ) -> DeleteResponse {
+        let pool_arc = pool.clone();
+        let task_id = task_id.0;
+        let username = _token.0.username;
+
+        match Task::delete(&pool_arc, &task_id, &username).await {
+            Ok(_) => DeleteResponse::no_content(),
+            Err(e) => {
+                let err = format!("Failed to delete task: {}", e);
+                warn!("{}", err);
+                DeleteResponse::not_found(err)
             }
         }
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Menu, Button, Empty, message } from 'antd';
-import { MenuUnfoldOutlined, MenuFoldOutlined, TableOutlined, HistoryOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { MenuUnfoldOutlined, MenuFoldOutlined, DatabaseOutlined, HistoryOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import Workflow from './Workflow';
 import { Workflow as WorkflowData, TaskHistory as TaskHistoryData } from '../../StatEngine/components/WorkflowList/data';
 import TaskHistory from './TaskHistory';
@@ -16,11 +16,21 @@ export type OmicsDataProps = {
 const OmicsData: React.FC<OmicsDataProps> = (props) => {
     const defaultMenuItems: any[] = [
         {
+            label: 'Datasets',
+            key: 'datasets',
+            icon: <DatabaseOutlined />,
+            onClick: () => {
+                setMenuKey('datasets');
+                setMenuItems(defaultMenuItems);
+            }
+        },
+        {
             label: 'Workflows',
             key: 'workflows',
             icon: <AppstoreOutlined />,
             onClick: () => {
                 setMenuKey('workflows');
+                setMenuItems(defaultMenuItems);
             }
         },
         {
@@ -29,6 +39,7 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
             icon: <HistoryOutlined />,
             onClick: () => {
                 setMenuKey('task-history');
+                setMenuItems(defaultMenuItems);
             }
         },
         {
@@ -37,7 +48,7 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
     ];
 
     const [menuItems, setMenuItems] = useState<any[]>(defaultMenuItems);
-    const [menuKey, setMenuKey] = useState<string>('workflows');
+    const [menuKey, setMenuKey] = useState<string>('datasets');
     const [workflows, setWorkflows] = useState<WorkflowData[]>([]);
     const [collapsed, setCollapsed] = useState<boolean>(false);
 
@@ -90,7 +101,9 @@ const OmicsData: React.FC<OmicsDataProps> = (props) => {
     };
 
     const whichPanel = () => {
-        if (menuKey === 'workflows') {
+        if (menuKey === 'datasets') {
+            return <Empty className='empty-omics-data-container' description='Datasets panel is coming soon' />;
+        } else if (menuKey === 'workflows') {
             return <Workflow className='workflow-container' onWorkflowClick={onWorkflowClick} />;
         } else if (menuKey === 'task-history') {
             return <TaskHistory className='task-history-container' onTaskHistoryClick={onTaskHistoryClick} />;

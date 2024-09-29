@@ -33,15 +33,14 @@ use poem_openapi::OpenApiService;
 use rust_embed::RustEmbed;
 use std::sync::Arc;
 use structopt::StructOpt;
-
+use tokio::sync::Notify;
 /// BioMedGPS backend server.
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name="biomedgps", author="Jingcheng Yang <yjcyxky@163.com>")]
 struct Opt {
-    /// Activate debug mode
-    /// short and long flags (--debug) will be deduced from the field's name
-    #[structopt(name = "debug", long = "debug")]
-    debug: bool,
+    /// Short and long flags (--verbose or -v) will increase the log level.
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: u8,
 
     /// Activate ui mode
     #[structopt(name = "ui", short = "u", long = "ui")]
@@ -135,15 +134,20 @@ async fn main() -> Result<(), std::io::Error> {
 
     let args = Opt::from_args();
 
-    let log_result = if args.debug {
-        init_logger("biomedgps", LevelFilter::Debug)
-    } else {
-        init_logger("biomedgps", LevelFilter::Info)
+    info!("Setting up logger with {} level.", args.verbose);
+    let log_result = match args.verbose {
+        0 => init_logger("biomedgps", LevelFilter::Warn),
+        1 => init_logger("biomedgps", LevelFilter::Info),
+        2 => init_logger("biomedgps", LevelFilter::Debug),
+        _ => init_logger("biomedgps", LevelFilter::Debug),
     };
 
-    if let Err(log) = log_result {
-        error!(target:"stdout", "Log initialization error, {}", log);
-        std::process::exit(1);
+    let _logger_handle = match log_result {
+        Ok(handle) => handle,
+        Err(log) => {
+            error!(target:"stdout", "Log initialization error, {}", log);
+            std::process::exit(1);
+        }
     };
 
     let host = args.host;
@@ -250,46 +254,6 @@ async fn main() -> Result<(), std::io::Error> {
     let pool = connect_db(&database_url, pool_size).await;
     let arc_pool = Arc::new(pool);
     let shared_rb = AddData::new(arc_pool.clone());
-
-    // Check WORKFLOW_ROOT_DIR and TASK_ROOT_DIR environment variables.
-    match std::env::var("WORKFLOW_ROOT_DIR") {
-        Ok(v) => {
-            if v.is_empty() {
-                warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
-            }
-        }
-        Err(_) => {
-            warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
-        }
-    }
-
-    match std::env::var("TASK_ROOT_DIR") {
-        Ok(v) => {
-            if v.is_empty() {
-                warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
-            }
-        }
-        Err(_) => {
-            warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
-        }
-    }
-
-    // Register tasks.
-    let mut task_manager = TaskManager::new();
-    match std::env::var("CROMWELL_API_SERVER") {
-        Ok(v) => match register_tasks(&mut task_manager, &arc_pool, &v).await {
-            Ok(_) => {
-                info!("Register tasks successfully.");
-            }
-            Err(err) => {
-                error!("Register tasks failed, {}", err);
-                std::process::exit(1);
-            }
-        },
-        Err(_) => {
-            warn!("{}", "CROMWELL_API_SERVER is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
-        }
-    };
 
     // Check the environment, such as database version.
     match check_db_version(&arc_pool.clone()).await {
@@ -411,16 +375,97 @@ async fn main() -> Result<(), std::io::Error> {
         .with(shared_rb)
         .with(shared_graph_pool);
 
-    if args.cors {
-        info!("CORS mode is enabled.");
-        let route = route.with(Cors::new().allow_origin("*"));
-        Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-            .run(route)
-            .await
-    } else {
-        warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
-        Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-            .run(route)
-            .await
+    // Register and launch tasks.
+    // Check WORKFLOW_ROOT_DIR and TASK_ROOT_DIR environment variables.
+    match std::env::var("WORKFLOW_ROOT_DIR") {
+        Ok(v) => {
+            if v.is_empty() {
+                warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+            }
+        }
+        Err(_) => {
+            warn!("WORKFLOW_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
     }
+
+    match std::env::var("TASK_ROOT_DIR") {
+        Ok(v) => {
+            if v.is_empty() {
+                warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+            }
+        }
+        Err(_) => {
+            warn!("TASK_ROOT_DIR is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
+    }
+
+    let mut task_manager = TaskManager::new();
+    match std::env::var("CROMWELL_API_SERVER") {
+        Ok(v) => match register_tasks(&mut task_manager, &arc_pool, &v).await {
+            Ok(_) => {
+                info!("Register tasks successfully.");
+            }
+            Err(err) => {
+                error!("Register tasks failed, {}", err);
+                std::process::exit(1);
+            }
+        },
+        Err(_) => {
+            warn!("{}", "CROMWELL_API_SERVER is not set, so we will skip registering tasks. You will not be able to run workflows correctly.");
+        }
+    };
+
+    info!("Register tasks successfully.");
+
+    // Launch all tasks.
+    info!("Starting all tasks...");
+    let shutdown_notify = Arc::new(Notify::new());
+
+    // Launch all tasks.
+    let task_manager_handle = tokio::spawn({
+        let shutdown_notify_clone = shutdown_notify.clone();
+        async move {
+            task_manager.start_all(shutdown_notify_clone).await;
+        }
+    });
+
+    let server_handle = tokio::spawn(async move {
+        if args.cors {
+            info!("CORS mode is enabled.");
+            let route = route.with(Cors::new().allow_origin("*"));
+            Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+                .run(route)
+                .await
+        } else {
+            warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
+            Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+                .run(route)
+                .await
+        }
+    });
+
+    // Wait for Ctrl+C signal.
+    match tokio::signal::ctrl_c().await {
+        Ok(_) => {
+            info!("Ctrl+C received, notifying tasks to shut down...");
+            shutdown_notify.notify_waiters();
+        }
+        Err(e) => {
+            error!("Failed to listen for shutdown signal: {}", e);
+        }
+    }
+
+    // Wait for tasks to finish.
+    match task_manager_handle.await {
+        Ok(_) => info!("All tasks stopped gracefully."),
+        Err(e) => error!("Error while waiting for tasks to stop: {:?}", e),
+    }
+
+    // Wait for the server to finish.
+    match server_handle.await {
+        Ok(_) => info!("Server stopped gracefully."),
+        Err(e) => error!("Error while waiting for server to stop: {:?}", e),
+    }
+
+    Ok(())
 }

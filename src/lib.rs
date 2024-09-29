@@ -1131,15 +1131,16 @@ pub fn init_logger(tag_name: &str, level: LevelFilter) -> Result<log4rs::Handle,
             Logger::builder()
                 .appender("stdout")
                 .additive(false)
-                .build("stdout", level),
+                .build("biomedgps", level),
         )
         .build(Root::builder().appender("stdout").build(level))
-        .unwrap();
+        .map_err(|e| format!("Couldn't build logger config: {}", e.to_string()))?;
 
+    // 初始化日志系统
     log4rs::init_config(config).map_err(|e| {
         format!(
-            "couldn't initialize log configuration. Reason: {}",
-            e.description()
+            "Couldn't initialize log configuration. Reason: {}",
+            e.to_string()
         )
     })
 }
@@ -1549,7 +1550,7 @@ pub async fn change_emb_dimension(
     let pool = connect_db(database_url, 1).await;
     for table in ["entity_embedding", "relation_embedding"] {
         let table_name = format!("{}_{}", table_name, table);
-    
+
         match check_table_is_empty(&pool, &table_name).await? {
             true => {
                 info!("The table {} is empty.", table_name);
@@ -1566,7 +1567,7 @@ pub async fn change_emb_dimension(
             table_name, dimension
         );
         sqlx::query(&sql_str).execute(&pool).await?;
-    };
+    }
 
     return Ok(());
 }

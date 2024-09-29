@@ -2,7 +2,7 @@ import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'rea
 import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { TaskHistory, TaskHistoryTableData } from '../../StatEngine/components/WorkflowList/data';
-import { fetchTasks } from '@/services/swagger/KnowledgeGraph';
+import { fetchTasks, deleteTask } from '@/services/swagger/KnowledgeGraph';
 
 type TaskHistoryTableProps = {
     page?: number;
@@ -17,7 +17,7 @@ type TaskHistoryTableProps = {
 };
 
 const isFinished = (taskHistory: TaskHistory) => {
-    return taskHistory.status === 'Completed';
+    return taskHistory.status === 'Succeeded';
 };
 
 const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref) => {
@@ -25,6 +25,8 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
     const [loading, setLoading] = useState<boolean>(false);
     const [page, setPage] = useState<number>(props.page || 1);
     const [pageSize, setPageSize] = useState<number>(props.pageSize || 30);
+    const [refreshKey, setRefreshKey] = useState<number>(props.refreshKey || 0);
+    const [popupVisible, setPopupVisible] = useState<boolean>(false);
 
     const columns: ColumnsType<TaskHistory> = [
         {
@@ -102,8 +104,32 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
             render: (text, record) => {
                 return <Button.Group>
                     <Button type="primary" onClick={() => { props.onTaskHistoryClick?.(record) }}>View</Button>
-                    <Button disabled={!isFinished(record)}>Log</Button>
-                    <Button danger disabled>Delete</Button>
+                    <Button disabled={isFinished(record)}>Log</Button>
+                    <Popover content={
+                        <div>
+                            <p>Are you sure you want to delete this task?</p>
+                            <Button.Group>
+                                <Button type="default" onClick={() => {
+                                    setPopupVisible(false);
+                                }}>Cancel</Button>
+                                <Button danger onClick={() => {
+                                    deleteTask({
+                                        task_id: record.task_id,
+                                    }).then(() => {
+                                        message.success('Delete task successfully');
+                                        setRefreshKey(refreshKey + 1);
+                                    }).catch((error) => {
+                                        message.error(`Delete task failed, ${error}`);
+                                        setRefreshKey(refreshKey + 1);
+                                    }).finally(() => {
+                                        setPopupVisible(false);
+                                    });
+                                }}>Delete</Button>
+                            </Button.Group>
+                        </div>
+                    } trigger="click" popupVisible={popupVisible}>
+                        <Button danger style={{ backgroundColor: '#FF4D4F', color: '#fff' }}>Delete</Button>
+                    </Popover>
                 </Button.Group>
             },
         },
@@ -129,7 +155,15 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
                 setData({} as TaskHistoryTableData);
                 setLoading(false);
             });
-    }, [page, pageSize, props.refreshKey]);
+    }, [page, pageSize, refreshKey]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setRefreshKey(refreshKey + 1);
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const getRowKey = (record: TaskHistory) => {
         return record.id || `${JSON.stringify(record)}`;

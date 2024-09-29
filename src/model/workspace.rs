@@ -299,7 +299,10 @@ impl Workflow {
         format!("{}-{}", workflow_short_name, workflow_version)
     }
 
-    pub fn get_workflow_installation_path(workflow_root_dir: &PathBuf, workflow_name: &str) -> PathBuf {
+    pub fn get_workflow_installation_path(
+        workflow_root_dir: &PathBuf,
+        workflow_name: &str,
+    ) -> PathBuf {
         workflow_root_dir.join("workflows").join(workflow_name)
     }
 
@@ -372,7 +375,7 @@ pub struct Task {
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
-    pub results: Option<JsonValue>, // {"files": [{"filelink": "...", "filetype": "tsv"}, {"filelink": "...", "filetype": "text/plain"}], "charts": [{"filelink": "...", "filetype": "plotly"}, {"filelink": "...", "filetype": "png"}]}
+    pub results: Option<JsonValue>, // {"files": [{"filename": "...", "filetype": "tsv"}, {"filename": "...", "filetype": "text/plain"}], "charts": [{"filename": "...", "filetype": "plotly"}, {"filename": "...", "filetype": "png"}]}
 
     #[serde(skip_deserializing)]
     #[oai(read_only)]
@@ -430,7 +433,6 @@ impl ExpandedTask {
         task_id: &str,
         owner: &str,
         task_root_dir: &PathBuf,
-        expand_results: bool,
     ) -> Result<ExpandedTask, anyhow::Error> {
         // Updated query to explicitly select columns from both tables
         let sql_str = "
@@ -523,9 +525,10 @@ impl ExpandedTask {
             };
 
             // The status of the task contains Succeeded, Submitted, Failed, Running, Pending, etc in Cromwell server.
-            if task.status.is_some()
+            // Only need to update results one time when the task is succeeded.
+            if task.results.is_none()
+                && task.status.is_some()
                 && task.status == Some("Succeeded".to_string())
-                && expand_results
             {
                 let workflow_short_name = &workflow.short_name;
                 // We expect all workflows have a task named "<workflow.short_name>", and the output directory is call-<workflow.short_name>_task in the workflow directory. Each workflow only has one such task. The task name is same as the workflow short name. such as:
@@ -553,15 +556,30 @@ impl ExpandedTask {
                     .join(workflow_short_name)
                     .join(task_id)
                     .join(output_task_dir_name);
-                let output_metadata_file = output_task_dir.join("metadata.json");
 
-                if output_metadata_file.exists() {
-                    let metadata = std::fs::read_to_string(output_metadata_file)?;
-                    let metadata: JsonValue = serde_json::from_str(&metadata)?;
+                // TODO: In the current implementation, we don't support files on the cloud storage.
+                let possible_output_metadata_filepaths = vec![
+                    output_task_dir.join("metadata.json"),
+                    output_task_dir.join("execution").join("metadata.json"),
+                    // TODO: add more possible file paths based on the cromwell doc
+                ];
 
-                    task.update_results(Some(metadata));
-                } else {
-                    let msg = format!("Output metadata file not found: {}, it might not a valid workflow or the task is not finished.", output_metadata_file.display());
+                for path in &possible_output_metadata_filepaths {
+                    if path.exists() {
+                        let metadata = std::fs::read_to_string(path)?;
+                        let metadata: JsonValue = serde_json::from_str(&metadata)?;
+
+                        task.update_results(Some(metadata));
+                        break;
+                    }
+                }
+
+                if task.results.is_none() {
+                    let msg = format!(
+                        "Output metadata file not found in the task directory: {}, it might not a valid workflow or the task is not finished. We tried the following paths: {:?}",
+                        output_task_dir.display(),
+                        possible_output_metadata_filepaths
+                    );
                     warn!("{}", msg);
                     return Err(anyhow::anyhow!(msg));
                 }
@@ -583,8 +601,9 @@ impl ExpandedTask {
         task_root_dir: &PathBuf,
         task_id: &str,
     ) -> Result<String, anyhow::Error> {
-        let expanded_task = ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir, false).await?;
-        
+        let expanded_task =
+            ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir).await?;
+
         let workflow_short_name = &expanded_task.workflow.short_name;
         let task_dir = task_root_dir
             .join(workflow_short_name)
@@ -599,13 +618,16 @@ impl ExpandedTask {
         if stderr_log_file.exists() {
             log_content += &std::fs::read_to_string(stderr_log_file)?;
         }
-        
+
         if stdout_log_file.exists() {
             log_content += &std::fs::read_to_string(stdout_log_file)?;
         }
 
         if log_content.is_empty() {
-            return Err(anyhow::anyhow!("Log file not found in the task directory: {}", task_id));
+            return Err(anyhow::anyhow!(
+                "Log file not found in the task directory: {}",
+                task_id
+            ));
         }
 
         AnyOk(log_content)
@@ -619,7 +641,7 @@ impl ExpandedTask {
         file_name: &str,
     ) -> Result<PathBuf, anyhow::Error> {
         let expanded_task =
-            ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir, false).await?;
+            ExpandedTask::get_records_by_id(pool, task_id, owner, task_root_dir).await?;
 
         let workflow_short_name = &expanded_task.workflow.short_name;
         let task_dir = task_root_dir
@@ -677,6 +699,21 @@ impl Task {
             .await?;
 
         AnyOk(task)
+    }
+
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        task_id: &str,
+        owner: &str,
+    ) -> Result<(), anyhow::Error> {
+        let sql_str = "DELETE FROM biomedgps_task WHERE task_id = $1 AND owner = $2";
+        sqlx::query(sql_str)
+            .bind(task_id)
+            .bind(owner)
+            .execute(pool)
+            .await?;
+
+        Ok(())
     }
 }
 

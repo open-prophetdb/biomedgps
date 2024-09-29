@@ -1,6 +1,7 @@
 use anyhow;
 use log::{error, info};
 use reqwest::multipart::{Form, Part};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -28,6 +29,19 @@ pub struct ServiceStatus {
 pub struct WorkflowStatus {
     pub id: String,
     pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub message: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WorkflowResponse {
+    WorkflowStatus(WorkflowStatus),
+    WorkflowErrorResponse(ErrorResponse),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -328,15 +342,43 @@ impl CromwellClient {
             Err(e) => return Err(Self::handle_error(e)),
         };
 
-        if response.status().is_success() {
-            let submission_response: WorkflowStatus = match response.json().await {
-                Ok(submission_response) => submission_response,
-                Err(e) => return Err(Self::handle_error(e)),
-            };
-            Ok(submission_response)
-        } else {
-            Err(Self::handle_error(response.error_for_status().unwrap_err()))
-        }
+        let status_code = response.status();
+        let submission_response: WorkflowStatus = match response.json().await {
+            Ok(WorkflowResponse::WorkflowStatus(workflow_status)) => workflow_status,
+            Ok(WorkflowResponse::WorkflowErrorResponse(error_response)) => {
+                if status_code == StatusCode::BAD_REQUEST {
+                    if requested_workflow_id.is_some()
+                        && error_response
+                            .message
+                            .contains("Requested workflow IDs are already in use")
+                    {
+                        return Err(CromwellError {
+                            response_code: status_code.as_u16(),
+                            response_type: "DuplicateWorkflowId".to_string(),
+                            response_message: error_response.message,
+                            response_text: None,
+                        });
+                    } else {
+                        return Err(CromwellError {
+                            response_code: status_code.as_u16(),
+                            response_type: "BadRequest".to_string(),
+                            response_message: error_response.message,
+                            response_text: None,
+                        });
+                    }
+                } else {
+                    return Err(CromwellError {
+                        response_code: status_code.as_u16(),
+                        response_type: "InternalServerError".to_string(),
+                        response_message: error_response.message,
+                        response_text: None,
+                    });
+                };
+            }
+            Err(e) => return Err(Self::handle_error(e)),
+        };
+
+        Ok(submission_response)
     }
 
     async fn read_file(path: &Path) -> Result<Vec<u8>, std::io::Error> {
@@ -477,7 +519,9 @@ impl CromwellClient {
         let response_type = match response_code {
             200 => "Success",
             404 => "NotFound",
+            400 => "BadRequest",
             500 => "InternalServerError",
+            201 => "Created",
             _ => "Unknown",
         };
 
@@ -549,6 +593,11 @@ pub fn render_workflow_metadata(
         }
     };
 
+    info!(
+        "Rendering workflow metadata from {} to {}",
+        input_file.display(),
+        dest_dir.display()
+    );
     let tera = match Tera::new(dir.join("*.json").to_str().unwrap()) {
         Ok(tera) => tera,
         Err(e) => return Err(anyhow::anyhow!("Failed to create Tera instance: {}", e)),

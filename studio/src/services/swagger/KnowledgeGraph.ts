@@ -924,6 +924,20 @@ export async function fetchTaskByTaskId(
   });
 }
 
+/** Call `/api/v1/tasks/:task_id` with payload to delete a task. DELETE /api/v1/tasks/${param0} */
+export async function deleteTask(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.deleteTaskParams,
+  options?: { [key: string]: any },
+) {
+  const { task_id: param0, ...queryParams } = params;
+  return request<any>(`/api/v1/tasks/${param0}`, {
+    method: 'DELETE',
+    params: { ...queryParams },
+    ...(options || {}),
+  });
+}
+
 /** Call `/api/v1/tasks/:task_id/file` with query params to fetch file by file_name. GET /api/v1/tasks/${param0}/file */
 export async function fetchFileByFileName(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -936,6 +950,20 @@ export async function fetchFileByFileName(
     params: {
       ...queryParams,
     },
+    ...(options || {}),
+  });
+}
+
+/** Call `/api/v1/tasks/:task_id/log` with query params to fetch log by task_id. GET /api/v1/tasks/${param0}/log */
+export async function fetchLogByTaskId(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: swagger.fetchLogByTaskIdParams,
+  options?: { [key: string]: any },
+) {
+  const { task_id: param0, ...queryParams } = params;
+  return request<swagger.LogMessage>(`/api/v1/tasks/${param0}/log`, {
+    method: 'GET',
+    params: { ...queryParams },
     ...(options || {}),
   });
 }

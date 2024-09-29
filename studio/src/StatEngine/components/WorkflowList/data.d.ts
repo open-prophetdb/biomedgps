@@ -29,8 +29,8 @@ export type TaskHistory = {
   task_name: string;
   description?: string;
   submitted_time: string;
-  started_time: string;
-  finished_time: string;
+  started_time?: string;
+  finished_time?: string;
   task_params: any;
   labels?: any;
   status?: string;
@@ -73,9 +73,14 @@ export declare type ChartData = {
   examples: Example[];
 };
 
+export type FileMeta = {
+  filename: string;
+  filetype: string;
+};
+
 export declare type ChartResult = {
-  results?: string[];
-  charts?: string[];
+  files?: FileMeta[];
+  charts?: FileMeta[];
   task_id?: string;
-  log?: string;
+  log_message?: string;
 };

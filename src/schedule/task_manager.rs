@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::time::{interval, sleep, timeout};
 use tokio::task::JoinHandle;
+use tokio::{
+    sync::Notify,
+    time::{interval, sleep, timeout, Duration},
+};
+use log::{error, info, warn};
 
 // Task configuration structure
 struct TaskConfig {
@@ -56,13 +59,15 @@ impl TaskManager {
     }
 
     // Start all tasks
-    pub async fn start_all(&self) {
+    pub async fn start_all(&self, shutdown_notify: Arc<Notify>) {
         let mut handles = vec![];
 
         for task in self.tasks.values() {
             let task_clone = task.clone();
+            let shutdown_notify_clone = Arc::clone(&shutdown_notify);
+
             handles.push(tokio::spawn(async move {
-                run_task_loop(task_clone).await;
+                run_task_loop(task_clone, shutdown_notify_clone).await;
             }));
         }
 
@@ -73,40 +78,46 @@ impl TaskManager {
 }
 
 // Task main loop, including congestion detection, retry, and timeout
-pub async fn run_task_loop(task: Task) {
+pub async fn run_task_loop(task: Task, shutdown_notify: Arc<Notify>) {
     let mut interval = interval(task.config.interval);
 
     loop {
-        interval.tick().await; // Wait for the next time interval
+        tokio::select! {
+            _ = interval.tick() => {
+                // 检测任务是否正在运行，防止拥塞
+                let mut running = task.is_running.lock().unwrap();
+                if *running {
+                    info!("Task {} is running, skip this round", task.name);
+                    continue; // 跳过任务执行
+                }
+                *running = true;
+                drop(running); // 释放锁
 
-        // Detect if the task is running to prevent congestion
-        let mut running = task.is_running.lock().unwrap();
-        if *running {
-            println!("Task {} is running, skip this round", task.name);
-            continue; // Skip task execution
-        }
-        *running = true;
-        drop(running); // Release the lock
+                // 开始执行任务（包含重试机制）
+                let task_func = Arc::clone(&task.func);
+                let is_task_running = Arc::clone(&task.is_running);
+                let task_name = task.name.clone();
+                let max_retries = task.config.retries;
+                let task_timeout = task.config.timeout;
 
-        // Start executing the task (retry mechanism)
-        let task_func = Arc::clone(&task.func);
-        let is_task_running = Arc::clone(&task.is_running);
-        let task_name = task.name.clone();
-        let max_retries = task.config.retries;
-        let task_timeout = task.config.timeout;
+                tokio::spawn(async move {
+                    let result =
+                        run_task_with_retry(&task_name, task_func, max_retries, task_timeout).await;
 
-        tokio::spawn(async move {
-            let result =
-                run_task_with_retry(&task_name, task_func, max_retries, task_timeout).await;
+                    if let Err(err) = result {
+                        info!("Task {} finally failed: {}", &task_name, err);
+                    }
 
-            if let Err(err) = result {
-                println!("Task {} finally failed: {}", &task_name, err);
+                    // 任务结束后重置状态
+                    let mut running = is_task_running.lock().unwrap();
+                    *running = false;
+                });
+            },
+            _ = shutdown_notify.notified() => {
+                info!("Received shutdown signal, stopping task {}", task.name);
+                break; // 跳出循环，停止任务
             }
-
-            // Reset the status after the task is finished
-            let mut running = is_task_running.lock().unwrap();
-            *running = false;
-        });
+        }
     }
 }
 
@@ -123,7 +134,7 @@ where
     let mut attempts = 0;
 
     while attempts <= retries {
-        println!("Task {} attempt {}", name, attempts + 1);
+        info!("Task {} attempt {}", name, attempts + 1);
 
         // Use tokio::time::timeout to implement timeout control
         let func_clone = Arc::clone(&func);
@@ -133,26 +144,26 @@ where
 
         match result {
             Ok(Ok(Ok(_))) => {
-                println!("Task {} success", name);
+                info!("Task {} success", name);
                 return Ok(());
             }
             Ok(Ok(Err(e))) => {
-                println!("Task {} failed: {}", name, e);
+                error!("Task {} failed: {}", name, e);
             }
             Ok(Err(join_err)) => {
-                println!("Task {} execution error: {}", name, join_err);
+                error!("Task {} execution error: {}", name, join_err);
             }
             Err(_) => {
-                println!("Task {} timeout", name);
+                error!("Task {} timeout", name);
             }
         }
 
         attempts += 1;
         if attempts <= retries {
-            println!("Waiting 5 seconds before retrying task {}", name);
+            warn!("Waiting 5 seconds before retrying task {}", name);
             sleep(Duration::from_secs(5)).await;
         } else {
-            println!("Task {} retry count exhausted", name);
+            warn!("Task {} retry count exhausted", name);
             return Err("Task retry failed".to_string());
         }
     }

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { ProFormColumnsType } from '@ant-design/pro-form';
 import { GridContent } from '@ant-design/pro-layout';
 import { Col, message, Row, Spin, Tabs, Form, Empty, Select, Input, Button, Popover, Descriptions } from 'antd';
@@ -17,7 +18,7 @@ import Resizer from './components/Resizer';
 import ResultPanel from './components/ResultPanel';
 
 // Custom DataType
-import type { ChartResult, DataItem } from './components/WorkflowList/data';
+import type { ChartResult, DataItem, FileMeta } from './components/WorkflowList/data';
 import type { Workflow, TaskHistory } from './components/WorkflowList/data';
 
 // Custom API
@@ -35,14 +36,22 @@ export type StatEngineProps = {
   task?: TaskHistory;
 }
 
+const isRunningFn = (task: TaskHistory): boolean => {
+  return task.status === 'Running' || !task.status;
+}
+
 const StatEngine: React.FC<StatEngineProps> = (props) => {
   console.log('StatEngine Props: ', props);
 
   const [taskName, setTaskName] = useState<string>(props.task?.task_name || '');
   const [taskNameWarning, setTaskNameWarning] = useState<string | null>(null);
   const [taskDescription, setTaskDescription] = useState<string>(props.task?.description || '');
+
+  const [currentTask, setCurrentTask] = useState<TaskHistory | undefined>(props.task);
+
   const [workflowInfoVisible, setWorkflowInfoVisible] = useState<boolean>(false);
   const [taskStatus, setTaskStatus] = useState<'Running' | 'Succeeded' | 'Failed' | 'Unknown' | null>(null);
+  const [submitDisabled, setSubmitDisabled] = useState<boolean>(false);
 
   const [leftSpan, setLeftSpan] = useState<number>(8);
   const [resizeBtnActive, setResizeBtnActive] = useState<boolean>(false);
@@ -50,31 +59,18 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   // Left Panel
   const [currentActiveKey, setCurrentActiveKey] = useState<string>('arguments');
 
-  // Chart
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [argumentColumns, setArgumentColumns] = useState<ProFormColumnsType<DataItem>[] & any>([]);
   const [fieldsValue, setFieldsValue] = useState<Record<string, any>>(props.task?.task_params || {});
+  const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
 
   const [resultData, setResultData] = useState<ChartResult | undefined>({
-    results: [],
+    files: [],
     charts: [],
     task_id: '',
-    log: '',
+    log_message: '',
   });
-
-  // Result
   const [resultLoading, setResultLoading] = useState<boolean>(false);
-
-  // useEffect(() => {
-  //   // More details on https://v3.umijs.org/docs/routing#routing-component-parameters
-  //   const chart = props.chart;
-
-  //   if (chart) {
-  //     setCurrentChart(chart);
-  //   } else {
-  //     setCurrentChart('boxplot');
-  //   }
-  // }, [props.chart]);
 
   const setChart = (workflowId: string, fieldsValue?: Record<string, any>) => {
     fetchWorkflowSchema({ id: workflowId }).then((response) => {
@@ -113,50 +109,79 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
   };
 
   useEffect(() => {
-    if (props.task) {
-      autoFetchTask(props.task.task_id || "");
+    if (!currentTask || !currentTask.task_id) {
+      return;
     }
-  }, [props.task]);
+
+    const taskId = currentTask.task_id;
+    autoFetchTask(taskId);
+
+    // Clear existing interval to avoid creating multiple intervals
+    if (intervalIdRef.current) {
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+
+    // Create a new interval
+    const newIntervalId = setInterval(() => {
+      autoFetchTask(taskId);
+    }, 5000);
+
+    intervalIdRef.current = newIntervalId;
+
+    return () => {
+      // Always clear interval in cleanup function
+      if (newIntervalId) {
+        clearInterval(newIntervalId);
+        intervalIdRef.current = null;
+      }
+    };
+  }, [currentTask]);
+
+  const clearRunningInterval = () => {
+    if (intervalIdRef.current) {
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+  };
 
   const autoFetchTask = (taskId: string) => {
-    const interval = setInterval(() => {
-      if (taskId.length > 0) {
-        fetchTaskByTaskId({ task_id: taskId })
-          .then((resp) => {
-            const { task, workflow } = resp;
-            const results: { files: Record<string, any>[], charts: Record<string, any>[] } | null = task.results;
+    if (taskId.length > 0) {
+      fetchTaskByTaskId({ task_id: taskId })
+        .then((resp) => {
+          const { task, workflow } = resp;
+          const results: { files: FileMeta[]; charts: FileMeta[] } | null = task.results;
 
-            if (task.status === 'Succeeded') {
-              setResultData({
-                results: results?.files.map((file) => file.filelink) || [],
-                charts: results?.charts.map((chart) => chart.filelink) || [],
-                log: task.log_message,
-                task_id: task.task_id,
-              });
-              setTaskStatus('Succeeded');
-              message.success('Load chart...');
-              clearInterval(interval);
-            } else if (task.status === 'Failed') {
-              setResultData({
-                results: results?.files.map((file) => file.filelink) || [],
-                charts: results?.charts.map((chart) => chart.filelink) || [],
-                log: task.log_message,
-                task_id: task.task_id,
-              });
-              setTaskStatus('Failed');
-              message.error('Something wrong, please check the log for more details.');
-              clearInterval(interval);
-            } else {
-              setTaskStatus('Running');
-            }
-          })
-          .catch((error) => {
-            console.log('Get Task Error: ', error);
-            clearInterval(interval);
-            setTaskStatus('Unknown');
-          });
-      }
-    }, 5000);
+          if (task.status === 'Succeeded') {
+            setResultData({
+              files: results?.files || [],
+              charts: results?.charts || [],
+              log_message: task.log_message,
+              task_id: task.task_id,
+            });
+            setTaskStatus('Succeeded');
+            message.success('Load chart...');
+            clearRunningInterval();
+          } else if (task.status === 'Failed') {
+            setResultData({
+              files: results?.files || [],
+              charts: results?.charts || [],
+              log_message: task.log_message,
+              task_id: task.task_id,
+            });
+            setTaskStatus('Failed');
+            message.error('Something wrong, please check the log for more details.');
+            clearRunningInterval();
+          } else {
+            setTaskStatus('Running');
+          }
+        })
+        .catch((error) => {
+          console.log('Get Task Error: ', error);
+          setTaskStatus('Unknown');
+          clearRunningInterval();
+        });
+    }
   };
 
   const onSubmit = (values: Pick<TaskHistory, 'task_params'>): Promise<TaskHistory> => {
@@ -182,18 +207,27 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
       owner: ''
     }
 
+    setResultLoading(true);
     return new Promise<TaskHistory>((resolve, reject) => {
       postTask(task, values)
         .then((response) => {
           console.log('Post Chart: ', response);
           message.success(`Create the ${taskName} successfully.`);
-          setResultLoading(true);
-          autoFetchTask(response.task_id);
+
+          setResultLoading(false);
+          setSubmitDisabled(true);
+          setCurrentTask(response);
+
           resolve(response);
         })
         .catch((error) => {
           message.warning('Unknown error, please retry later.');
           console.log('Post Chart Error: ', error);
+
+          setResultLoading(false);
+          setSubmitDisabled(false);
+          setCurrentTask(undefined);
+
           reject(error);
         });
     });
@@ -217,11 +251,11 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
             setTaskNameWarning(null);
             setTaskName(e.target.value)
           }} allowClear
-            disabled={props.task !== undefined} size='large' />
+            disabled={props.task !== undefined || taskStatus !== null || submitDisabled} size='large' />
         </Form.Item>
         <Form.Item style={{ width: 'calc(60% - 100px)' }}>
           <Input placeholder='Enter Your Task Description' value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} allowClear
-            disabled={props.task !== undefined} size='large' />
+            disabled={props.task !== undefined || taskStatus !== null || submitDisabled} size='large' />
         </Form.Item>
         <Popover content={
           <Descriptions title="Workflow Summary" column={2} bordered>
@@ -262,7 +296,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
                     key="arguments"
                   >
                     <ArgumentForm
-                      readonly={props.task !== undefined}
+                      readonly={props.task !== undefined || taskStatus !== null || submitDisabled}
                       contextData={{}}
                       fieldsValue={fieldsValue}
                       labelSpan={24}
@@ -305,11 +339,11 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
               <ResultPanel
                 taskStatus={taskStatus}
                 workflow={props.workflow}
-                results={resultData?.results || []}
+                files={resultData?.files || []}
                 charts={resultData?.charts || []}
-                taskId={resultData?.task_id || ''}
+                task={currentTask}
                 responsiveKey={leftSpan}
-                logLink={resultData?.log || ''}
+                logMessage={resultData?.log_message || ''}
                 onClickItem={restoreChart}
               ></ResultPanel>
             </Row>

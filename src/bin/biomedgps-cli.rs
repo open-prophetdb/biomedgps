@@ -27,10 +27,9 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(setting=structopt::clap::AppSettings::ColoredHelp, name = "A cli for biomedgps service.", author="Jingcheng Yang <yjcyxky@163.com>;")]
 struct Opt {
-    /// Activate debug mode
-    /// short and long flags (--debug) will be deduced from the field's name
-    #[structopt(name = "debug", long = "debug")]
-    debug: bool,
+    /// Short and long flags (--verbose or -v) will increase the log level.
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: u8,
 
     #[structopt(subcommand)]
     cmd: SubCommands,
@@ -287,10 +286,20 @@ pub struct ImportKGEArguments {
 async fn main() {
     let opt = Opt::from_args();
 
-    let _ = if opt.debug {
-        init_logger("biomedgps-cli", LevelFilter::Debug)
-    } else {
-        init_logger("biomedgps-cli", LevelFilter::Info)
+    info!("Setting up logger with {} level.", opt.verbose);
+    let log_result = match opt.verbose {
+        0 => init_logger("biomedgps", LevelFilter::Warn),
+        1 => init_logger("biomedgps", LevelFilter::Info),
+        2 => init_logger("biomedgps", LevelFilter::Debug),
+        _ => init_logger("biomedgps", LevelFilter::Debug),
+    };
+
+    let _logger_handle = match log_result {
+        Ok(handle) => handle,
+        Err(log) => {
+            error!(target:"stdout", "Log initialization error, {}", log);
+            std::process::exit(1);
+        }
     };
 
     match opt.cmd {
