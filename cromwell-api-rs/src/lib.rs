@@ -1,5 +1,5 @@
 use anyhow;
-use log::{error, info};
+use log::{error, info, warn};
 use reqwest::multipart::{Form, Part};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -574,7 +574,9 @@ pub fn print_status(status: &StatusResponse) {
 pub fn render_workflow_metadata(
     input_file: &Path,
     metadata: &serde_json::Value,
+    script_dir: &str,
     dest_dir: &Path,
+    template_mode: bool,
 ) -> Result<PathBuf, anyhow::Error> {
     if !dest_dir.exists() {
         return Err(anyhow::anyhow!(
@@ -598,22 +600,53 @@ pub fn render_workflow_metadata(
         input_file.display(),
         dest_dir.display()
     );
-    let tera = match Tera::new(dir.join("*.json").to_str().unwrap()) {
-        Ok(tera) => tera,
-        Err(e) => return Err(anyhow::anyhow!("Failed to create Tera instance: {}", e)),
-    };
 
-    let mut context = Context::new();
-    context.insert("metadata", metadata);
+    let mut metadata_obj = metadata.clone();
+    let metadata_obj = metadata_obj.as_object_mut().unwrap();
+    metadata_obj.insert(
+        "script_dir".to_string(),
+        serde_json::Value::String(script_dir.to_string()),
+    );
 
-    let filename = input_file.file_name().unwrap();
-    let dest_file = dest_dir.join(filename);
-    match tera.render(filename.to_str().unwrap(), &context) {
-        Ok(rendered) => {
-            std::fs::write(&dest_file, rendered)?;
-            Ok(dest_file)
+    if template_mode {
+        let tera = match Tera::new(dir.join("*.json").to_str().unwrap()) {
+            Ok(tera) => tera,
+            Err(e) => return Err(anyhow::anyhow!("Failed to create Tera instance: {}", e)),
+        };
+
+        let mut context = Context::new();
+        context.insert("metadata", metadata_obj);
+
+        let filename = input_file.file_name().unwrap();
+        let dest_file = dest_dir.join(filename);
+        match tera.render(filename.to_str().unwrap(), &context) {
+            Ok(rendered) => {
+                std::fs::write(&dest_file, rendered)?;
+                Ok(dest_file)
+            }
+            Err(e) => return Err(anyhow::anyhow!("Failed to render template: {}", e)),
         }
-        Err(e) => return Err(anyhow::anyhow!("Failed to render template: {}", e)),
+    } else {
+        let json_content = match std::fs::read_to_string(input_file) {
+            Ok(json_content) => json_content,
+            Err(e) => return Err(anyhow::anyhow!("Failed to read input file: {}", e)),
+        };
+        let mut inputs: serde_json::Value = serde_json::from_str(&json_content)?;
+        let dest_file = dest_dir.join(input_file.file_name().unwrap());
+
+        // Replace the metadata in the JSON file with the metadata in the metadata argument
+        for (key, value) in inputs.as_object_mut().unwrap() {
+            let variable_name = key.split('.').last().unwrap();
+            if metadata_obj.get(variable_name).is_some() {
+                *value = metadata_obj.get(variable_name).unwrap().clone();
+            } else {
+                warn!("Variable {} not found in metadata", variable_name);
+            }
+        }
+
+        std::fs::write(&dest_file, serde_json::to_string_pretty(&inputs)?)?;
+
+        Ok(dest_file)
     }
 }
 

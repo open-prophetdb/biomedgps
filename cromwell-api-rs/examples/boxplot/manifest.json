@@ -1,0 +1,19 @@
+{
+    "name": "Boxplot",
+    "short_name": "boxplot",
+    "description": "Generate boxplot for selected genes / proteins across groups.",
+    "home": "https://github.com/yjcyxky/omix-insight-r",
+    "hidden": false,
+    "icons": {
+        "src": "/workflows/boxplot-v0.1.0/logo.png",
+        "type": "image/png",
+        "sizes": "512x512"
+    },
+    "category": "Pipeline",
+    "source": "OpenProphetDB",
+    "author": "yjcyxky",
+    "maintainers": ["exo-team"],
+    "tags": ["boxplot"],
+    "readme": "/workflows/boxplot-v0.1.0/README.md",
+    "version": "0.1.0"
+}

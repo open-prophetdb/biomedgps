@@ -127,7 +127,7 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
                                 }}>Delete</Button>
                             </Button.Group>
                         </div>
-                    } trigger="click" popupVisible={popupVisible}>
+                    } trigger="click" open={popupVisible}>
                         <Button danger style={{ backgroundColor: '#FF4D4F', color: '#fff' }}>Delete</Button>
                     </Popover>
                 </Button.Group>

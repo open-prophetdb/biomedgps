@@ -209,7 +209,7 @@ const StatEngine: React.FC<StatEngineProps> = (props) => {
 
     setResultLoading(true);
     return new Promise<TaskHistory>((resolve, reject) => {
-      postTask(task, values)
+      postTask(task)
         .then((response) => {
           console.log('Post Chart: ', response);
           message.success(`Create the ${taskName} successfully.`);

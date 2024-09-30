@@ -72,7 +72,7 @@ const WorkflowPanel: React.FC<WorkflowProps> = (props) => {
                             alignItems: 'center',
                             borderRadius: '5px',
                         }}>
-                            {icon ? <img src={icon.src} alt={icon.type || ''} width={'100%'} height={'100%'} /> : <AppstoreOutlined style={{ color: '#fff' }} />}
+                            {icon ? <img src={icon.src} alt={icon.type || ''} width={'36px'} height={'36px'} /> : <AppstoreOutlined style={{ color: '#fff' }} />}
                         </div>
                     </Col>
                     <Col>

@@ -1,0 +1,12 @@
+{
+    "boxplot.boxplot_task.exp_file": "/Users/jy006/Documents/Code/BioMiner/omix-insight-r/examples/gene_expression.tsv",
+    "boxplot.boxplot_task.sample_info_file": "/Users/jy006/Documents/Code/BioMiner/omix-insight-r/examples/sample_info.tsv",
+    "boxplot.boxplot_task.which_entrez_ids": [],
+    "boxplot.boxplot_task.which_gene_symbols": ["BDNF", "TP53"],
+    "boxplot.boxplot_task.which_groups": ["Female_MECFS", "Female_Control"],
+    "boxplot.boxplot_task.method": "t.test",
+    "boxplot.boxplot_task.log_scale": "FALSE",
+    "boxplot.boxplot_task.enable_label": "FALSE",
+    "boxplot.boxplot_task.enable_log2fc": "FALSE",
+    "boxplot.boxplot_task.script_dir": "/Users/jy006/Documents/Code/BioMedGPS/biomedgps/cromwell-api-rs/examples/boxplot"
+}

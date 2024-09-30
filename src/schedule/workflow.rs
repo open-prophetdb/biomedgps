@@ -233,7 +233,7 @@ pub async fn submit_workflow(
                 std::fs::create_dir_all(&task_template_dir)?;
             }
 
-            match render_workflow_metadata(&input_json_file, &task_params, &task_template_dir) {
+            match render_workflow_metadata(&input_json_file, &task_params, &workflow_dir.to_str().unwrap(), &task_template_dir, false) {
                 Ok(rendered_input_json_file) => {
                     let workflow_file = workflow_dir.join("workflow.wdl");
 

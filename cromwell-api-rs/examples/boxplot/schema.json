@@ -1,0 +1,144 @@
+{
+    "readme": "/workflows/boxplot-v0.1.0/README.md",
+    "schema": {
+        "fields": [
+            {
+                "key": "exp_file",
+                "dataIndex": "exp_file",
+                "valueType": "text",
+                "title": "Expression Matrix File",
+                "tooltip": "Expression matrix file.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Expression matrix file is required."
+                        }
+                    ]
+                }
+            },
+            {
+                "key": "sample_info_file",
+                "dataIndex": "sample_info_file",
+                "valueType": "text",
+                "title": "Sample Information File",
+                "tooltip": "Sample information file.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Sample information file is required."
+                        }
+                    ]
+                }
+            },
+            {
+                "key": "which_gene_symbols",
+                "dataIndex": "which_gene_symbols",
+                "valueType": "select",
+                "fieldProps": {
+                    "mode": "multiple"
+                },
+                "title": "Which Gene Symbols",
+                "tooltip": "Which gene symbols to select.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Which gene symbols is required."
+                        }
+                    ]
+                },
+                "valueEnum": {
+                    "BDNF": "BDNF",
+                    "TP53": "TP53",
+                    "EGFR": "EGFR"
+                }
+            },
+            {
+                "key": "which_groups",
+                "dataIndex": "which_groups",
+                "valueType": "select",
+                "title": "Which Groups",
+                "tooltip": "Which groups to select.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Which groups is required."
+                        }
+                    ]
+                },
+                "fieldProps": {
+                    "mode": "multiple"
+                },
+                "valueEnum": {
+                    "Female_MECFS": "Female_MECFS",
+                    "Female_Control": "Female_Control"
+                }
+            },
+            {
+                "key": "method",
+                "dataIndex": "method",
+                "valueType": "select",
+                "valueEnum": {
+                    "t.test": "t.test",
+                    "wilcox.test": "wilcox.test",
+                    "anova": "anova",
+                    "kruskal.test": "kruskal.test"
+                },
+                "title": "Method",
+                "tooltip": "Method to use for boxplot. Supported methods: `t.test`, `wilcox.test`, `anova`, `kruskal.test`. Default: `t.test`."
+            },
+            {
+                "key": "log_scale",
+                "dataIndex": "log_scale",
+                "valueType": "select",
+                "valueEnum": {
+                    "TRUE": "TRUE",
+                    "FALSE": "FALSE"
+                },
+                "title": "Log Scale",
+                "tooltip": "Whether to use log scale for boxplot. TRUE or FALSE. Default: FALSE."
+            },
+            {
+                "key": "enable_label",
+                "dataIndex": "enable_label",
+                "valueType": "select",
+                "valueEnum": {
+                    "TRUE": "TRUE",
+                    "FALSE": "FALSE"
+                },
+                "title": "Enable Label",
+                "tooltip": "Whether to enable label for boxplot. TRUE or FALSE. Default: FALSE."
+            },
+            {
+                "key": "enable_log2fc",
+                "dataIndex": "enable_log2fc",
+                "valueType": "select",
+                "valueEnum": {
+                    "TRUE": "TRUE",
+                    "FALSE": "FALSE"
+                },
+                "title": "Enable Log2FC",
+                "tooltip": "Whether to enable log2 fold change for boxplot. TRUE or FALSE. Default: FALSE."
+            }
+        ],
+        "examples": [
+            {
+                "title": "Example 1",
+                "key": "example-1",
+                "arguments": {
+                    "exp_file": "data/expression_matrix.tsv",
+                    "sample_info_file": "data/sample_info.tsv",
+                    "which_gene_symbols": ["Gene1", "Gene2"],
+                    "which_groups": ["Group1", "Group2"],
+                    "method": "t.test",
+                    "log_scale": "FALSE",
+                    "enable_label": "FALSE",
+                    "enable_log2fc": "FALSE"
+                }
+            }
+        ]
+    }
+}
