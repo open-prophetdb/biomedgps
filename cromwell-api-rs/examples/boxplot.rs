@@ -31,7 +31,7 @@ async fn main() -> Result<(), CromwellError> {
 
     let workflow_uuid = uuid::Uuid::new_v4().to_string();
     let workflow_source = Some(Path::new("examples/boxplot/workflow.wdl"));
-    let workflow_inputs = Some(Path::new("examples/boxplot/inputs_example.json"));
+    let workflow_inputs = Some(Path::new("examples/boxplot/inputs.json"));
 
     let status = match client
         .submit_workflow(

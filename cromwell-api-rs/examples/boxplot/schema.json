@@ -3,6 +3,21 @@
     "schema": {
         "fields": [
             {
+                "key": "dataset",
+                "dataIndex": "dataset",
+                "valueType": "dataset_searcher",
+                "title": "Dataset",
+                "tooltip": "Dataset to use for boxplot.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Dataset is required."
+                        }
+                    ]
+                }
+            },
+            {
                 "key": "exp_file",
                 "dataIndex": "exp_file",
                 "valueType": "text",
@@ -14,7 +29,8 @@
                             "required": true,
                             "message": "Expression matrix file is required."
                         }
-                    ]
+                    ],
+                    "hidden": true
                 }
             },
             {
@@ -29,13 +45,14 @@
                             "required": true,
                             "message": "Sample information file is required."
                         }
-                    ]
+                    ],
+                    "hidden": true
                 }
             },
             {
                 "key": "which_gene_symbols",
                 "dataIndex": "which_gene_symbols",
-                "valueType": "select",
+                "valueType": "gene_searcher",
                 "fieldProps": {
                     "mode": "multiple"
                 },
@@ -48,11 +65,6 @@
                             "message": "Which gene symbols is required."
                         }
                     ]
-                },
-                "valueEnum": {
-                    "BDNF": "BDNF",
-                    "TP53": "TP53",
-                    "EGFR": "EGFR"
                 }
             },
             {
@@ -71,10 +83,6 @@
                 },
                 "fieldProps": {
                     "mode": "multiple"
-                },
-                "valueEnum": {
-                    "Female_MECFS": "Female_MECFS",
-                    "Female_Control": "Female_Control"
                 }
             },
             {
@@ -88,7 +96,10 @@
                     "kruskal.test": "kruskal.test"
                 },
                 "title": "Method",
-                "tooltip": "Method to use for boxplot. Supported methods: `t.test`, `wilcox.test`, `anova`, `kruskal.test`. Default: `t.test`."
+                "tooltip": "Method to use for boxplot. Supported methods: `t.test`, `wilcox.test`, `anova`, `kruskal.test`. Default: `t.test`.",
+                "formItemProps": {
+                    "initialValue": "t.test"
+                }
             },
             {
                 "key": "log_scale",
@@ -99,7 +110,15 @@
                     "FALSE": "FALSE"
                 },
                 "title": "Log Scale",
-                "tooltip": "Whether to use log scale for boxplot. TRUE or FALSE. Default: FALSE."
+                "tooltip": "Whether to use log scale for boxplot. TRUE or FALSE. Default: FALSE.",
+                "formItemProps": {
+                    "rules": [
+                        {
+                            "required": true,
+                            "message": "Log scale is required."
+                        }
+                    ]
+                }
             },
             {
                 "key": "enable_label",
@@ -110,7 +129,10 @@
                     "FALSE": "FALSE"
                 },
                 "title": "Enable Label",
-                "tooltip": "Whether to enable label for boxplot. TRUE or FALSE. Default: FALSE."
+                "tooltip": "Whether to enable label for boxplot. TRUE or FALSE. Default: FALSE.",
+                "formItemProps": {
+                    "initialValue": "FALSE"
+                }
             },
             {
                 "key": "enable_log2fc",
@@ -121,7 +143,10 @@
                     "FALSE": "FALSE"
                 },
                 "title": "Enable Log2FC",
-                "tooltip": "Whether to enable log2 fold change for boxplot. TRUE or FALSE. Default: FALSE."
+                "tooltip": "Whether to enable log2 fold change for boxplot. TRUE or FALSE. Default: FALSE.",
+                "formItemProps": {
+                    "initialValue": "TRUE"
+                }
             }
         ],
         "examples": [

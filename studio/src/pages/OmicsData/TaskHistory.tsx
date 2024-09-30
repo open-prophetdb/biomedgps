@@ -39,8 +39,9 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
         },
         {
             title: 'Description',
-            dataIndex: 'key_sentence',
+            dataIndex: 'description',
             fixed: 'left',
+            align: 'center',
             ellipsis: true,
             width: 'auto',
         },
@@ -94,6 +95,9 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
             dataIndex: 'status',
             align: 'center',
             width: 120,
+            render: (text) => {
+                return <Tag color={text === 'Succeeded' ? 'green' : 'red'}>{text}</Tag>;
+            },
         },
         {
             title: 'Actions',
@@ -108,26 +112,21 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
                     <Popover content={
                         <div>
                             <p>Are you sure you want to delete this task?</p>
-                            <Button.Group>
-                                <Button type="default" onClick={() => {
+                            <Button danger onClick={() => {
+                                deleteTask({
+                                    task_id: record.task_id,
+                                }).then(() => {
+                                    message.success('Delete task successfully');
+                                    setRefreshKey(refreshKey + 1);
+                                }).catch((error) => {
+                                    message.error(`Delete task failed, ${error}`);
+                                    setRefreshKey(refreshKey + 1);
+                                }).finally(() => {
                                     setPopupVisible(false);
-                                }}>Cancel</Button>
-                                <Button danger onClick={() => {
-                                    deleteTask({
-                                        task_id: record.task_id,
-                                    }).then(() => {
-                                        message.success('Delete task successfully');
-                                        setRefreshKey(refreshKey + 1);
-                                    }).catch((error) => {
-                                        message.error(`Delete task failed, ${error}`);
-                                        setRefreshKey(refreshKey + 1);
-                                    }).finally(() => {
-                                        setPopupVisible(false);
-                                    });
-                                }}>Delete</Button>
-                            </Button.Group>
+                                });
+                            }}>Delete</Button>
                         </div>
-                    } trigger="click" open={popupVisible}>
+                    } trigger="click">
                         <Button danger style={{ backgroundColor: '#FF4D4F', color: '#fff' }}>Delete</Button>
                     </Popover>
                 </Button.Group>

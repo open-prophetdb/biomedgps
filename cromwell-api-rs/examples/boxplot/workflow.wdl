@@ -70,10 +70,15 @@ task boxplot_task {
         EOF
 
         Rscript ~{script_dir}/boxplot.R args.json
+
+        cp ~{exp_file} ./
+        cp ~{sample_info_file} ./
     >>>
 
     output {
         File metadata = "metadata.json"
         File out_plot = "output.json"
+        File exp_file = "~{basename(exp_file)}"
+        File sample_info_file = "~{basename(sample_info_file)}"
     }
 }

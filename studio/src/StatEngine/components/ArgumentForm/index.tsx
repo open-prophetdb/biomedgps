@@ -1,9 +1,9 @@
 import { DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ProFormColumnsType, ProFormLayoutType } from '@ant-design/pro-form';
 import { BetaSchemaForm, ProProvider, ProFormSelect } from '@ant-design/pro-components';
-import { Button, Col, Empty, Row, Space, Tooltip, Form } from 'antd';
-// import GeneSearcher from '@/components/GeneSearcher';
-// import { GenesQueryParams, GeneDataResponse } from '@/components/GeneSearcher';
+import { Button, Col, Empty, Row, Space, Tooltip, Form, Select } from 'antd';
+import GeneSearcher from '../GeneSearcher';
+import { GenesQueryParams, GeneDataResponse } from '../GeneSearcher';
 import FormItem from 'antd/lib/form/FormItem';
 import React, { memo, useContext, useEffect, useState } from 'react';
 import type { TaskHistory } from '../WorkflowList/data';
@@ -14,6 +14,19 @@ type DataItem = {
   name: string;
   state: string;
 };
+
+const datasets = [
+  {
+    datasetName: "GSE251790_Female_CSF",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/gene_expression.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["Female_MECFS", "Female_Control"]
+    }
+  }
+]
 
 export type ArgumentProps = {
   // queryGenes: (params: GenesQueryParams) => Promise<GeneDataResponse>;
@@ -27,7 +40,9 @@ export type ArgumentProps = {
 };
 
 const ArgumentForm: React.FC<ArgumentProps> = (props) => {
-  const { columns, height, labelSpan, onSubmit, fieldsValue } = props;
+  const { height, labelSpan, onSubmit, fieldsValue } = props;
+
+  const [columns, setColumns] = useState<ProFormColumnsType<DataItem>[]>(props.columns);
 
   const activateBtn = (
     <FormItem
@@ -46,9 +61,12 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
   const [layoutType, setLayoutType] = useState<ProFormLayoutType>('QueryFilter');
   const [form] = Form.useForm();
 
+  // Ensure columns are initialized on first load
   useEffect(() => {
-    form.resetFields()
-  }, [columns])
+    if (props.columns && props.columns.length > 0) {
+      setColumns(props.columns);
+    }
+  }, [props.columns]);
 
   useEffect(() => {
     if (fieldsValue) {
@@ -64,23 +82,65 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
       <ProProvider.Provider
         value={{
           ...values,
-          // valueTypeMap: {
-          //   gene_searcher: {
-          //     render: (text: any) => <a>{text}</a>,
-          //     renderFormItem: (text: any, props: any) => {
-          //       console.log("Gene Searcher Component: ", props, form.getFieldValue(props?.id))
-          //       const initialValue = form.getFieldValue(props?.id)
-          //       return (<GeneSearcher
-          //         placeholder="Enter gene symbol, entrez id or ensembl id"
-          //         dataset={defaultDataset}
-          //         queryGenes={queryGenes}
-          //         initialValue={initialValue ? initialValue : props?.formItemProps?.initialValue}
-          //         {...props?.fieldProps}
-          //         mode={props?.fieldProps?.mode}
-          //         style={{ width: '100%' }} />)
-          //     },
-          //   }
-          // },
+          valueTypeMap: {
+            gene_searcher: {
+              render: (text: any) => <a>{text}</a>,
+              renderFormItem: (text: any, props: any) => {
+                console.log("Gene Searcher Component: ", props, form.getFieldValue(props?.id))
+                const initialValue = form.getFieldValue(props?.id)
+                return (<GeneSearcher
+                  placeholder="Enter gene symbol, entrez id"
+                  initialValue={initialValue ? initialValue : props?.formItemProps?.initialValue}
+                  {...props?.fieldProps}
+                  mode={props?.fieldProps?.mode ? props?.fieldProps?.mode : 'single'}
+                  style={{ width: '100%' }} />)
+              },
+            },
+            dataset_searcher: {
+              render: (text: any) => <a>{text}</a>,
+              renderFormItem: (text: any, props: any) => {
+                console.log("Dataset Searcher Component: ", props, text)
+                return <Select placeholder="Select a dataset" onChange={(value) => {
+                  const dataset = datasets.find((dataset) => dataset.datasetName === value)
+                  console.log("Dataset Searcher Component: ", dataset)
+                  const fieldValue = dataset?.fieldValue ?? {};
+
+                  form.setFieldsValue({
+                    ...fieldValue
+                  })
+
+                  const fieldValueEnum = dataset?.fieldValueEnum ?? {};
+                  // Update the valueEnum of which_groups
+                  const updatedColumns = columns.map((column) => {
+                    const keys = Object.keys(fieldValueEnum);
+                    if (keys.includes(column.dataIndex as string)) {
+                      const valueEnum = fieldValueEnum[column.dataIndex as keyof typeof fieldValueEnum] as string[];
+                      return {
+                        ...column,
+                        valueEnum: valueEnum.reduce((acc: any, cur: any) => {
+                          acc[cur] = cur;
+                          return acc;
+                        }, {})
+                      };
+                    }
+
+                    return column;
+                  });
+                  setColumns(updatedColumns);
+
+                  form.setFieldsValue({
+                    [props.id]: value
+                  })
+                }}>
+                  {datasets.map((dataset) => (
+                    <Select.Option key={dataset.datasetName} value={dataset.datasetName}>
+                      {dataset.datasetName}
+                    </Select.Option>
+                  ))}
+                </Select>
+              },
+            }
+          }
         }}
       >
         <Col className="argument-form__header" style={{ display: 'none' }}>
@@ -135,7 +195,7 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
       </ProProvider.Provider>
     </Row>
   ) : (
-    <Empty />
+    <Empty description="No arguments" />
   );
 };
 
