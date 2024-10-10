@@ -18,12 +18,79 @@ type DataItem = {
 const datasets = [
   {
     datasetName: "GSE251790_Female_CSF",
+    datasetDescription: "[Protein] Deep phenotyping of Post-infectious Myalgic Encephalomyelitis/Chronic Fatigue Syndrome",
     fieldValue: {
-      exp_file: "/data/biomedgps/cromwell/data/gene_expression.tsv",
-      sample_info_file: "/data/biomedgps/cromwell/data/sample_info.tsv",
+      exp_file: "/data/biomedgps/cromwell/data/GSE251790_Female_CSF/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/GSE251790_Female_CSF/sample_info.tsv",
     },
     fieldValueEnum: {
       which_groups: ["Female_MECFS", "Female_Control"]
+    }
+  },
+  {
+    datasetName: "GSE245661_Female_Muscle",
+    datasetDescription: "[RNA-seq] Deep phenotyping of Post-infectious Myalgic Encephalomyelitis/Chronic Fatigue Syndrome",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/GSE245661_Female_Muscle/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/GSE245661_Female_Muscle/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["HV", "MECFS"]
+    }
+  },
+  {
+    datasetName: "GSE254030_Female_Plasma",
+    datasetDescription: "[Protein] Deep phenotyping of Post-infectious Myalgic Encephalomyelitis/Chronic Fatigue Syndrome",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/GSE254030_Female_Plasma/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/GSE254030_Female_Plasma/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["Female_MECFS", "Female_Control"]
+    }
+  },
+  {
+    datasetName: "GSE254030_Full_Plasma",
+    datasetDescription: "[Protein] Deep phenotyping of Post-infectious Myalgic Encephalomyelitis/Chronic Fatigue Syndrome",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/GSE254030_Full_Plasma/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/GSE254030_Full_Plasma/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["MECFS", "Control"]
+    }
+  },
+  {
+    datasetName: "GSE254030_Male_Plasma",
+    datasetDescription: "[Protein] Deep phenotyping of Post-infectious Myalgic Encephalomyelitis/Chronic Fatigue Syndrome",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/GSE254030_Male_Plasma/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/GSE254030_Male_Plasma/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["Male_MECFS", "Male_Control"]
+    }
+  },
+  {
+    datasetName: "MaureenHanson_Female_Plasma",
+    datasetDescription: "[Protein] In-Depth Analysis of the Plasma Proteome in ME/CFS Exposes Disrupted Ephrin-Eph and Immune System Signaling",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/MaureenHanson_Female_Plasma/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/MaureenHanson_Female_Plasma/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["MECFS", "Control"]
+    }
+  },
+  {
+    datasetName: "Zenodo7781290_Bacterial_Viral",
+    datasetDescription: "A multi-platform approach to identify a blood-based host protein signature for distinguishing between bacterial and viral infections in febrile children (PERFORM): a multi-cohort machine learning study",
+    fieldValue: {
+      exp_file: "/data/biomedgps/cromwell/data/Zenodo7781290_Bacterial_Viral/expression_data.tsv",
+      sample_info_file: "/data/biomedgps/cromwell/data/Zenodo7781290_Bacterial_Viral/sample_info.tsv",
+    },
+    fieldValueEnum: {
+      which_groups: ["DefiniteBacterial", "DefiniteViral", "HealthyControl"]
     }
   }
 ]
@@ -133,8 +200,10 @@ const ArgumentForm: React.FC<ArgumentProps> = (props) => {
                   })
                 }}>
                   {datasets.map((dataset) => (
-                    <Select.Option key={dataset.datasetName} value={dataset.datasetName}>
-                      {dataset.datasetName}
+                    <Select.Option key={dataset.datasetName} value={dataset.datasetName} style={{ width: '100%' }}>
+                      <span>{dataset.datasetName}</span>
+                      <br />
+                      <span style={{ fontSize: '12px', color: 'gray', wordBreak: 'break-all', whiteSpace: 'normal' }}>{dataset.datasetDescription}</span>
                     </Select.Option>
                   ))}
                 </Select>

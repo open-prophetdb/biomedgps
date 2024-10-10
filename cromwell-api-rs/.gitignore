@@ -1,2 +1,5 @@
 .DS_Store
 /target
+cromwell-8*.jar
+cromwell-executions
+cromwell-workflow-logs

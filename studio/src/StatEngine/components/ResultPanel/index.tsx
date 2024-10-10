@@ -24,6 +24,7 @@ import type { ChartResult } from '../WorkflowList/data';
 import type { PlotlyChart } from 'biominer-components/dist/PlotlyViewer/data';
 import { fetchFileByFileName } from '../../../services/swagger/KnowledgeGraph';
 import type { Workflow, TaskHistory, FileMeta } from '../WorkflowList/data';
+import { formatDuration } from './util';
 
 // AG Grid theme
 import 'ag-grid-enterprise';
@@ -207,23 +208,7 @@ const ResultPanel: React.FC<ResultPanelProps> = (props) => {
       duration = finishedTime - startedTime;
     }
 
-    const durationInSeconds = duration / 1000;
-
-    if (durationInSeconds <= 0) {
-      return '0s';
-    }
-
-    if (durationInSeconds < 60) {
-      return `${Math.round(durationInSeconds)}s`;
-    } else if (durationInSeconds < 3600) {
-      const minutes = Math.floor(durationInSeconds / 60);
-      const seconds = Math.round(durationInSeconds % 60);
-      return seconds > 0 ? `${minutes}min ${seconds}s` : `${minutes}min`;
-    } else {
-      const hours = Math.floor(durationInSeconds / 3600);
-      const minutes = Math.floor((durationInSeconds % 3600) / 60);
-      return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
-    }
+    return formatDuration(duration);
   };
 
   useEffect(() => {

@@ -9,7 +9,7 @@ task boxplot_task {
     input {
         String exp_file
         String sample_info_file
-        Array[String] which_entrez_ids
+        Array[String] which_ids
         Array[String] which_gene_symbols
         Array[String] which_groups
         String method
@@ -23,7 +23,7 @@ task boxplot_task {
         echo "Generating a args file, named args.json"
         echo "exp_file: ~{exp_file}"
         echo "sample_info_file: ~{sample_info_file}"
-        echo "which_entrez_ids: ~{sep=", " which_entrez_ids}"
+        echo "which_ids: ~{sep=", " which_ids}"
         echo "which_gene_symbols: ~{sep=", " which_gene_symbols}"
         echo "which_groups: ~{sep=", " which_groups}"
         echo "method: ~{method}"
@@ -36,7 +36,7 @@ task boxplot_task {
         {
             "exp_file": "~{exp_file}",
             "sample_info_file": "~{sample_info_file}",
-            "which_entrez_ids": "~{sep=',' which_entrez_ids}",
+            "which_ids": "~{sep=',' which_ids}",
             "which_gene_symbols": "~{sep=',' which_gene_symbols}",
             "which_groups": "~{sep=',' which_groups}",
             "method": "~{method}",

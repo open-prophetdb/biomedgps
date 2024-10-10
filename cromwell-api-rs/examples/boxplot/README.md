@@ -6,7 +6,7 @@ Generate boxplot for selected genes / proteins across groups.
 
 - `exp_file`: Expression matrix file.
 - `sample_info_file`: Sample information file.
-- `which_entrez_ids`: Which entrez ids to select.
+- `which_ids`: Which ids to select.
 - `which_gene_symbols`: Which gene symbols to select.
 - `which_groups`: Which groups to select.
 - `output_file`: Output file.

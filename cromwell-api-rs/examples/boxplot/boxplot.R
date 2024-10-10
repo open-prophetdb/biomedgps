@@ -15,15 +15,15 @@ library(OmixInsightR)
 print("Running OmixInsightR for boxplot")
 
 print("Querying data from expression matrix and sample information")
-which_entrez_ids <- unlist(strsplit(args_json$which_entrez_ids, ","))
+which_ids <- unlist(strsplit(args_json$which_ids, ","))
 which_gene_symbols <- unlist(strsplit(args_json$which_gene_symbols, ","))
 which_groups <- unlist(strsplit(args_json$which_groups, ","))
 
-print(paste("Querying data from expression matrix and sample information:", args_json$exp_file, args_json$sample_info_file, which_entrez_ids, which_gene_symbols, which_groups))
+print(paste("Querying data from expression matrix and sample information:", args_json$exp_file, args_json$sample_info_file, which_ids, which_gene_symbols, which_groups))
 d <- query_data(
     exp_file = args_json$exp_file,
     sample_info_file = args_json$sample_info_file,
-    which_entrez_ids = which_entrez_ids,
+    which_ids = which_ids,
     which_gene_symbols = which_gene_symbols,
     which_groups = which_groups
 )

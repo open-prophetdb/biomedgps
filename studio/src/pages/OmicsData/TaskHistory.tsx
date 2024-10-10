@@ -3,6 +3,7 @@ import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { TaskHistory, TaskHistoryTableData } from '../../StatEngine/components/WorkflowList/data';
 import { fetchTasks, deleteTask } from '@/services/swagger/KnowledgeGraph';
+import { formatDuration } from '../../StatEngine/components/ResultPanel/util';
 
 type TaskHistoryTableProps = {
     page?: number;
@@ -35,7 +36,7 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
             align: 'center',
             dataIndex: 'task_name',
             fixed: 'left',
-            width: 150,
+            width: 200,
         },
         {
             title: 'Description',
@@ -89,6 +90,19 @@ const TaskHistoryTable: React.FC<TaskHistoryTableProps> = forwardRef((props, ref
                 return new Date(text).toLocaleString();
             },
             width: 200,
+        },
+        {
+            title: 'Duration',
+            key: 'duration',
+            align: 'center',
+            width: 100,
+            render: (text, record) => {
+                const finishedTime = record.finished_time ? new Date(record.finished_time).getTime() : new Date().getTime();
+                const submittedTime = new Date(record.submitted_time).getTime();
+                const duration = finishedTime - submittedTime;
+
+                return formatDuration(duration);
+            },
         },
         {
             title: 'Status',
