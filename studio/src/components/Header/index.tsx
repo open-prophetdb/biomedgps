@@ -1,4 +1,4 @@
-import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined, FileOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined, FileOutlined, GithubOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown, Row } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden } from '@/components/util';
@@ -31,8 +31,16 @@ type Workspace = {
 const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   const { loginWithRedirect, isAuthenticated, logout, user, getIdTokenClaims, getAccessTokenSilently } = useAuth0();
   const [current, setCurrent] = useState('user');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState(props.username || user?.name || user?.email || user?.nickname || 'Anonymous');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+
+  useEffect(() => {
+    console.log('user: ', user);
+    if (user && user[`https://drugs.3steps.cn/roles`] && user[`https://drugs.3steps.cn/roles`].includes('Administrator')) {
+      setIsAdmin(true);
+    }
+  }, [user]);
 
   useEffect(() => {
     const checkTokenValidity = async () => {
@@ -193,6 +201,11 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       {
         isHeaderHidden() ? null : (
           <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />
+        )
+      }
+      {
+        isAdmin && (
+          <Button type="text" icon={<GithubOutlined />} onClick={() => window.open('https://drugs.3steps.cn/jupyterlab', '_blank')}>JupyterLab</Button>
         )
       }
       {

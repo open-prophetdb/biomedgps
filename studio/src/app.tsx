@@ -163,7 +163,8 @@ export function rootContainer(container: React.ReactNode): React.ReactNode {
       domain={AUTH0_DOMAIN}
       clientId={CLIENT_ID}
       authorizationParams={{
-        redirect_uri: window.location.origin
+        redirect_uri: window.location.origin,
+        scope: 'openid profile email roles',
       }}>
       {component}
     </Auth0Provider>

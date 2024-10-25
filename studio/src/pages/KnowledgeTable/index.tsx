@@ -794,11 +794,16 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                         <Tooltip title="Download the table data as a TSV file.">
                             <Button size="middle" type="default" onClick={() => {
                                 // Download as TSV file
-                                const header = columns.map((col) => col.title);
+                                // const header = columns.map((col) => col.title);
+                                // const data = tableData.map((record) => {
+                                //     return columns.map((col: any) => {
+                                //         return record[col.key];
+                                //     });
+                                // });
+
+                                const header = tableData.length > 0 ? Object.keys(tableData[0]) : [];
                                 const data = tableData.map((record) => {
-                                    return columns.map((col: any) => {
-                                        return record[col.key];
-                                    });
+                                    return header.map((key) => record[key]);
                                 });
                                 const tsvData = [header, ...data].map((row) => row.join('\t')).join('\n');
                                 const blob = new Blob([tsvData], { type: 'text/tsv' });

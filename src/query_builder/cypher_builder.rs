@@ -1,6 +1,6 @@
 use crate::model::graph::{EdgeData, NodeData, COMPOSED_ENTITY_DELIMITER, COMPOSED_ENTITY_REGEX};
 use log::{debug, error, info};
-use neo4rs::{query, Graph, Node as NeoNode, Relation, RowStream};
+use neo4rs::{query, Graph, Node as NeoNode, Path, Relation, RowStream};
 use std::collections::HashMap;
 
 /// Split the composed entity id into two parts: the entity type and the entity id.
@@ -256,6 +256,73 @@ async fn parse_shared_results(
     info!("Number of edges: {}", &edges.len());
 
     Ok((nodes, edges))
+}
+
+pub async fn parse_all_paths_results(
+    result: &mut RowStream,
+) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
+    let mut nodes: Vec<NodeData> = Vec::new();
+    let mut edges: Vec<EdgeData> = Vec::new();
+
+    while let Some(row) = result.next().await? {
+        let path: Path = match row.get::<Path>("p") {
+            Some(path) => path,
+            None => continue,
+        };
+
+        for node in path.nodes() {
+            let node_data = NodeData::from_neo_node(node);
+            nodes.push(node_data);
+        }
+
+        for rel in path.rels() {
+            // Cannot use the BoltMap here. but if the latest version of neo4rs has changed the RowStream api (0.7.0+), so we need to rewrite all of this file.
+            // How to do it?
+            println!("{:?}", rel);
+        }
+    }
+
+    Ok((nodes, edges))
+}
+
+// Query all explainable and ranked paths for a new link.
+//
+// # Arguments
+// * `graph` - The graph database connection.
+// * `start_node_id` - The start node id. Such as 'Compound::DrugBank:DB00818'
+// * `end_node_id` - The end node id. Such as 'Disease::MONDO:0005404'
+// * `nhops` - The number of hops between the start node and the end node.
+// * `topk` - The number of top k paths.
+//
+// # Returns
+// * `Ok((paths, nodes, edges))` - The paths, nodes, and edges between the start node and the end node.
+// * `Err(e)` - The error message.
+pub async fn query_all_paths(
+    graph: &Graph,
+    start_node_id: &str,
+    end_node_id: &str,
+    nhops: usize,
+    topk: usize,
+) -> Result<(Vec<NodeData>, Vec<EdgeData>), anyhow::Error> {
+    let score_threshold = 0.5;
+    let query_str = format!("
+            MATCH p = (startNode {{idx: '{start_node_id}'}})<-[r*1..{nhops}]-(endNode {{idx: '{end_node_id}'}})
+            WHERE ALL(rel in relationships(p) WHERE rel.biomedgps_score > {score_threshold})
+            WITH p, REDUCE(s = 0, rel IN relationships(p) | s + rel.biomedgps_score) AS totalScore, size(relationships(p)) AS relCount
+            WITH p, totalScore / relCount AS avgScore
+            ORDER BY avgScore DESC
+            RETURN p
+            LIMIT {topk}
+        ",
+        start_node_id = start_node_id,
+        end_node_id = end_node_id,
+        nhops = nhops,
+        topk = topk
+    );
+
+    let mut result = graph.execute(query(&query_str)).await?;
+    let r = parse_all_paths_results(&mut result).await?;
+    Ok(r)
 }
 
 // Query the graph database to get the shared shared nodes between the start nodes.
@@ -522,6 +589,33 @@ mod tests {
         {
             Ok((nodes, edges)) => {
                 // 进行测试断言
+                debug!("nodes: {:?}", nodes);
+                info!("Number of nodes: {}", nodes.len());
+                assert!(!nodes.is_empty());
+                debug!("edges: {:?}", edges);
+                info!("Number of edges: {}", edges.len());
+                assert!(!edges.is_empty());
+            }
+            Err(e) => panic!("Query failed: {}", e),
+        }
+    }
+
+    #[async_test]
+    async fn test_query_all_paths() {
+        let neo4j_url =
+            env::var("NEO4J_URL").unwrap_or("neo4j://neo4j:password@localhost:7687".to_string());
+
+        let graph = connect_graph_db(&neo4j_url).await;
+        match query_all_paths(
+            &graph,
+            "Disease::MONDO:0005404",
+            "Compound::DrugBank:DB00328",
+            2,
+            1,
+        )
+        .await
+        {
+            Ok((nodes, edges)) => {
                 debug!("nodes: {:?}", nodes);
                 info!("Number of nodes: {}", nodes.len());
                 assert!(!nodes.is_empty());
