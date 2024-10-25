@@ -37,7 +37,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
 
   useEffect(() => {
     console.log('user: ', user);
-    if (user && user[`https://drugs.3steps.cn/roles`] && user[`https://drugs.3steps.cn/roles`].includes('Administrator')) {
+    if (user && user[`${window.location.origin}/roles`] && user[`${window.location.origin}/roles`].includes('Administrator')) {
       setIsAdmin(true);
     }
   }, [user]);
@@ -205,7 +205,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       }
       {
         isAdmin && (
-          <Button type="text" icon={<GithubOutlined />} onClick={() => window.open('https://drugs.3steps.cn/jupyterlab', '_blank')}>JupyterLab</Button>
+          <Button type="text" icon={<GithubOutlined />} onClick={() => window.open(`${window.location.origin}/jupyterlab`, '_blank')}>JupyterLab</Button>
         )
       }
       {
