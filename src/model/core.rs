@@ -1542,13 +1542,14 @@ impl Image {
     pub fn upload(destdir: &PathBuf, filename: &str, image_bytes: &Vec<u8>, mime_type: &str, raw_image_url: &str, raw_image_src: &str) -> Result<Image, anyhow::Error> {
         let hasher = Sha256::new();
         let checksum = hasher.chain_update(image_bytes).finalize();
-        let suffix = filename.split('.').last().unwrap_or("jpg");
-        let checksum_string = format!("{:x}.{}", checksum, suffix);
+        // Fix the suffix, it might be jpg, jpeg, png, or something like .640?wxh=640&wxt=jpg, but we don't like the string after the question mark.
+        let suffix = filename.split('.').last().unwrap_or("jpg").split('?').next().unwrap_or(suffix);
+        let filename = format!("{:x}.{}", checksum, suffix);
 
         // Split the checksum string to make several subfolders
         let mut subfolders = Vec::new();
 
-        for (i, c) in checksum_string.chars().enumerate() {
+        for (i, c) in filename.chars().enumerate() {
             if i < 3 {
                 subfolders.push(c.to_string());
             } else {
@@ -1557,7 +1558,7 @@ impl Image {
         }
 
         let subdir = subfolders.join("/");
-        let filepath = destdir.join(&subdir).join(&checksum_string);
+        let filepath = destdir.join(&subdir).join(&filename);
 
         if !filepath.exists() {
             // Make sure the parent directories exist
@@ -1573,7 +1574,7 @@ impl Image {
         let image = Image {
             image_path: filepath.to_string_lossy().to_string().replace(destdir.to_str().unwrap(), ""),
             filename: filename.to_string(),
-            checksum: checksum_string,
+            checksum: format!("{:x}", checksum),
             mime_type: mime_type.to_string(),
             created_at: Utc::now(),
             raw_image_url: raw_image_url.to_string(),
