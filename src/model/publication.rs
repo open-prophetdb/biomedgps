@@ -273,7 +273,8 @@ impl Publication {
             return Err(anyhow::Error::msg("OPENAI_API_KEY not found"));
         }
 
-        let chatbot = ChatBot::new("GPT4", &openai_api_key);
+        let chatbot = ChatBot::new("GPT4", &openai_api_key)?;
+
         let publications_context = PublicationsContext {
             publications: publications.clone(),
             question: question.to_string(),

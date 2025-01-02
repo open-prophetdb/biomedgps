@@ -11,3 +11,4 @@ pub mod entity_attr;
 pub mod publication;
 pub mod workspace;
 pub mod embedding;
+pub mod omics_dataset;

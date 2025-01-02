@@ -4,8 +4,8 @@ use super::core::{Entity, Relation};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::warn;
-use openai_api_rs::v1::api::OpenAIClient;
+use log::{error, warn};
+use openai_api_rs::v1::api::{OpenAIClient, OpenAIClientBuilder};
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, ToolCall};
 use openai_api_rs::v1::common::{GPT3_5_TURBO, GPT4_O};
 use openssl::hash::{hash, MessageDigest};
@@ -112,7 +112,11 @@ impl Context {
 /// A trait for LLM context. Each LLM context might can render several prompt templates. So we separate the context and prompt template. But this means the users need to provide the right pair of context and prompt template.
 pub trait LlmContext {
     fn get_context(&self) -> Self;
-    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error>;
+    fn render_prompt(
+        &self,
+        prompt_template_category: &str,
+        prompt_template: &str,
+    ) -> Result<String, anyhow::Error>;
     fn register_prompt_template();
 }
 
@@ -121,7 +125,11 @@ impl LlmContext for Entity {
         self.clone()
     }
 
-    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
+    fn render_prompt(
+        &self,
+        prompt_template_category: &str,
+        prompt_template: &str,
+    ) -> Result<String, anyhow::Error> {
         let mut prompt = prompt_template.to_string();
         prompt = prompt.replace("{{entity_name}}", &self.name);
         prompt = prompt.replace("{{entity_id}}", &self.id);
@@ -162,7 +170,11 @@ impl LlmContext for ExpandedRelation {
         self.clone()
     }
 
-    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
+    fn render_prompt(
+        &self,
+        prompt_template_category: &str,
+        prompt_template: &str,
+    ) -> Result<String, anyhow::Error> {
         let mut prompt = prompt_template.to_string();
         prompt = prompt.replace("{{source_name}}", &self.source.name);
         prompt = prompt.replace("{{source_id}}", &self.source.id);
@@ -206,7 +218,11 @@ impl LlmContext for SubgraphWithCtx {
         self.clone()
     }
 
-    fn render_prompt(&self, prompt_template_category: &str, prompt_template: &str) -> Result<String, anyhow::Error> {
+    fn render_prompt(
+        &self,
+        prompt_template_category: &str,
+        prompt_template: &str,
+    ) -> Result<String, anyhow::Error> {
         let ctx_str_regex = Regex::new(r"(.*)#(.*)#(.*)").unwrap();
         let err_msg = "Invalid context_str, it should be a combination of a node1, a relation type, and a node2, such as `Ibuprofen#treats#Headache` when you use the prompt template `explain_path_with_attention_subgraph`".to_string();
         if prompt_template_category == "explain_path_with_attention_subgraph" {
@@ -514,7 +530,7 @@ pub struct ChatBot {
 }
 
 impl ChatBot {
-    pub fn new(model_name: &str, openai_api_key: &str) -> Self {
+    pub fn new(model_name: &str, openai_api_key: &str) -> Result<Self, anyhow::Error> {
         let model = if model_name == "GPT4" {
             // GPT4 or GPT4_1106_PREVIEW
             // https://platform.openai.com/account/limits
@@ -524,16 +540,28 @@ impl ChatBot {
             GPT3_5_TURBO.to_string()
         };
 
-        let client = OpenAIClient::new(openai_api_key.to_string());
+        let client = match OpenAIClientBuilder::new()
+            .with_api_key(openai_api_key.to_string())
+            .build()
+        {
+            Ok(client) => client,
+            Err(e) => {
+                error!("Failed to build OpenAI client: {}", e.to_string());
+                return Err(anyhow::anyhow!(
+                    "Failed to build OpenAI client: {}",
+                    e.to_string()
+                ));
+            }
+        };
 
-        ChatBot {
+        Ok(ChatBot {
             role: MessageRole::user,
             name: None,
             content: None,
             tool_call: None,
             model_name: model,
             client: client,
-        }
+        })
     }
 
     pub async fn answer(&self, prompt: String) -> Result<String, anyhow::Error> {
@@ -564,10 +592,18 @@ impl ChatBot {
 // Write unit tests
 #[cfg(test)]
 mod tests {
+    use log::error;
+
     #[tokio::test]
     async fn test_answer() {
         let OPENAI_API_KEY = std::env::var("OPENAI_API_KEY").unwrap();
-        let chatbot = super::ChatBot::new("GPT3", &OPENAI_API_KEY);
+        let chatbot = match super::ChatBot::new("GPT3", &OPENAI_API_KEY) {
+            Ok(chatbot) => chatbot,
+            Err(e) => {
+                error!("{}", e.to_string());
+                return;
+            }
+        };
 
         let node = super::Entity {
             idx: 0,
@@ -583,7 +619,7 @@ mod tests {
         };
 
         super::init_prompt_templates();
-        
+
         let mut llm_msg = super::LlmMessage::new("explain_node_summary", node, None).unwrap();
         let answer = llm_msg.answer(&chatbot, None).await.unwrap();
         println!("Prompt: {}", answer.prompt);

@@ -1543,7 +1543,7 @@ impl Image {
         let hasher = Sha256::new();
         let checksum = hasher.chain_update(image_bytes).finalize();
         // Fix the suffix, it might be jpg, jpeg, png, or something like .640?wxh=640&wxt=jpg, but we don't like the string after the question mark.
-        let suffix = filename.split('.').last().unwrap_or("jpg").split('?').next().unwrap_or(suffix);
+        let suffix = filename.split('.').last().unwrap_or("jpg").split('?').next().unwrap_or("");
         let filename = format!("{:x}.{}", checksum, suffix);
 
         // Split the checksum string to make several subfolders

@@ -28,7 +28,7 @@ use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{
     get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery,
 };
-use log::{debug, info, warn};
+use log::{debug, info, warn, error};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::path::PathBuf;
@@ -3651,7 +3651,13 @@ impl BiomedgpsApi {
             }
         };
 
-        let chatbot = ChatBot::new("GPT4", &openai_api_key);
+        let chatbot = match ChatBot::new("GPT4", &openai_api_key) {
+            Ok(chatbot) => chatbot,
+            Err(e) => {
+                error!("{}", e);
+                return PostResponse::bad_request("Cannot initialize ChatBot correctly.".to_string());
+            }
+        };
         match context
             .answer(&chatbot, &prompt_template_id, Some(&pool_arc))
             .await
