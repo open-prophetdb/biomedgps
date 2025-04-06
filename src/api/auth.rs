@@ -359,7 +359,7 @@ async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
                         None => vec![],
                     };
 
-                    debug!("Claims: {:?}, username: {}", claims, username);
+                    info!("Claims: {:?}, username: {}, email: {}, roles: {:?}", claims, username, email, roles);
 
                     return Some(User::new(&username, email, roles));
                 }

@@ -95,6 +95,13 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             width: 150,
         },
         {
+            title: 'Curator',
+            dataIndex: 'curator',
+            align: 'center',
+            key: 'curator',
+            width: 120,
+        },
+        {
             title: 'Actions',
             key: 'actions',
             align: 'center',

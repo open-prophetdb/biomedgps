@@ -28,7 +28,7 @@ use crate::query_builder::cypher_builder::{query_nhops, query_shared_nodes};
 use crate::query_builder::sql_builder::{
     get_all_field_pairs, make_order_clause_by_pairs, ComposeQuery,
 };
-use log::{debug, info, warn, error};
+use log::{debug, error, info, warn};
 use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi};
 use std::path::PathBuf;
@@ -960,7 +960,11 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<EntityCuration> {
         let pool_arc = pool.clone();
-        let curator = &_token.0.username;
+        let curator = if _token.0.is_admin() {
+            "".to_string() // Allow to show all curated key sentences. more details is at the get_records_by_owner function of KeySentenceCuration model in src/model/core.rs
+        } else {
+            _token.0.username.clone()
+        };
         let query_str = query_str.0;
         let fingerprint = match &fingerprint.0 {
             Some(fingerprint) => fingerprint,
@@ -1301,7 +1305,11 @@ impl BiomedgpsApi {
         _token: CustomSecurityScheme,
     ) -> GetRecordsResponse<EntityMetadataCuration> {
         let pool_arc = pool.clone();
-        let curator = &_token.0.username;
+        let curator = if _token.0.is_admin() {
+            "".to_string() // Allow to show all curated key sentences. more details is at the get_records_by_owner function of KeySentenceCuration model in src/model/core.rs
+        } else {
+            _token.0.username.clone()
+        };
         let fingerprint = match &fingerprint.0 {
             Some(fingerprint) => fingerprint,
             None => {
@@ -1869,7 +1877,13 @@ impl BiomedgpsApi {
                     curator
                 }
             }
-            None => _token.0.username.clone(),
+            None => {
+                if _token.0.is_admin() {
+                    "".to_string() // Allow to show all curated key sentences. more details is at the get_records_by_owner function of KeySentenceCuration model in src/model/core.rs
+                } else {
+                    _token.0.username.clone()
+                }
+            }
         };
 
         let project_id = match project_id.0 {
@@ -3661,7 +3675,9 @@ impl BiomedgpsApi {
             Ok(chatbot) => chatbot,
             Err(e) => {
                 error!("{}", e);
-                return PostResponse::bad_request("Cannot initialize ChatBot correctly.".to_string());
+                return PostResponse::bad_request(
+                    "Cannot initialize ChatBot correctly.".to_string(),
+                );
             }
         };
         match context

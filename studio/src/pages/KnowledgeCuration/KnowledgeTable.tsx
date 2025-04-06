@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { GraphEdge, GraphTableData } from './typings';
 import type { GraphData } from 'biominer-components/dist/typings';
 import { pushGraphDataToLocalStorage } from 'biominer-components/dist/KnowledgeGraph/utils';
-import { deleteCuratedKnowledge, fetchCuratedGraph, fetchCuratedKnowledges } from '@/services/swagger/KnowledgeGraph';
+import { deleteCuratedKnowledge, fetchCuratedGraph, fetchCuratedKnowledges, fetchCuratedKnowledgesByOwner } from '@/services/swagger/KnowledgeGraph';
 
 import './KnowledgeTable.less';
 
@@ -78,6 +78,13 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
             dataIndex: 'target_type',
             align: 'center',
             key: 'target_type',
+            width: 120,
+        },
+        {
+            title: 'Curator',
+            dataIndex: 'curator',
+            align: 'center',
+            key: 'curator',
             width: 120,
         },
         {
@@ -170,54 +177,59 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
 
     useEffect(() => {
         setLoading(true);
-        fetchCuratedKnowledges({
+        fetchCuratedKnowledgesByOwner({
             page: page,
-            page_size: 1,
+            page_size: pageSize,
         }).then((response) => {
             setTotal(response.total);
+            setTableData(response.records);
+            setLoading(false);
         }).catch((error) => {
             console.log('Get knowledges error: ', error);
             setTotal(0);
+            setLoading(false);
         });
 
-        fetchCuratedGraph({
-            page: page,
-            page_size: pageSize,
-            strict_mode: true,
-            project_id: '-1',
-            organization_id: '-1',
-        })
-            .then((response) => {
-                setGraphData(response);
-                setLoading(false);
-                const edges = response.edges.map((item) => {
-                    return {
-                        // We need it for the row selection
-                        ...item,
-                        ...item.data,
-                    }
-                });
+        // Cannot get all curated knowledges by fetchCuratedGraph, because the backend does not support to query all curated knowledges for admin.
+        // TODO: How to explain the selected knowledges in the graph?
+        // fetchCuratedGraph({
+        //     page: page,
+        //     page_size: pageSize,
+        //     strict_mode: true,
+        //     project_id: '-1',
+        //     organization_id: '-1',
+        // })
+        //     .then((response) => {
+        //         setGraphData(response);
+        //         setLoading(false);
+        //         const edges = response.edges.map((item) => {
+        //             return {
+        //                 // We need it for the row selection
+        //                 ...item,
+        //                 ...item.data,
+        //             }
+        //         });
 
-                let tableData = edges.map((item) => {
-                    const newItem: any = { ...item };
-                    const sourceName = response.nodes.find((node) => node.data.id === item.source_id)?.data.name;
-                    const targetName = response.nodes.find((node) => node.data.id === item.target_id)?.data.name;
-                    newItem.source_name = sourceName;
-                    newItem.source_node = response.nodes.find((node) => node.data.id === item.source_id);
-                    newItem.target_name = targetName;
-                    newItem.target_node = response.nodes.find((node) => node.data.id === item.target_id);
+        //         let tableData = edges.map((item) => {
+        //             const newItem: any = { ...item };
+        //             const sourceName = response.nodes.find((node) => node.data.id === item.source_id)?.data.name;
+        //             const targetName = response.nodes.find((node) => node.data.id === item.target_id)?.data.name;
+        //             newItem.source_name = sourceName;
+        //             newItem.source_node = response.nodes.find((node) => node.data.id === item.source_id);
+        //             newItem.target_name = targetName;
+        //             newItem.target_node = response.nodes.find((node) => node.data.id === item.target_id);
 
-                    return newItem;
-                })
-                setTableData(tableData);
-                setLoading(false);
-            })
-            .catch((error) => {
-                console.log('Get knowledges error: ', error);
-                setGraphData({} as GraphData);
-                setTableData([]);
-                setLoading(false);
-            });
+        //             return newItem;
+        //         })
+        //         setTableData(tableData);
+        //         setLoading(false);
+        //     })
+        //     .catch((error) => {
+        //         console.log('Get knowledges error: ', error);
+        //         setGraphData({} as GraphData);
+        //         setTableData([]);
+        //         setLoading(false);
+        //     });
     }, [page, pageSize, refreshKey]);
 
     const getRowKey = (record: GraphEdge) => {
@@ -235,10 +247,11 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
                 loading={loading}
                 scroll={{ x: props.xScroll || 1000, y: props.yScroll || 'calc(100vh - 280px)' }}
                 dataSource={tableData}
-                rowSelection={{
-                    selectedRowKeys,
-                    onChange: onSelectChange,
-                }}
+                // TODO: How to explain the selected knowledges in the graph?
+                // rowSelection={{
+                //     selectedRowKeys,
+                //     onChange: onSelectChange,
+                // }}
                 rowKey={(record) => getRowKey(record)}
                 expandable={{
                     expandedRowRender: (record) => (
