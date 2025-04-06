@@ -96,6 +96,13 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
             width: 120,
         },
         {
+            title: 'Curator',
+            key: 'curator',
+            align: 'center',
+            dataIndex: 'curator',
+            width: 120
+        },
+        {
             title: 'Actions',
             key: 'actions',
             align: 'center',

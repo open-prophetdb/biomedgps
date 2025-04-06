@@ -1620,7 +1620,7 @@ impl KeySentenceCuration {
             format!("fingerprint = '{}'", fingerprint)
         };
 
-        let curator_qstr = if project_id < 0 && organization_id < 0 {
+        let curator_qstr = if !curator.is_empty() && project_id < 0 && organization_id < 0 {
             format!("curator = '{}'", curator)
         } else {
             format!("curator IS NOT NULL")

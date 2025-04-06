@@ -252,7 +252,7 @@ const HomePage: React.FC = () => {
             description: 'Predict new indications for your queried drug.',
             icon: <IconFont className="icon" type="biomedgps-disease" style={{ color: '#fff', fontSize: '30px' }}></IconFont>,
             onClick: () => {
-                history.push('/predict-explain/predict-model?prediction_type=Disease&model_name=Compound');
+                history.push('/predict-explain/predict-model?prediction_type=Disease&model_name=Drug');
             }
         },
         {

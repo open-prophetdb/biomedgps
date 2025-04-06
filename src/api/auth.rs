@@ -8,6 +8,7 @@ use poem_openapi::SecurityScheme;
 use reqwest::Error as ReqwestError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::RwLock;
 
 pub const USERNAME_PLACEHOLDER: &str = "ANONYMOUS-USER-PLACEHOLDER";
@@ -23,16 +24,18 @@ pub struct User {
     pub email: String,
     pub organizations: Vec<i32>,
     pub projects: Vec<i32>,
+    pub roles: Vec<String>, // The role item must be in the following list: ["Administrator", "Premium Member", "Standard User"]. They are same as the roles on the Auth0 dashboard.
 }
 
 impl User {
-    fn new(username: &str, email: &str) -> Self {
+    fn new(username: &str, email: &str, roles: Vec<String>) -> Self {
         Self {
             username: username.to_string(),
             email: email.to_string(),
             // Be compatible with the old version, the token might not contain the organizations field.
             organizations: vec![-1],
             projects: vec![-1],
+            roles: roles,
         }
     }
 
@@ -43,15 +46,39 @@ impl User {
     fn add_projects(&mut self, projects: Vec<i32>) {
         self.projects = projects;
     }
+
+    fn add_roles(&mut self, roles: Vec<String>) {
+        self.roles = roles;
+    }
+
+    pub fn is_admin(&self) -> bool {
+        self.roles.contains(&"Administrator".to_string())
+    }
+
+    pub fn is_premium_member(&self) -> bool {
+        self.roles.contains(&"Premium Member".to_string())
+    }
+
+    pub fn is_standard_user(&self) -> bool {
+        self.roles.contains(&"Standard User".to_string())
+    }
 }
 
 fn get_username_from_claims(claims: &Claims) -> Option<String> {
-    if !claims.name.is_empty() {
-        Some(claims.name.clone())
-    } else if !claims.email.is_empty() {
-        Some(claims.email.clone())
-    } else if !claims.nickname.is_empty() {
-        Some(claims.nickname.clone())
+    if !claims.standard_claims.name.is_empty() {
+        Some(claims.standard_claims.name.clone())
+    } else if !claims.standard_claims.email.is_empty() {
+        Some(claims.standard_claims.email.clone())
+    } else if !claims.standard_claims.nickname.is_empty() {
+        Some(claims.standard_claims.nickname.clone())
+    } else {
+        None
+    }
+}
+
+fn get_roles_from_claims(claims: &Claims) -> Option<Vec<String>> {
+    if let Some(roles) = claims.get_roles() {
+        Some(roles)
     } else {
         None
     }
@@ -71,7 +98,7 @@ struct Jwk {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
+struct StandardClaims {
     nickname: String,
     name: String,
     picture: String,
@@ -85,6 +112,35 @@ struct Claims {
     exp: i64,
     sub: String,
     nonce: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    #[serde(flatten)]
+    standard_claims: StandardClaims,
+
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
+}
+
+impl Claims {
+    pub fn get_roles(&self) -> Option<Vec<String>> {
+        // 1. 找到那个以 "/roles" 结尾的 key
+        //    因为域名前缀可能变，比如 "https://drugs.3steps.cn/roles" 或其他
+        // 2. 确认这个值是个 JSON 数组，并逐项转成 String
+        self.extra.iter().find_map(|(key, value)| {
+            if key.ends_with("/roles") {
+                // 如果是数组，就尝试把它转为 Vec<String>
+                value.as_array().map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| item.as_str().map(|s| s.to_owned()))
+                        .collect::<Vec<String>>()
+                })
+            } else {
+                None
+            }
+        })
+    }
 }
 
 pub async fn fetch_and_store_jwks(url: &str) -> Result<Jwks, ReqwestError> {
@@ -218,7 +274,7 @@ pub struct CustomSecurityScheme(pub User);
 
 async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
     // Get jwt_secret_key from environment variable
-    let default_user = Some(User::new(USERNAME_PLACEHOLDER, EMAIL_PLACEHOLDER));
+    let default_user = Some(User::new(USERNAME_PLACEHOLDER, EMAIL_PLACEHOLDER, vec![]));
 
     let jwt_secret_key = match std::env::var("JWT_SECRET_KEY") {
         Ok(key) => key,
@@ -297,11 +353,15 @@ async fn jwt_token_checker(_: &Request, bearer: Bearer) -> Option<User> {
                         }
                     };
 
-                    let email = &claims.email;
+                    let email = &claims.standard_claims.email;
+                    let roles = match get_roles_from_claims(&claims) {
+                        Some(roles) => roles,
+                        None => vec![],
+                    };
 
                     debug!("Claims: {:?}, username: {}", claims, username);
 
-                    return Some(User::new(&username, email));
+                    return Some(User::new(&username, email, roles));
                 }
                 Err(err) => {
                     error!("Error: {}", err);
@@ -348,6 +408,6 @@ mod tests {
         let validated_claims = validate_token_with_rs256(client_id, token, &jwks, &kid)
             .await
             .unwrap();
-        assert_eq!(validated_claims.name, "Craig Yang");
+        assert_eq!(validated_claims.standard_claims.name, "Craig Yang");
     }
 }

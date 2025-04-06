@@ -39,5 +39,5 @@ We may update this Privacy Policy from time to time. Any changes will be posted 
 ## 9. Contact Us
 If you have any questions about this Privacy Policy or require further information, please contact us at:
 
-Email: support@3steps.cn
+Email: yjcyxky@gmail.com
 Website: https://drugs.3steps.cn

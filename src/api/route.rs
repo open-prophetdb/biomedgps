@@ -601,7 +601,13 @@ impl BiomedgpsApi {
                     curator
                 }
             }
-            None => _token.0.username.clone(),
+            None => {
+                if _token.0.is_admin() {
+                    "".to_string() // Allow to show all curated knowledges. more details is at the get_records_by_owner function of KnowledgeCuration model in src/model/core.rs
+                } else {
+                    _token.0.username.clone()
+                }
+            }
         };
 
         let project_id = match project_id.0 {
