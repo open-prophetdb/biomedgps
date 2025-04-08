@@ -55,7 +55,7 @@ const AUTH0_DOMAIN = process.env.UMI_APP_AUTH0_DOMAIN ? process.env.UMI_APP_AUTH
 console.log('apiPrefix', process.env, apiPrefix);
 
 export const request: RequestConfig = {
-  timeout: 120000,
+  timeout: 600000,
   // More details on ./config/proxy.ts or ./config/config.cloud.ts
   baseURL: apiPrefix,
   errorConfig: {

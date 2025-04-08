@@ -194,10 +194,14 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
 
   return (
     <Space className={`${styles.right} ${styles.light} right-content`}>
-      <Row>
-        <Button style={{ marginRight: '0', borderTopRightRadius: '0', borderBottomRightRadius: '0', borderRight: '0' }}>Default Workspace</Button>
-        <Button type="primary" style={{ borderTopLeftRadius: '0', borderBottomLeftRadius: '0' }} disabled>Switch Workspace</Button>
-      </Row>
+      {
+        isHeaderHidden() ? null : (
+          <Row>
+            <Button style={{ marginRight: '0', borderTopRightRadius: '0', borderBottomRightRadius: '0', borderRight: '0' }}>Default Workspace</Button>
+            <Button type="primary" style={{ borderTopLeftRadius: '0', borderBottomLeftRadius: '0' }} disabled>Switch Workspace</Button>
+          </Row>
+        )
+      }
       {
         isHeaderHidden() ? null : (
           <Menu onClick={onClick} selectedKeys={[current]} theme="light" mode="inline" items={directItems} />

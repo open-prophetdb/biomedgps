@@ -311,7 +311,7 @@ const HomePage: React.FC = () => {
                         }}>
                             <Tag color={guessColor("Compound")}>Compound | Particular Matter</Tag>
                         </a>
-                        <a onClick={() => {
+                        {/* <a onClick={() => {
                             onSearch('Compound::MESH:D013458', 'SULFUR DIOXIDE')
                         }}>
                             <Tag color={guessColor("Compound")}>Compound | SULFUR DIOXIDE</Tag>
@@ -320,16 +320,16 @@ const HomePage: React.FC = () => {
                             onSearch('Compound::MESH:D009589', 'Nitrogen Oxides')
                         }}>
                             <Tag color={guessColor("Compound")}>Compound | Nitrogen Oxides</Tag>
-                        </a>
+                        </a> */}
                         <a onClick={() => {
                             onSearch('Gene::ENTREZ:3569', 'IL6')
                         }}>
                             <Tag color={guessColor("Gene")}>Gene | IL6</Tag>
                         </a>
                         <a onClick={() => {
-                            onSearch('Pathway::WikiPathways:WP358', 'MAPK signaling pathway')
+                            onSearch('Pathway::KEGG:hsa04115', 'p53 Signaling pathway')
                         }}>
-                            <Tag color={guessColor("Pathway")}>Pathway | MAPK signaling pathway</Tag>
+                            <Tag color={guessColor("Pathway")}>Pathway | p53 Signaling pathway</Tag>
                         </a>
                         <a onClick={() => {
                             onSearch('Disease::MONDO:0005233', 'Non-small Cell Lung Carcinoma')
@@ -344,7 +344,7 @@ const HomePage: React.FC = () => {
                 <Row className="statistics" gutter={16}>
                     <Row style={{ width: '80%', maxWidth: '1800px', margin: '0 auto' }}>
                         <Col className="data-stat">
-                            <p className="desc" style={{ textAlign: 'justify' }}>
+                            <p className="desc" style={{ textAlign: 'justify', height: '400px' }}>
                                 <span>
                                     Air pollution emerged as the leading contributor to the global disease burden in 2021 and the second most significant risk factor for premature death worldwide. It is linked to severe health issues, including cancer and cardiovascular diseases. Traditional studies often isolate health outcomes without a broader, multidimensional approach, focusing solely on specific diseases. This deficiency underscores the importance of conducting integrated analyses of air pollution health impacts. Unfortunately, there is a notable absence of a comprehensive, integrated knowledge graph for detailed analysis, to better understand and mitigate the effects of air pollution.
                                 </span>

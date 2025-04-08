@@ -595,7 +595,22 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                     const keys = getDefaultKeys(nodes);
 
                     console.log('Current Nodes: ', nodes, keys);
-                    let newMenuItems = nodes.map((node, index) => {
+                    let newMenuItems = [{
+                        key: 'knowledge',
+                        label: 'Knowledge',
+                        icon: <LinkOutlined />,
+                        onClick: () => {
+                            setMenuKey('knowledge');
+                        },
+                    }];
+                    newMenuItems.push(
+                        {
+                            // @ts-ignore, don't worry about the type error
+                            type: 'divider',
+                        }
+                    )
+
+                    newMenuItems.push(...nodes.map((node, index) => {
                         return {
                             key: `${keys[index]}`,
                             label: `${keys[index]}`,
@@ -604,23 +619,11 @@ const KnowledgeTable: React.FC<KnowledgeTableProps> = (props) => {
                                 setMenuKey(`${keys[index]}`);
                             },
                         };
-                    });
-                    newMenuItems.push(
-                        {
-                            // @ts-ignore, don't worry about the type error
-                            type: 'divider',
-                        }
-                    )
-                    newMenuItems.push({
-                        key: 'knowledge',
-                        label: 'Knowledge',
-                        icon: <LinkOutlined />,
-                        onClick: () => {
-                            setMenuKey('knowledge');
-                        },
-                    });
+                    }));
+
                     setMenuItems(newMenuItems);
-                    setMenuKey(whichMenu || `${keys[0]}`);
+                    // setMenuKey(whichMenu || `${keys[0]}`);
+                    setMenuKey(whichMenu || 'knowledge');
                 };
 
                 let tableData = edges.map((item) => {

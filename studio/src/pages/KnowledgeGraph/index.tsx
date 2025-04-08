@@ -9,6 +9,7 @@ import {
 } from '@/services/swagger/KnowledgeGraph';
 import NodeInfoPanel from '@/NodeInfoPanel';
 import EdgeInfoPanel from '@/EdgeInfoPanel';
+import { isAuthEnabled } from '@/components/util';
 
 
 import './index.less';
@@ -43,15 +44,17 @@ const KnowledgeGraphWithChatBot: React.FC = () => {
       ) : null
     }
     <Col xxl={span} xl={span} lg={span} md={24} sm={24} xs={24}>
-      <Button shape="default" className="chat-button" onClick={() => {
-        if (chatBoxVisible) {
-          // Clear the message when chatbot is closed, otherwise it will activate the chat ai again when chatbot is opened.
-          setMessage('')
-        }
-        setChatBoxVisible(!chatBoxVisible)
-      }} icon={chatBoxVisible ? <MessageOutlined /> : <MessageFilled />}>
-        {chatBoxVisible ? 'Hide Chatbot' : 'Show Chatbot'}
-      </Button>
+      {!isAuthEnabled() ? null : (
+        <Button shape="default" className="chat-button" onClick={() => {
+          if (chatBoxVisible) {
+            // Clear the message when chatbot is closed, otherwise it will activate the chat ai again when chatbot is opened.
+            setMessage('')
+          }
+          setChatBoxVisible(!chatBoxVisible)
+        }} icon={chatBoxVisible ? <MessageOutlined /> : <MessageFilled />}>
+          {chatBoxVisible ? 'Hide Chatbot' : 'Show Chatbot'}
+        </Button>
+      )}
       <KnowledgeGraph
         apis={{
           GetStatisticsFn: fetchStatistics,

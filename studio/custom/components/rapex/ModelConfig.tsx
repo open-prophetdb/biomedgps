@@ -633,35 +633,6 @@ const ModelConfig: React.FC = (props) => {
                 });
             });
         },
-    },
-    {
-        shortName: 'MOA',
-        name: 'Predicted MOAs',
-        icon: <BranchesOutlined />,
-        description: 'To predict MOAs for a given drug and disease',
-        parameters: [{
-            key: 'entity_id',
-            name: 'Disease',
-            type: 'NodeIdSearcher',
-            description: 'Enter a name of disease for which you want to find mode of actions',
-            required: true,
-            entityType: 'Disease'
-        }, {
-            key: 'entity_id',
-            name: 'Compound',
-            type: 'NodeIdSearcher',
-            description: 'Enter a name of drug for which you want to find mode of actions',
-            required: true,
-            entityType: 'Compound'
-        }, {
-            key: 'topk',
-            name: 'TopK',
-            type: 'number',
-            description: 'Number of results to return',
-            required: false,
-            defaultValue: 10
-        }],
-        disabled: true
     }])
 
     const handleMenuClick = (e: any) => {
