@@ -1,10 +1,10 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined, FileOutlined, GithubOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown, Row } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden } from '@/components/util';
+import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden, checkAuthAndRedirect } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
-import { history } from 'umi';
+import { history, useLocation } from 'umi';
 import jwtDecode from "jwt-decode";
 import { fetchWorkspaces } from '@/services/swagger/KnowledgeGraph';
 
@@ -34,6 +34,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState(props.username || user?.name || user?.email || user?.nickname || 'Anonymous');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+
+  const location = useLocation();
 
   useEffect(() => {
     console.log('user: ', user);
@@ -76,7 +78,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   useEffect(() => {
     // If the user is not authenticated, redirect to the login page.
     if (!isAuthenticated) {
-      logoutWithRedirect();
+      checkAuthAndRedirect(location.pathname);
       return;
     }
 

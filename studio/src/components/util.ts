@@ -106,6 +106,15 @@ export const isAuthenticated = () => {
     return false
 }
 
+export const checkAuthAndRedirect = (path: string) => {
+    const ignoreList = ['/login', '/not-authorized', '/', '/privacy-policy', '/changelog', '/help'];
+    console.log("isAuthenticated: ", isAuthenticated(), history.location.pathname, path);
+    if (!isAuthenticated() && !ignoreList.includes(path)) {
+        console.log("You are not authenticated, redirecting to login page.");
+        logoutWithRedirect();
+    }
+}
+
 export const logoutWithRedirect = () => {
     if (!isAuthEnabled()) {
         return
@@ -152,7 +161,7 @@ export const getUsername = (): string | undefined => {
             const paddedBase64 = padLength < 4 ? base64 + "=".repeat(padLength) : base64;
             const payloadJson = JSON.parse(atob(paddedBase64));
             console.log('payloadJson: ', payloadJson);
-            return payloadJson?.name || payloadJson?.email || payloadJson?.nickname 
+            return payloadJson?.name || payloadJson?.email || payloadJson?.nickname
         } catch (error) {
             logout();
             console.log('Error in getUsername: ', error);

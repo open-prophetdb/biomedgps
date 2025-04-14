@@ -5,7 +5,7 @@ import { RequestConfig, history, RuntimeConfig, request as UmiRequest, matchRout
 import { PageLoading, SettingDrawer } from '@ant-design/pro-components';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { CustomSettings, AppVersion } from '../config/defaultSettings';
-import { getJwtAccessToken, logout, logoutWithRedirect, getUsername, isAuthEnabled, isAuthenticated } from '@/components/util';
+import { getJwtAccessToken, logout, logoutWithRedirect, getUsername, isAuthEnabled, isAuthenticated, checkAuthAndRedirect } from '@/components/util';
 
 // import * as Sentry from "@sentry/react";
 
@@ -174,11 +174,7 @@ export function rootContainer(container: React.ReactNode): React.ReactNode {
 // Gateway to validate the user's authentication status, If you want to ignore more paths, you can add them to the ignore list.
 export function onRouteChange({ clientRoutes, location }: { clientRoutes: any, location: any }) {
   const route = matchRoutes(clientRoutes, location.pathname)?.pop()?.route;
-  const ignoreList = ['/login', '/not-authorized', '/', '/privacy-policy', '/changelog', '/help'];
-  console.log("isAuthenticated: ", isAuthenticated(), history.location.pathname, route?.path);
-  if (!isAuthenticated() && !ignoreList.includes(route?.path || '')) {
-    logoutWithRedirect();
-  }
+  checkAuthAndRedirect(route?.path || '');
 }
 
 // https://umijs.org/docs/max/layout-menu#%E8%BF%90%E8%A1%8C%E6%97%B6%E9%85%8D%E7%BD%AE
