@@ -32,6 +32,7 @@ import { getJwtAccessToken, logout, logoutWithRedirect, getUsername, isAuthEnabl
 // @ts-ignore
 const publicPath = window.publicPath || process.env.PUBLIC_PATH || '/';
 const defaultCustomSettings = {
+  userManualUrl: `${publicPath}README/nme_user_manual.md`,
   privacyPolicyUrl: `${publicPath}README/privacy_policy.md`,
   changeLogUrl: `${publicPath}README/changelog.md`,
   aboutUrl: `${publicPath}README/about.md`,

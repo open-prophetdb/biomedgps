@@ -146,6 +146,13 @@ export const routes = [
     component: './PrivacyPolicy',
   },
   {
+    name: 'user-manual',
+    icon: 'file',
+    path: '/user-manual',
+    hideInMenu: true,
+    component: './UserManual',
+  },
+  {
     name: 'not-authorized',
     key: 'not-authorized',
     hideInMenu: true,

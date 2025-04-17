@@ -96,8 +96,9 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         // Decode the URL component before using it
         const decodedUrl = decodeURIComponent(redirectUrl);
         console.log('decodedUrl: ', decodedUrl);
+        localStorage.setItem('redirectUrl', '');
         history.push(decodedUrl == '/' ? '/dashboard' : decodedUrl);
-      } else {
+      } else if (location.hash.startsWith('#/not-authorized')) {
         history.push('/dashboard');
       }
     });
@@ -154,7 +155,12 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       label: 'Privacy Policy',
       key: 'privacy-policy',
       icon: <FileOutlined />
-    }
+    },
+    {
+      label: 'User Manual for NME',
+      key: 'user-manual',
+      icon: <QuestionCircleOutlined />
+    },
   ]
 
   const userItems: MenuProps['items'] = [
@@ -175,6 +181,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
       history.push('/changelog')
     } else if (item.key === 'privacy-policy') {
       history.push('/privacy-policy')
+    } else if (item.key === 'user-manual') {
+      history.push('/user-manual')
     } else if (item.key === 'version') {
       window.open('https://github.com/open-prophetdb/biomedgps/releases', '_blank');
     } else if (item.key === 'logout') {

@@ -6,12 +6,12 @@ import RehypeRaw from 'rehype-raw';
 
 import './index.less';
 
-const PrivacyPolicy: React.FC = () => {
+const UserManual: React.FC = () => {
   const [markdown, setMarkdown] = React.useState('');
   const { initialState } =
     useModel('@@initialState');
   // @ts-ignore
-  const markdownLink = `${initialState?.customSettings?.privacyPolicyUrl}`;
+  const markdownLink = `${initialState?.customSettings?.userManualUrl}`;
 
   useEffect(() => {
     fetch(markdownLink)
@@ -20,10 +20,10 @@ const PrivacyPolicy: React.FC = () => {
   }, []);
 
   return (
-    <Card className="privacy-policy">
+    <Card className="user-manual">
       <MarkdownViewer markdown={markdown} rehypePlugins={[RehypeRaw]} />
     </Card>
   );
 };
 
-export default PrivacyPolicy;
+export default UserManual;
