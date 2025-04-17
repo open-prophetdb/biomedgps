@@ -2,60 +2,79 @@
 
 ## 1. Introduction
 
-This Privacy Policy explains how the **Network Medicine Extension** (the "Extension") handles user data. The Extension is developed by the **Open ProphetDB Group** (https://www.prophetdb.org/) and is intended solely for **internal use by members of the Group**. We are committed to protecting user privacy and ensuring that no personally identifiable information is collected, shared, or used for commercial purposes.
+This Privacy Policy explains how the **Network Medicine Extension** (the "Extension") handles user data. The Extension is developed by the **OpenProphetDB Group** (https://www.prophetdb.org/) and is intended solely for **internal use by members of the Group**. We are committed to protecting user privacy and ensuring that no personally identifiable information is collected, shared, or used for commercial purposes.
 
 ## 2. Information We Collect
 
-The Extension is designed to support scientific research and operates with a focus on transparency and minimal data collection. Specifically:
+The Extension is designed to support scientific research with a focus on transparency and minimal data collection. Specifically:
 
 - **User-generated Annotations**: Highlights, tags, sentence-level comments, and other annotations made by users on academic literature pages.
 - **Contextual Metadata**: Information such as the title of the article, publication source, and structural HTML coordinates of the annotated content.
 - **Local Configuration Data**: Interface preferences (e.g., drawer width, visibility state) saved locally using `chrome.storage`.
+- **Authentication Metadata**: The Extension uses a third-party authentication provider (Auth0) to verify user identity.
 
-No browsing history, personal identifiers, or sensitive credentials are collected.
+> We do **not** collect or transmit browsing history, personal device data, or login credentials ourselves.
 
-## 3. How We Use and Share Information
+## 3. User Authentication via Auth0
+
+To control access and ensure that only authorized OpenProphetDB members can use the system, the Extension integrates with **Auth0**, a secure third-party identity management platform.
+
+- User authentication (e.g., login email and password) is handled entirely by **Auth0**.  
+- OpenProphetDB Group **does not store or manage user credentials** directly.
+- Auth0 provides a verified identity token to the Extension, which is used only to:
+  - Confirm user identity;
+  - Verify group membership;
+  - Securely associate user-created annotations with the authenticated user.
+
+All personal data managed by Auth0 is subject to **Auth0’s own privacy and security policies**.
+
+> ⚠️ In the future, user accounts may be provisioned through an **invitation-only system**, to restrict access to verified research collaborators.
+
+## 4. How We Use and Share Information
 
 ### 🔹 Data Sync to OpenProphetDB Platform
 
-Selected annotation content and metadata described above may be **transmitted to [https://drugs.3steps.cn](https://drugs.3steps.cn)** — the internal research platform of the OpenProphetDB Group. This allows team members to collaboratively curate, search, and analyze findings from scientific literature.
+User-generated annotations and related metadata may be transmitted to **https://drugs.3steps.cn**, the internal research platform of the OpenProphetDB Group. This data is used solely for collaborative academic research among group members.
 
-All transmitted data is strictly related to academic content and user-created highlights. It is stored securely and used only for internal, non-commercial research purposes.
+No personal identity data is transmitted beyond the authentication token provided by Auth0.
 
-### 🔹 No Third-Party Sharing
+### 🔹 No Third-Party Data Sharing
 
-We do **not** share any collected data with third-party vendors, advertisers, analytics providers, or external services.
+We do **not** share any data with advertisers, analytics providers, or other third parties.  
+All data remains within the secure infrastructure of OpenProphetDB.
 
-## 4. Legal Disclosure
+## 5. Legal Disclosure
 
-We may disclose stored research annotations only if required by law (e.g., a valid subpoena from a governmental authority). However, due to the academic and non-personal nature of the data, such circumstances are extremely rare.
+We may disclose stored research annotations only if legally required (e.g., a valid subpoena from a government authority). Due to the non-personal and academic nature of the data, this is expected to be extremely rare.
 
-## 5. Data Storage and Security
+## 6. Data Storage and Security
 
-- Local data is stored in the browser using the `chrome.storage` API.
-- Synced data is transmitted via HTTPS to the OpenProphetDB server at **https://drugs.3steps.cn**, and stored in secure, access-controlled databases.
-- Only authorized OpenProphetDB members can view or manage this data.
-- No commercial data pipelines or third-party integrations are involved.
+- Local preferences are stored using Chrome’s `storage` API in the user’s browser.
+- Annotation data is transmitted securely via HTTPS to the OpenProphetDB server at **https://drugs.3steps.cn** and stored in a protected research database.
+- Authentication is handled by **Auth0**, and only identity tokens are received by the Extension.
+- No user passwords or sensitive authentication data are stored by the Extension or by OpenProphetDB Group.
 
-## 6. Internal-Only Use
+## 7. Internal-Only Use
 
-This Extension is developed for and distributed within the **Open ProphetDB Group** exclusively.  
-It is **not intended for public or commercial distribution**, and all collected data is used for internal academic collaboration only.
+This Extension is developed for and distributed exclusively within the **OpenProphetDB Group**.  
+It is **not intended for public or commercial use**, and any data collected or synchronized is used solely for internal academic collaboration.
 
-## 7. Your Rights
+## 8. Your Rights
 
-If you are a registered user of the OpenProphetDB platform, you may request access to or deletion of your annotations via the project contact email.  
-You may also remove the Extension or clear browser storage at any time to delete local data.
+If you are an authenticated user of the OpenProphetDB platform, you may request access to or deletion of your annotations.  
+To do so, please contact the project team using the information below.  
+You may also delete all locally stored data at any time by removing the Extension or clearing your browser storage.
 
-## 8. Changes to This Policy
+## 9. Changes to This Policy
 
-We may update this Privacy Policy periodically. All updates will be posted at: **https://drugs.3steps.cn/#/privacy-policy**
+We may update this Privacy Policy periodically to reflect changes in platform features or security practices. All updates will be posted at:  
+📍 **https://drugs.3steps.cn/assets/README/privacy_policy.html**
 
-We encourage users to review this policy regularly to stay informed about our data practices.
+Please review this policy periodically to stay informed.
 
-## 9. Contact
+## 10. Contact
 
-For questions, concerns, or further information regarding this policy, please contact:
+For questions or further information about this Privacy Policy, please contact:
 
 **Email:** yjcyxky@gmail.com  
 **Website:** https://drugs.3steps.cn
