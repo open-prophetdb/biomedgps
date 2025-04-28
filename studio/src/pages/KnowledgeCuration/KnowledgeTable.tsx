@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { history } from 'umi';
 import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -19,7 +19,7 @@ type GraphTableProps = {
     xScroll?: number | string;
 };
 
-const GraphTable: React.FC<GraphTableProps> = (props) => {
+const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
     const [graphData, setGraphData] = useState<GraphData>({} as GraphData);
     const [tableData, setTableData] = useState<GraphEdge[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -28,6 +28,29 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [total, setTotal] = useState<number>(0);
+
+    useImperativeHandle(ref, () => ({
+        downloadTable() {
+            if (!tableData || !tableData.length) {
+                message.error('No data to export');
+                return;
+            }
+
+            const jsonString = JSON.stringify(tableData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'knowledges.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            message.success('Download successfully!');
+        }
+    }));
 
     const columns: ColumnsType<GraphEdge> = [
         {
@@ -281,6 +304,6 @@ const GraphTable: React.FC<GraphTableProps> = (props) => {
             ></Table>
         </Row>
     );
-};
+});
 
 export default GraphTable;

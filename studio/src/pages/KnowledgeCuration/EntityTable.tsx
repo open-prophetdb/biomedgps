@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EntityCuration, EntityTableData } from './typings';
 import { deleteEntityCuration, fetchEntityCurationByOwner } from '@/services/swagger/KnowledgeGraph';
 
-type KeySentenceTableProps = {
+type EntityTableProps = {
     page?: number;
     pageSize?: number;
     pageSizeOptions?: string[];
@@ -14,12 +14,35 @@ type KeySentenceTableProps = {
     xScroll?: number | string;
 };
 
-const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
+const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
     const [data, setData] = useState<EntityTableData>({} as EntityTableData);
     const [loading, setLoading] = useState<boolean>(false);
     const [page, setPage] = useState<number>(props.page || 1);
     const [pageSize, setPageSize] = useState<number>(props.pageSize || 30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+
+    useImperativeHandle(ref, () => ({
+        downloadTable() {
+            if (!data.data || !data.data.length) {
+                message.error('No data to export');
+                return;
+            }
+
+            const jsonString = JSON.stringify(data.data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'entities.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            message.success('Download successfully!');
+        }
+    }));
 
     const columns: ColumnsType<EntityCuration> = [
         {
@@ -222,6 +245,6 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = (props) => {
             ></Table>
         </Row>
     );
-};
+});
 
-export default KeySentenceTable;
+export default EntityTable;
