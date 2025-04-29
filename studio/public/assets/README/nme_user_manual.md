@@ -8,11 +8,11 @@ Findings can be manually curated or machine-annotated from scientific literature
 
 ### Overview
 
-![Overview](https://lh3.googleusercontent.com/pa4i1wZfdY-0fVRlJHtzzBXty6afVXz1SKVy5efGRI2hAyV1vKMHUYNwWkKxjoZaY6XuNGbydBv0YFro7_9bQpJTdSc=s1280-w1280-h800)
+<img src="https://lh3.googleusercontent.com/pa4i1wZfdY-0fVRlJHtzzBXty6afVXz1SKVy5efGRI2hAyV1vKMHUYNwWkKxjoZaY6XuNGbydBv0YFro7_9bQpJTdSc=s1280-w1280-h800" alt="Overview" width="400">
 
-![Overview](https://lh3.googleusercontent.com/mmlsWWVG9AuJxnVgiHbPu3LAUl54P9oVdMGv1yTof4-P_kBGX5J6SNtlmo08xnNxRUmjI7G7dSZNKoppDrZWYOt9=s1280-w1280-h800)
+<img src="https://lh3.googleusercontent.com/mmlsWWVG9AuJxnVgiHbPu3LAUl54P9oVdMGv1yTof4-P_kBGX5J6SNtlmo08xnNxRUmjI7G7dSZNKoppDrZWYOt9=s1280-w1280-h800" alt="Overview" width="400">
 
-![Overview](https://lh3.googleusercontent.com/iRhpSb9d250WD1KHzcXjKaGo3oCwocl8CY_OsDplE3U8IbNcGJNRGrFYpy9pHYEFEXTjU54P4siqhHm6oIzAZVBk=s1280-w1280-h800)
+<img src="https://lh3.googleusercontent.com/iRhpSb9d250WD1KHzcXjKaGo3oCwocl8CY_OsDplE3U8IbNcGJNRGrFYpy9pHYEFEXTjU54P4siqhHm6oIzAZVBk=s1280-w1280-h800" alt="Overview" width="400">
 
 
 ### Installation
@@ -24,3 +24,7 @@ Click "Add to Chrome" to install the extension.
 ### Video Tutorial
 
 A video tutorial is available [here](https://meeting.tencent.com/crm/23VjW08L59).
+
+<a href="https://meeting.tencent.com/crm/23VjW08L59" target="_blank">
+    <img src="https://lh3.googleusercontent.com/pa4i1wZfdY-0fVRlJHtzzBXty6afVXz1SKVy5efGRI2hAyV1vKMHUYNwWkKxjoZaY6XuNGbydBv0YFro7_9bQpJTdSc=s1280-w1280-h800" alt="Overview" width="400">
+</a>
