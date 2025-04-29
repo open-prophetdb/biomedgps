@@ -35,11 +35,13 @@ Click "Add to Chrome" to install the extension.
 
 ## Video Tutorial
 
-A video tutorial is available [here](https://meeting.tencent.com/crm/23VjW08L59).
-
-<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;"></div>
+<div style="display: flex; justify-content: center; flex-direction: column; align-items: center; margin-bottom: 20px;">
 <a href="https://meeting.tencent.com/crm/23VjW08L59" target="_blank">
-    <img src="https://lh3.googleusercontent.com/pa4i1wZfdY-0fVRlJHtzzBXty6afVXz1SKVy5efGRI2hAyV1vKMHUYNwWkKxjoZaY6XuNGbydBv0YFro7_9bQpJTdSc=s1280-w1280-h800" alt="Overview" width="800">
+    <img src="/assets/README/images/nme-video-tutorial.png" alt="Overview" width="800">
 </a>
 <h3>Click the image to watch the video tutorial</h3>
 </div>
+
+## FAQs
+
+Download the FAQs [here](/assets/README/nme_faqs.pptx).
