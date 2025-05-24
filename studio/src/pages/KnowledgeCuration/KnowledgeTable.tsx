@@ -111,6 +111,16 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
             width: 120,
         },
         {
+            title: 'Created Time',
+            key: 'created_at',
+            align: 'center',
+            dataIndex: 'created_at',
+            render: (text) => {
+                return new Date(text).toLocaleString();
+            },
+            width: 120,
+        },
+        {
             title: 'Actions',
             key: 'actions',
             align: 'center',
