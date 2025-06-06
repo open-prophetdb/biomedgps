@@ -22,7 +22,7 @@ const Footer: React.FC = () => {
   }, []);
 
   const allowTrack = function () {
-    const link = "//rf.revolvermaps.com/0/0/3.js?i=506fpu66up3&amp;b=0&amp;s=40&amp;m=2&amp;cl=ffffff&amp;co=007eff&amp;cd=ffc000&amp;v0=60&amp;v1=60&amp;r=1"
+    const link = "//cdn.clustrmaps.com/map_v2.js?cl=006c8f&w=106&t=n&d=MPWClGSAiOC-0JlMxUP_pPwFfxi1-6reWYzVXQTWDYc&co=f5f5f5"
     // Check whether the script is already loaded.
     const scripts = document.getElementsByTagName('script');
     for (let i = 0; i < scripts.length; i++) {
@@ -30,13 +30,22 @@ const Footer: React.FC = () => {
         return;
       }
     }
-    // <script type="text/javascript" src="//rf.revolvermaps.com/0/0/3.js?i=506fpu66up3&amp;b=0&amp;s=40&amp;m=2&amp;cl=ffffff&amp;co=007eff&amp;cd=ffc000&amp;v0=60&amp;v1=60&amp;r=1" async="async"></script>
+    // <script type="text/javascript" src="//cdn.clustrmaps.com/map_v2.js?cl=006c8f&w=106&t=n&d=MPWClGSAiOC-0JlMxUP_pPwFfxi1-6reWYzVXQTWDYc&co=f5f5f5" async="async"></script>
     var custom_script = document.createElement('script');
+    custom_script.id = 'clustrmaps';
     custom_script.setAttribute('src', link);
     // custom_script.setAttribute('async', 'async');
     custom_script.setAttribute('type', 'text/javascript');
-    var dlAnchorElem = document.getElementsByTagName('body')[0];
-    dlAnchorElem.appendChild(custom_script);
+
+    const footer = document.getElementsByClassName('ant-pro-global-footer');
+    if (footer) {
+      // We ensure that the clustrmaps script is only added once
+      Array.from(footer).forEach((item) => {
+        item.appendChild(custom_script);
+      });
+    } else {
+      console.log('footer not found');
+    }
   };
 
   return (
@@ -75,7 +84,7 @@ const Footer: React.FC = () => {
           allowTrack();
         }}
       >
-        This website uses an toolbox from revolvermaps.com to count the number of visitors, but we
+        This website uses an toolbox from clustrmaps.com to count the number of visitors, but we
         don't gather and track your personal information.
       </CookieConsent>
     </Row>

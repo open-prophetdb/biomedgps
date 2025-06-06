@@ -1,5 +1,5 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EntityCuration, EntityTableData } from './typings';
 import { deleteEntityCuration, fetchEntityCurationByOwner } from '@/services/swagger/KnowledgeGraph';
@@ -20,6 +20,7 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
     const [page, setPage] = useState<number>(props.page || 1);
     const [pageSize, setPageSize] = useState<number>(props.pageSize || 30);
     const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [searchText, setSearchText] = useState<string>('');
 
     useImperativeHandle(ref, () => ({
         downloadTable() {
@@ -186,11 +187,41 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
         },
     ];
 
+    const makeSearchQuery = (searchText: string) => {
+        if (!searchText) {
+            return undefined;
+        }
+
+        const composedQuery = {
+            operator: 'or',
+            items: [{
+                operator: 'ilike',
+                field: 'entity_name',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'entity_id',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'entity_type',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'curator',
+                value: `%${searchText}%`,
+            }],
+        }
+
+        return JSON.stringify(composedQuery);
+    };
+
     useEffect(() => {
         setLoading(true);
         fetchEntityCurationByOwner({
             page: page,
             page_size: pageSize,
+            query_str: makeSearchQuery(searchText),
         })
             .then((response) => {
                 setData({
@@ -209,7 +240,7 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
                 setData({} as EntityTableData);
                 setLoading(false);
             });
-    }, [page, pageSize, refreshKey]);
+    }, [page, pageSize, refreshKey, searchText]);
 
     const getRowKey = (record: EntityCuration) => {
         return record.id || `${JSON.stringify(record)}`;
@@ -217,6 +248,16 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
 
     return (
         <Row className="key-sentence-table-container">
+            <Input.Search
+                placeholder="Search by Keywords [AI Search Functionality Coming Soon]"
+                allowClear
+                enterButton="Search"
+                size="middle"
+                onSearch={(value) => {
+                    setSearchText(value);
+                }}
+                style={{ marginBottom: '10px' }}
+            />
             <Table
                 className={props.className ? props.className + ' key-sentence-table' : 'key-sentence-table'}
                 style={props.style}

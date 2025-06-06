@@ -23,47 +23,6 @@ type StatItem = {
 
 const HomePage: React.FC = () => {
     const { loginWithRedirect, isAuthenticated } = useAuth0();
-    const [nodeOptions, setNodeOptions] = useState<OptionType[] | undefined>(undefined);
-
-    const [menuItems, setMenuItems] = useState<MenuItemType[] | undefined>([
-        {
-            label: 'Predict & Explain Drugs',
-            key: 'predict-explain',
-            icon: <LinkOutlined />,
-            onClick: () => {
-                console.log('Predict & Explain Drugs');
-                if (isAuthenticated) {
-                    history.push('/dashboard');
-                } else {
-                    message.info('Please sign in / up first.');
-                }
-            }
-        },
-        {
-            label: 'Understand Disease Mechanism',
-            key: 'understand-disease',
-            icon: <CommentOutlined />,
-            onClick: () => {
-                if (isAuthenticated) {
-                    history.push('/dashboard');
-                } else {
-                    message.info('Please sign in / up first.');
-                }
-            }
-        },
-        {
-            label: 'Analyze Omics Data',
-            key: 'omics-data',
-            icon: <LineChartOutlined />,
-            onClick: () => {
-                if (isAuthenticated) {
-                    history.push('/dashboard');
-                } else {
-                    message.info('Please sign in / up first.');
-                }
-            }
-        }
-    ]);
 
     const stats: StatItem[] = [
         {
@@ -115,7 +74,44 @@ const HomePage: React.FC = () => {
                         <img src={require('@/assets/logo-home.png')} alt="logo" className="logo" />
                     </Row>
                     <Row>
-                        <Menu items={menuItems} mode="horizontal" />
+                        <Menu items={[
+                            {
+                                label: 'Predict & Explain Drugs',
+                                key: 'predict-explain',
+                                icon: <LinkOutlined />,
+                                onClick: () => {
+                                    if (isAuthenticated) {
+                                        history.push('/predict-explain/predict-model?prediction_type=Compound&model_name=Disease');
+                                    } else {
+                                        message.info('Please sign in / up first.');
+                                    }
+                                }
+                            },
+                            {
+                                label: 'Understand Disease Mechanism',
+                                key: 'understand-disease',
+                                icon: <CommentOutlined />,
+                                onClick: () => {
+                                    if (isAuthenticated) {
+                                        history.push('/predict-explain/predict-model?prediction_type=Gene&model_name=Disease');
+                                    } else {
+                                        message.info('Please sign in / up first.');
+                                    }
+                                }
+                            },
+                            {
+                                label: 'Analyze Omics Data',
+                                key: 'omics-data',
+                                icon: <LineChartOutlined />,
+                                onClick: () => {
+                                    if (isAuthenticated) {
+                                        history.push('/analyze-omics-data');
+                                    } else {
+                                        message.info('Please sign in / up first.');
+                                    }
+                                }
+                            }
+                        ]} mode="horizontal" />
                         {isAuthenticated ?
                             <Button type='primary' onClick={() => { redirectToDashboard('/dashboard') }}>My Workspace</Button> :
                             <Button type='primary' onClick={() => loginWithRedirect()}>

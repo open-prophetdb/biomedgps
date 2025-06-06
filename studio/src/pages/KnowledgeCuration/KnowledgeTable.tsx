@@ -1,6 +1,6 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { history } from 'umi';
-import { Table, Row, Tag, Space, message, Popover, Button } from 'antd';
+import { Table, Row, Tag, Space, message, Popover, Button, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { GraphEdge, GraphTableData } from './typings';
 import type { GraphData } from 'biominer-components/dist/typings';
@@ -28,6 +28,7 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [total, setTotal] = useState<number>(0);
+    const [searchText, setSearchText] = useState<string>('');
 
     useImperativeHandle(ref, () => ({
         downloadTable() {
@@ -182,6 +183,35 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
         },
     ];
 
+    const makeSearchQuery = (searchText: string) => {
+        if (!searchText) {
+            return undefined;
+        }
+
+        const composedQuery = {
+            operator: 'or',
+            items: [{
+                operator: 'ilike',
+                field: 'source_name',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'target_name',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'relation_type',
+                value: `%${searchText}%`,
+            }, {
+                operator: 'ilike',
+                field: 'curator',
+                value: `%${searchText}%`,
+            }],
+        }
+
+        return JSON.stringify(composedQuery);
+    };
+
     const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
         console.log('selectedRowKeys changed: ', newSelectedRowKeys);
         setSelectedRowKeys(newSelectedRowKeys);
@@ -213,6 +243,7 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
         fetchCuratedKnowledgesByOwner({
             page: page,
             page_size: pageSize,
+            query_str: makeSearchQuery(searchText)
         }).then((response) => {
             setTotal(response.total);
             setTableData(response.records);
@@ -263,7 +294,7 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
         //         setTableData([]);
         //         setLoading(false);
         //     });
-    }, [page, pageSize, refreshKey]);
+    }, [page, pageSize, refreshKey, searchText]);
 
     const getRowKey = (record: GraphEdge) => {
         // return `${record.source_id}-${record.target_id}-${record.relation_type}-${record.pmid}-${record.curator}`;
@@ -272,6 +303,16 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
 
     return (
         <Row className="graph-table-container">
+            <Input.Search
+                placeholder="Search by Keywords [AI Search Functionality Coming Soon]"
+                allowClear
+                enterButton="Search"
+                size="middle"
+                onSearch={(value) => {
+                    setSearchText(value);
+                }}
+                style={{ marginBottom: '10px' }}
+            />
             <Table
                 className={props.className ? props.className + ' graph-table' : 'graph-table'}
                 style={props.style}
