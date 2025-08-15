@@ -126,6 +126,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
                                             <Button
                                                 danger
                                                 size="small"
+                                                disabled
                                                 onClick={() => {
                                                     if (
                                                         record.id !== undefined &&
@@ -159,7 +160,7 @@ const KeySentenceTable: React.FC<KeySentenceTableProps> = forwardRef((props, ref
                                 }
                                 title="Comfirm"
                             >
-                                <Button danger size="small">
+                                <Button danger size="small" disabled>
                                     Delete
                                 </Button>
                             </Popover>

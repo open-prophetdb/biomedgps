@@ -107,7 +107,7 @@ export const isAuthenticated = () => {
 }
 
 export const checkAuthAndRedirect = (path: string) => {
-    const ignoreList = ['/login', '/not-authorized', '/', '/privacy-policy', '/changelog', '/help'];
+    const ignoreList = ['/login', '/not-authorized', '/', '/privacy-policy', '/changelog', '/help', '/statistics/curation-statistics', '/statistics/kg-statistics'];
     console.log("isAuthenticated: ", isAuthenticated(), history.location.pathname, path);
     if (!isAuthenticated() && !ignoreList.includes(path)) {
         console.log("You are not authenticated, redirecting to login page.");

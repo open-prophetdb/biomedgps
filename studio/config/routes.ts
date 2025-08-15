@@ -91,11 +91,24 @@ export const routes = [
   {
     path: '/statistics',
     key: 'statistics',
-    hideInMenu: true,
+    // hideInMenu: true,
     name: 'Statistics',
-    icon: 'table',
-    component: './Statistics',
-    category: 'knowledge-graph'
+    icon: 'PieChartOutlined',
+    category: 'knowledge-graph',
+    routes: [
+      {
+        path: '/statistics/kg-statistics',
+        name: 'Knowledge Graph Statistics',
+        icon: 'table',
+        component: './Statistics',
+      },
+      {
+        path: '/statistics/curation-statistics',
+        name: 'Curation Statistics',
+        icon: 'table',
+        component: './KnowledgeCuration/Statistics',
+      }
+    ]
   },
   {
     path: '/knowledge-graph-editor',

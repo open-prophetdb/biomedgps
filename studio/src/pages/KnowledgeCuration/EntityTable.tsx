@@ -143,6 +143,7 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
                                             <Button
                                                 danger
                                                 size="small"
+                                                disabled
                                                 onClick={() => {
                                                     if (
                                                         record.id !== undefined &&
@@ -176,7 +177,7 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
                                 }
                                 title="Comfirm"
                             >
-                                <Button danger size="small">
+                                <Button danger size="small" disabled>
                                     Delete
                                 </Button>
                             </Popover>

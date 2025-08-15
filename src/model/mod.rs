@@ -12,3 +12,4 @@ pub mod publication;
 pub mod workspace;
 pub mod embedding;
 pub mod omics_dataset;
+pub mod stat;

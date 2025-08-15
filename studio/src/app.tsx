@@ -226,6 +226,12 @@ export const layout: RuntimeConfig = (initialState: any) => {
           span.classList.add('new-tag');
         }
       });
+
+      // Detect hideHeader variable from the url
+      const hideHeader = new URLSearchParams(location.search).get('hideHeader');
+      if (hideHeader) {
+        document.body.classList.add('hide-header');
+      }
     },
     links: [],
     logout: () => {

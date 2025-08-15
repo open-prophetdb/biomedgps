@@ -429,29 +429,42 @@ async fn main() -> Result<(), std::io::Error> {
         }
     });
 
-    let server_handle = tokio::spawn(async move {
-        if args.cors {
-            info!("CORS mode is enabled.");
-            let route = route.with(Cors::new().allow_origin("*"));
-            Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-                .run(route)
-                .await
-        } else {
-            warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
-            Server::new(TcpListener::bind(format!("{}:{}", host, port)))
-                .run(route)
-                .await
+    let server_shutdown_notify = Arc::new(Notify::new());
+    let server_handle = tokio::spawn({
+        let server_shutdown_notify = server_shutdown_notify.clone();
+        async move {
+            if args.cors {
+                info!("CORS mode is enabled.");
+                let route = route.with(Cors::new().allow_origin("*"));
+                Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+                    .run_with_graceful_shutdown(route, async move {
+                        server_shutdown_notify.notified().await;
+                        info!("Server received shutdown signal, gracefully shutting down...");
+                    }, None)
+                    .await
+            } else {
+                warn!("CORS mode is disabled. If you need the CORS, please use `--cors` flag.");
+                Server::new(TcpListener::bind(format!("{}:{}", host, port)))
+                    .run_with_graceful_shutdown(route, async move {
+                        server_shutdown_notify.notified().await;
+                        info!("Server received shutdown signal, gracefully shutting down...");
+                    }, None)
+                    .await
+            }
         }
     });
 
     // Wait for Ctrl+C signal.
     match tokio::signal::ctrl_c().await {
         Ok(_) => {
-            info!("Ctrl+C received, notifying tasks to shut down...");
+            info!("Ctrl+C received, initiating graceful shutdown...");
+            // Notify both task manager and server to shut down
             shutdown_notify.notify_waiters();
+            server_shutdown_notify.notify_waiters();
         }
         Err(e) => {
             error!("Failed to listen for shutdown signal: {}", e);
+            return Err(e);
         }
     }
 
@@ -463,7 +476,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     // Wait for the server to finish.
     match server_handle.await {
-        Ok(_) => info!("Server stopped gracefully."),
+        Ok(Ok(_)) => info!("Server stopped gracefully."),
+        Ok(Err(e)) => error!("Server error during shutdown: {:?}", e),
         Err(e) => error!("Error while waiting for server to stop: {:?}", e),
     }
 

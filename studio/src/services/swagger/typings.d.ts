@@ -113,6 +113,30 @@ declare namespace swagger {
     text: string;
   };
 
+  type CurationStatistics = {
+    total_knowledges: number;
+    total_entities: number;
+    total_key_sentences: number;
+    total_curators: number;
+    recent_activity_30_days: number;
+    recent_activity_60_days: number;
+    recent_activity_90_days: number;
+    recent_activity_180_days: number;
+    top_curators: TopCurator[];
+    top_relation_types: TopRelationType[];
+    top_entity_types: TopEntityType[];
+    monthly_trend: MonthlyTrend[];
+    curator_activity: CuratorActivity[];
+    monthly_curator_trend: MonthlyCuratorTrend[];
+  };
+
+  type CuratorActivity = {
+    curator: string;
+    knowledges: number;
+    entities: number;
+    sentences: number;
+  };
+
   type deleteConfigurationParams = {
     config_name: string;
     category: string;
@@ -633,6 +657,17 @@ declare namespace swagger {
     url: string;
   };
 
+  type MonthlyCuratorTrend = {
+    month: string;
+    total: number;
+    per_curator: Record<string, any>;
+  };
+
+  type MonthlyTrend = {
+    month: string;
+    count: number;
+  };
+
   type Node = {
     comboId?: string;
     id: string;
@@ -1089,6 +1124,21 @@ declare namespace swagger {
     log_message?: string;
     owner: string;
     groups?: string[];
+  };
+
+  type TopCurator = {
+    curator: string;
+    count: number;
+  };
+
+  type TopEntityType = {
+    entity_type: string;
+    count: number;
+  };
+
+  type TopRelationType = {
+    relation_type: string;
+    count: number;
   };
 
   type WebpageMetadata = {

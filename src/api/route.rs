@@ -12,6 +12,7 @@ use crate::model::core::{
     KeySentenceCuration, KnowledgeCuration, RecordResponse, Relation, RelationCount,
     RelationMetadata, Statistics, Subgraph, WebpageMetadata,
 };
+use crate::model::stat::CurationStatistics;
 use crate::model::embedding::Embedding;
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
@@ -172,9 +173,9 @@ impl BiomedgpsApi {
     async fn fetch_statistics(
         &self,
         pool: Data<&Arc<sqlx::PgPool>>,
-        _token: CustomSecurityScheme,
+        // _token: CustomSecurityScheme,
     ) -> GetRecordResponse<Statistics> {
-        info!("Username: {}", _token.0.username);
+        // info!("Username: {}", _token.0.username);
         let pool_arc = pool.clone();
 
         let entity_metadata = match EntityMetadata::get_entity_metadata(&pool_arc).await {
@@ -198,6 +199,29 @@ impl BiomedgpsApi {
         let statistics = Statistics::new(entity_metadata, relation_metadata);
 
         GetRecordResponse::ok(statistics)
+    }
+
+    /// Call `/api/v1/curation-statistics` to fetch curation statistics with caching.
+    #[oai(
+        path = "/curation-statistics",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchCurationStatistics"
+    )]
+    async fn fetch_curation_statistics(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+    ) -> GetRecordResponse<CurationStatistics> {
+        let pool_arc = pool.clone();
+
+        match CurationStatistics::fetch_statistics(&pool_arc).await {
+            Ok(stats) => GetRecordResponse::ok(stats),
+            Err(e) => {
+                let err = format!("Failed to fetch curation statistics: {}", e);
+                warn!("{}", err);
+                return GetRecordResponse::bad_request(err);
+            }
+        }
     }
 
     /// Call `/api/v1/entity-metadata` with query params to fetch all entity metadata.

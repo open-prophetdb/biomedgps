@@ -138,6 +138,7 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
                                         <p style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0' }}>
                                             <Button
                                                 danger
+                                                disabled
                                                 size="small"
                                                 onClick={() => {
                                                     if (
@@ -172,7 +173,7 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
                                 }
                                 title="Comfirm"
                             >
-                                <Button danger size="small">
+                                <Button danger size="small" disabled>
                                     Delete
                                 </Button>
                             </Popover>

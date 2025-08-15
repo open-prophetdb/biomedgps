@@ -3,6 +3,7 @@ import { Tabs, Table, Empty, Button, message, Row, Modal } from 'antd';
 import KnowledgeTable from './KnowledgeTable';
 import KeySentenceTable from './KeySentenceTable';
 import EntityTable from './EntityTable';
+import Statistics from './Statistics';
 import KnowledgeGraphEditorWrapper from './KnowledgeGraphEditor';
 
 import './index.less';
@@ -38,6 +39,8 @@ const KnowledgeCuration: React.FC = () => {
                                 knowledgeTableRef.current?.downloadTable();
                             } else if (currentTab === '4') {
                                 message.warning("No data to download.")
+                            } else if (currentTab === '5') {
+                                message.warning("Statistics data cannot be downloaded.")
                             }
                         }}>Download Table</Button>
                     </Row>
@@ -57,6 +60,9 @@ const KnowledgeCuration: React.FC = () => {
                 </Tabs.TabPane>
                 <Tabs.TabPane tab="Entity Metadata" key="4">
                     <Empty description="No data" />
+                </Tabs.TabPane>
+                <Tabs.TabPane tab="Statistics" key="5">
+                    <Statistics />
                 </Tabs.TabPane>
             </Tabs>
             <Modal open={graphVisible} onCancel={() => setGraphVisible(false)} className='knowledge-graph-editor-modal' footer={null} width={'100%'}>
