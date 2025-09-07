@@ -1,0 +1,194 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/deploy-docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout source repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.0'
+        bundler-cache: true
+        working-directory: ./docs
+
+    - name: Install Jekyll dependencies
+      run: |
+        cd docs
+        bundle install
+
+    - name: Build Jekyll site
+      run: |
+        cd docs
+        bundle exec jekyll build --destination ../_site
+        
+    - name: Prepare documentation files
+      run: |
+        # Create temporary directory for processed docs
+        mkdir -p /tmp/biomedgps-docs
+        
+        # Copy built Jekyll site
+        cp -r _site/* /tmp/biomedgps-docs/
+        
+        # Add metadata file with build information
+        cat > /tmp/biomedgps-docs/_build_info.json << EOF
+        {
+          "source_repo": "${{ github.repository }}",
+          "source_commit": "${{ github.sha }}",
+          "source_branch": "${{ github.ref_name }}",
+          "build_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "workflow_run": "${{ github.run_id }}"
+        }
+        EOF
+        
+        # Create index file if it doesn't exist
+        if [ ! -f /tmp/biomedgps-docs/index.html ]; then
+          cat > /tmp/biomedgps-docs/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>BioMedGPS Documentation</title>
+            <meta http-equiv="refresh" content="0; url=./getting-started.html">
+        </head>
+        <body>
+            <p>Redirecting to <a href="./getting-started.html">Getting Started</a>...</p>
+        </body>
+        </html>
+        EOF
+        fi
+
+    - name: Checkout target repository
+      uses: actions/checkout@v4
+      with:
+        repository: open-prophetdb/biomedgps-docs
+        token: ${{ secrets.DOCS_DEPLOY_TOKEN }}
+        path: target-repo
+        
+    - name: Configure Git
+      run: |
+        cd target-repo
+        git config --local user.email "biomedgps-action@github.com"
+        git config --local user.name "BioMedGPS GitHub Action"
+        
+    - name: Deploy documentation
+      run: |
+        cd target-repo
+        
+        # Create biomedgps directory if it doesn't exist
+        mkdir -p biomedgps
+        
+        # Remove existing content (except .git)
+        find biomedgps -mindepth 1 ! -path '*/\.git*' -delete 2>/dev/null || true
+        
+        # Copy new documentation
+        cp -r /tmp/biomedgps-docs/* biomedgps/
+        
+        # Add all changes
+        git add biomedgps/
+        
+        # Check if there are any changes
+        if git diff --staged --quiet; then
+          echo "No changes to deploy"
+          exit 0
+        fi
+        
+        # Commit changes
+        commit_message="Update BioMedGPS documentation"
+        if [ "${{ github.event_name }}" = "push" ]; then
+          commit_message="$commit_message from ${{ github.ref_name }}@${{ github.sha }}"
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          commit_message="$commit_message from PR #${{ github.event.number }}"
+        fi
+        
+        git commit -m "$commit_message
+
+        Source: ${{ github.repository }}@${{ github.sha }}
+        Workflow: ${{ github.workflow }} #${{ github.run_number }}
+        Triggered by: ${{ github.event_name }}"
+        
+        # Push changes
+        git push origin main
+
+    - name: Create deployment summary
+      if: success()
+      run: |
+        echo "## Documentation Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Status**: Successfully deployed" >> $GITHUB_STEP_SUMMARY
+        echo "🎯 **Target**: open-prophetdb/biomedgps-docs/biomedgps/" >> $GITHUB_STEP_SUMMARY
+        echo "📦 **Source**: ${{ github.repository }}@${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "🔗 **Documentation URL**: https://open-prophetdb.github.io/biomedgps-docs/biomedgps/" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Files Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        find /tmp/biomedgps-docs -type f -name "*.html" -o -name "*.md" -o -name "*.json" | head -20 >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Only run on main branch pushes for production deployment
+  validate-deployment:
+    needs: deploy-docs
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Wait for GitHub Pages to update
+      run: sleep 30
+      
+    - name: Validate deployment
+      run: |
+        # Check if documentation is accessible
+        url="https://open-prophetdb.github.io/biomedgps-docs/biomedgps/"
+        
+        echo "Checking documentation at: $url"
+        
+        # Use curl to check if the site is accessible
+        if curl -f -s "$url" > /dev/null; then
+          echo "✅ Documentation is accessible"
+        else
+          echo "❌ Documentation is not accessible"
+          exit 1
+        fi
+        
+        # Check specific pages
+        pages=("getting-started.html" "user-guide.html" "features.html" "api-reference.html" "faq.html")
+        
+        for page in "${pages[@]}"; do
+          page_url="${url}${page}"
+          if curl -f -s "$page_url" > /dev/null; then
+            echo "✅ $page is accessible"
+          else
+            echo "⚠️ $page might not be accessible yet"
+          fi
+        done
+
+    - name: Create validation summary
+      if: always()
+      run: |
+        echo "## Deployment Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔍 **Validation Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+        echo "🌐 **Documentation URL**: https://open-prophetdb.github.io/biomedgps-docs/biomedgps/" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [Getting Started](https://open-prophetdb.github.io/biomedgps-docs/biomedgps/getting-started.html)" >> $GITHUB_STEP_SUMMARY
+        echo "- [User Guide](https://open-prophetdb.github.io/biomedgps-docs/biomedgps/user-guide.html)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Features](https://open-prophetdb.github.io/biomedgps-docs/biomedgps/features.html)" >> $GITHUB_STEP_SUMMARY
+        echo "- [API Reference](https://open-prophetdb.github.io/biomedgps-docs/biomedgps/api-reference.html)" >> $GITHUB_STEP_SUMMARY
+        echo "- [FAQ](https://open-prophetdb.github.io/biomedgps-docs/biomedgps/faq.html)" >> $GITHUB_STEP_SUMMARY
