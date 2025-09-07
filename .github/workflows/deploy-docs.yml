@@ -137,8 +137,8 @@ jobs:
         Workflow: ${{ github.workflow }} #${{ github.run_number }}
         Triggered by: ${{ github.event_name }}"
         
-        # Push changes
-        git push origin main
+        # Push changes using GITHUB_TOKEN
+        git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/biomedgps-docs.git main
 
     - name: Create deployment summary
       if: always()
