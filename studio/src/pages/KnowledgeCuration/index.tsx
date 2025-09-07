@@ -5,16 +5,21 @@ import KeySentenceTable from './KeySentenceTable';
 import EntityTable from './EntityTable';
 import Statistics from './Statistics';
 import KnowledgeGraphEditorWrapper from './KnowledgeGraphEditor';
+import { useAuth0 } from "@auth0/auth0-react";
+import { isAdmin } from '@/components/util';
 
 import './index.less';
 
 const KnowledgeCuration: React.FC = () => {
+    const { user } = useAuth0();
     const keySentenceTableRef = useRef(null);
     const entityTableRef = useRef(null);
     const knowledgeTableRef = useRef(null);
     const entityMetadataTableRef = useRef(null);
     const [currentTab, setCurrentTab] = useState('1');
     const [graphVisible, setGraphVisible] = useState(false);
+
+    const isAdminUser = isAdmin(user);
 
     return (
         <Row>
@@ -28,21 +33,26 @@ const KnowledgeCuration: React.FC = () => {
                             setGraphVisible(true);
                         }} style={{ marginRight: '10px' }}>Show Graph</Button>
                         <Button type="primary" onClick={() => {
+                            let enableDownloadAll = false;
+                            if (isAdminUser) {
+                                enableDownloadAll = true;
+                            }
+
                             if (currentTab === '1') {
                                 // @ts-ignore
-                                keySentenceTableRef.current?.downloadTable();
+                                keySentenceTableRef.current?.downloadTable(enableDownloadAll);
                             } else if (currentTab === '2') {
                                 // @ts-ignore
-                                entityTableRef.current?.downloadTable();
+                                entityTableRef.current?.downloadTable(enableDownloadAll);
                             } else if (currentTab === '3') {
                                 // @ts-ignore
-                                knowledgeTableRef.current?.downloadTable();
+                                knowledgeTableRef.current?.downloadTable(enableDownloadAll);
                             } else if (currentTab === '4') {
                                 message.warning("No data to download.")
                             } else if (currentTab === '5') {
                                 message.warning("Statistics data cannot be downloaded.")
                             }
-                        }}>Download Table</Button>
+                        }}>{isAdminUser ? 'Download All Data' : 'Download Table'}</Button>
                     </Row>
                 }
             >

@@ -1,7 +1,7 @@
 import { QuestionCircleOutlined, InfoCircleOutlined, UserOutlined, FieldTimeOutlined, LogoutOutlined, FileOutlined, GithubOutlined } from '@ant-design/icons';
 import { Space, Menu, Button, message, Dropdown, Row } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden, checkAuthAndRedirect } from '@/components/util';
+import { getJwtAccessToken, logoutWithRedirect, isAuthEnabled, isHeaderHidden, checkAuthAndRedirect, isAdmin } from '@/components/util';
 import { useAuth0 } from "@auth0/auth0-react";
 import type { MenuProps } from 'antd';
 import { history, useLocation } from 'umi';
@@ -31,7 +31,7 @@ type Workspace = {
 const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
   const { loginWithRedirect, isAuthenticated, logout, user, getIdTokenClaims, getAccessTokenSilently } = useAuth0();
   const [current, setCurrent] = useState('user');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [username, setUsername] = useState(props.username || user?.name || user?.email || user?.nickname || 'Anonymous');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
@@ -39,8 +39,8 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
 
   useEffect(() => {
     console.log('user: ', user);
-    if (user && user[`${window.location.origin}/roles`] && user[`${window.location.origin}/roles`].includes('Administrator')) {
-      setIsAdmin(true);
+    if (isAdmin(user)) {
+      setIsAdminUser(true);
     }
   }, [user]);
 
@@ -218,7 +218,7 @@ const GlobalHeaderRight: React.FC<GlobalHeaderRightProps> = (props) => {
         )
       }
       {
-        isAdmin && (
+        isAdminUser && (
           <Button type="text" icon={<GithubOutlined />} onClick={() => window.open(`${window.location.origin}/jupyterlab`, '_blank')}>JupyterLab</Button>
         )
       }

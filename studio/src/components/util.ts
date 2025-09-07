@@ -21,6 +21,10 @@ export const getJwtAccessToken = (): string | null => {
     }
 }
 
+export const isAdmin = (user: any) => {
+    return user && user[`${window.location.origin}/roles`] && user[`${window.location.origin}/roles`].includes('Administrator')
+}
+
 export const guessColor = (text: string): string => {
     // TODO: We must change the colors if we add new types or change the existing ones in our database.
     const colors: Record<string, string> = {

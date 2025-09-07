@@ -22,26 +22,50 @@ const EntityTable: React.FC<EntityTableProps> = forwardRef((props, ref) => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [searchText, setSearchText] = useState<string>('');
 
+    const downloadDataAsJson = (data: EntityCuration[]) => {
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'entities.json';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        message.success('Download successfully!');
+    }
+
     useImperativeHandle(ref, () => ({
-        downloadTable() {
-            if (!data.data || !data.data.length) {
+        downloadTable: (enableDownloadAll = false) => {
+            if (data.total > 0) {
+                if (enableDownloadAll) {
+                    fetchEntityCurationByOwner({
+                        page: page,
+                        page_size: data.total
+                    }).then((response) => {
+                        const data = response.records.map((record: any) => ({
+                            ...record,
+                            webpage: record.annotation.uri
+                        }))
+                        downloadDataAsJson(data);
+                    }).catch((error) => {
+                        console.log('Download all data error: ', error);
+                        message.error('Download all data failed!');
+                    });
+                } else {
+                    if (!data.data || !data.data.length) {
+                        message.error('No data to export');
+                        return;
+                    }
+
+                    downloadDataAsJson(data.data);
+                }
+            } else {
                 message.error('No data to export');
-                return;
             }
-
-            const jsonString = JSON.stringify(data.data, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = 'entities.json';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            message.success('Download successfully!');
         }
     }));
 

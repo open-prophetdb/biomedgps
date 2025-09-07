@@ -30,26 +30,46 @@ const GraphTable: React.FC<GraphTableProps> = forwardRef((props, ref) => {
     const [total, setTotal] = useState<number>(0);
     const [searchText, setSearchText] = useState<string>('');
 
+    const downloadDataAsJson = (data: GraphEdge[]) => {
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'knowledges.json';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        message.success('Download successfully!');
+    }
+
     useImperativeHandle(ref, () => ({
-        downloadTable() {
-            if (!tableData || !tableData.length) {
+        downloadTable: (enableDownloadAll = false) => {
+            if (total > 0) {
+                if (enableDownloadAll) {
+                    fetchCuratedKnowledgesByOwner({
+                        page: page,
+                        page_size: total
+                    }).then((response) => {
+                        downloadDataAsJson(response.records);
+                    }).catch((error) => {
+                        console.log('Download all data error: ', error);
+                        message.error('Download all data failed!');
+                    });
+                } else {
+                    if (!tableData || !tableData.length) {
+                        message.error('No data to export');
+                        return;
+                    }
+
+                    downloadDataAsJson(tableData);
+                }
+            } else {
                 message.error('No data to export');
-                return;
             }
-
-            const jsonString = JSON.stringify(tableData, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = 'knowledges.json';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            message.success('Download successfully!');
         }
     }));
 
