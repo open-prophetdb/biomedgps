@@ -37,7 +37,8 @@ jobs:
     - name: Build Jekyll site
       run: |
         cd docs
-        bundle exec jekyll build --destination ../_site
+        # Build with correct baseurl for subdirectory deployment
+        JEKYLL_ENV=production bundle exec jekyll build --destination ../_site --baseurl "/biomedgps"
         
     - name: Prepare documentation files
       run: |

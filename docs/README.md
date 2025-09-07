@@ -33,14 +33,19 @@ bundle install
 
 ### Build and Serve
 ```bash
-# Serve locally with auto-reload
-bundle exec jekyll serve
+# Serve locally with auto-reload (uses development config)
+bundle exec jekyll serve --config _config.yml,_config-dev.yml
 
-# Build static site
+# Build static site for production (with correct baseurl)
+JEKYLL_ENV=production bundle exec jekyll build --baseurl "/biomedgps"
+
+# Build for local testing
 bundle exec jekyll build
 ```
 
 The site will be available at `http://localhost:4000`.
+
+**Important**: When developing locally, use the development config to avoid subdirectory path issues. The production build automatically handles the correct paths for GitHub Pages deployment.
 
 ## Deployment
 

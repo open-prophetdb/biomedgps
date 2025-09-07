@@ -1,0 +1,108 @@
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {%- seo -%}
+  <link rel="stylesheet" href="{{ "/assets/main.css" | relative_url }}">
+  {%- feed_meta -%}
+  {%- if jekyll.environment == 'production' and site.google_analytics -%}
+    {%- include google-analytics.html -%}
+  {%- endif -%}
+  
+  <!-- Custom CSS for subdirectory deployment -->
+  <style>
+    .site-header {
+      border-top: 5px solid #424242;
+      border-bottom: 1px solid #e8e8e8;
+      min-height: 55.95px;
+      position: relative;
+    }
+    
+    .site-title {
+      font-size: 26px;
+      font-weight: 300;
+      line-height: 54px;
+      letter-spacing: -1px;
+      margin-bottom: 0;
+      float: left;
+    }
+    
+    .site-nav {
+      float: right;
+      line-height: 54px;
+    }
+    
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .feature-card {
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 1.5rem;
+      background: #f8f9fa;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      color: #0366d6;
+    }
+
+    .feature-card h3 a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .feature-card p {
+      margin-bottom: 0;
+      color: #586069;
+    }
+    
+    /* Code highlighting */
+    .highlight {
+      background: #f8f8f8;
+      border: 1px solid #e1e4e8;
+      border-radius: 3px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    
+    /* Table styling */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+    }
+    
+    table th,
+    table td {
+      border: 1px solid #dfe2e5;
+      padding: 6px 13px;
+    }
+    
+    table th {
+      font-weight: 600;
+      background-color: #f6f8fa;
+    }
+    
+    /* Navigation improvements */
+    .page-link {
+      color: #0366d6;
+      text-decoration: none;
+    }
+    
+    .page-link:hover {
+      color: #0366d6;
+      text-decoration: underline;
+    }
+  </style>
+</head>

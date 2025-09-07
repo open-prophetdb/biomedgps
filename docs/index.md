@@ -20,22 +20,22 @@ BioMedGPS is a comprehensive knowledge graph platform that leverages graph neura
 
 <div class="feature-grid">
   <div class="feature-card">
-    <h3><a href="getting-started.html">🚀 Getting Started</a></h3>
+    <h3><a href="{{ 'getting-started.html' | relative_url }}">🚀 Getting Started</a></h3>
     <p>Learn how to set up and start using BioMedGPS</p>
   </div>
   
   <div class="feature-card">
-    <h3><a href="user-guide.html">📖 User Guide</a></h3>
+    <h3><a href="{{ 'user-guide.html' | relative_url }}">📖 User Guide</a></h3>
     <p>Comprehensive guide to all platform features</p>
   </div>
   
   <div class="feature-card">
-    <h3><a href="features.html">⚡ Features Overview</a></h3>
+    <h3><a href="{{ 'features.html' | relative_url }}">⚡ Features Overview</a></h3>
     <p>Explore what BioMedGPS can do for your research</p>
   </div>
   
   <div class="feature-card">
-    <h3><a href="api-reference.html">🔧 API Reference</a></h3>
+    <h3><a href="{{ 'api-reference.html' | relative_url }}">🔧 API Reference</a></h3>
     <p>Technical documentation for developers</p>
   </div>
 </div>

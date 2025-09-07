@@ -4,8 +4,8 @@ description: >-
   BioMedGPS is a knowledge graph platform with graph neural networks for drug repurposing and disease mechanism discovery.
   This documentation provides comprehensive guides for users to understand and use the platform effectively.
 
-baseurl: "" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
+baseurl: "/biomedgps-docs/biomedgps" # the subpath of your site, e.g. /blog
+url: "https://open-prophetdb.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 
 github_username: yjcyxky
 repository: yjcyxky/biomedgps

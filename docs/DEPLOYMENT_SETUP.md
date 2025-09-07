@@ -9,7 +9,7 @@ The GitHub Action is failing with:
 Error: Input required and not supplied: token
 ```
 
-This happens because the `DOCS_DEPLOY_TOKEN` secret is not configured.
+This happens because the `DOCS_PUSH_TOKEN` secret is not configured.
 
 ## Setup Instructions
 
@@ -33,7 +33,7 @@ This happens because the `DOCS_DEPLOY_TOKEN` secret is not configured.
 2. Navigate to Settings → Secrets and variables → Actions
 3. Click "New repository secret"
 4. Configure the secret:
-   - **Name**: `DOCS_DEPLOY_TOKEN`
+   - **Name**: `DOCS_PUSH_TOKEN`
    - **Secret**: Paste the token value from Step 1
 5. Click "Add secret"
 

@@ -1,0 +1,16 @@
+# Development configuration for local testing
+# Use this to test locally with: bundle exec jekyll serve --config _config.yml,_config-dev.yml
+
+baseurl: "" # Empty for local development
+url: "http://localhost:4000" # Local development URL
+
+# Development-specific settings
+show_excerpts: true
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Disable certain features for faster builds
+incremental: true
+livereload: true
