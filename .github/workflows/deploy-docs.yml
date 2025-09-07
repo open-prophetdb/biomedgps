@@ -94,6 +94,7 @@ jobs:
         cd target-repo
         git config --local user.email "biomedgps-action@github.com"
         git config --local user.name "BioMedGPS GitHub Action"
+        git remote set-url origin https://x-access-token:${{ secrets.DOCS_PUSH_TOKEN }}@github.com/open-prophetdb/biomedgps-docs.git
         
     - name: Deploy documentation
       run: |
@@ -138,7 +139,7 @@ jobs:
         Triggered by: ${{ github.event_name }}"
         
         # Push changes using GITHUB_TOKEN
-        git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/biomedgps-docs.git main
+        git push origin main
 
     - name: Create deployment summary
       if: always()
