@@ -36,6 +36,7 @@ pub struct CuratorActivity {
     pub knowledges: i64,
     pub entities: i64,
     pub sentences: i64,
+    pub publications: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object)]
@@ -51,6 +52,7 @@ pub struct CurationStatistics {
     pub total_entities: i64,
     pub total_key_sentences: i64,
     pub total_curators: i64,
+    pub total_publications: i64,
     pub recent_activity_30_days: i64,
     pub recent_activity_60_days: i64,
     pub recent_activity_90_days: i64,
@@ -128,6 +130,12 @@ impl CurationStatistics {
                 UNION
                 SELECT curator FROM biomedgps_key_sentence_curation
             ) AS all_curators"
+        )
+        .fetch_one(pool)
+        .await?;
+
+        let total_publications: i64 = sqlx::query_scalar(
+            "SELECT COUNT(DISTINCT fingerprint) FROM biomedgps_knowledge_curation"
         )
         .fetch_one(pool)
         .await?;
@@ -269,12 +277,13 @@ impl CurationStatistics {
         .await?;
 
         // Fetch curator activity
-        let curator_activity_rows: Vec<(String, i64, i64, i64)> = sqlx::query_as(
+        let curator_activity_rows: Vec<(String, i64, i64, i64, i64)> = sqlx::query_as(
             "SELECT 
                 curators.curator,
                 COALESCE(knowledge_stats.knowledge_count, 0)::bigint as knowledges,
                 COALESCE(entity_stats.entity_count, 0)::bigint as entities,
-                COALESCE(sentence_stats.sentence_count, 0)::bigint as sentences
+                COALESCE(sentence_stats.sentence_count, 0)::bigint as sentences,
+                COALESCE(publication_stats.publication_count, 0)::bigint as publications
              FROM (
                 SELECT DISTINCT curator FROM (
                     SELECT curator FROM biomedgps_knowledge_curation
@@ -299,6 +308,11 @@ impl CurationStatistics {
                 FROM biomedgps_key_sentence_curation
                 GROUP BY curator
              ) AS sentence_stats ON curators.curator = sentence_stats.curator
+             LEFT JOIN (
+                SELECT curator, COUNT(DISTINCT fingerprint)::bigint as publication_count
+                FROM biomedgps_knowledge_curation
+                GROUP BY curator
+             ) AS publication_stats ON curators.curator = publication_stats.curator
              ORDER BY (COALESCE(knowledge_stats.knowledge_count, 0) + COALESCE(entity_stats.entity_count, 0) + COALESCE(sentence_stats.sentence_count, 0)) DESC"
         )
         .fetch_all(pool)
@@ -306,11 +320,12 @@ impl CurationStatistics {
 
         let curator_activity: Vec<CuratorActivity> = curator_activity_rows
             .into_iter()
-            .map(|(curator, knowledges, entities, sentences)| CuratorActivity {
+            .map(|(curator, knowledges, entities, sentences, publications)| CuratorActivity {
                 curator,
                 knowledges,
                 entities,
                 sentences,
+                publications
             })
             .collect();
 
@@ -386,6 +401,7 @@ impl CurationStatistics {
             total_entities,
             total_key_sentences,
             total_curators,
+            total_publications,
             recent_activity_30_days,
             recent_activity_60_days,
             recent_activity_90_days,

@@ -118,6 +118,7 @@ declare namespace swagger {
     total_entities: number;
     total_key_sentences: number;
     total_curators: number;
+    total_publications: number;
     recent_activity_30_days: number;
     recent_activity_60_days: number;
     recent_activity_90_days: number;
@@ -135,6 +136,7 @@ declare namespace swagger {
     knowledges: number;
     entities: number;
     sentences: number;
+    publications: number;
   };
 
   type deleteConfigurationParams = {

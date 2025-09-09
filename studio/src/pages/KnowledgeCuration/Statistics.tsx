@@ -21,6 +21,7 @@ const Statistics: React.FC = () => {
         total_entities: 0,
         total_key_sentences: 0,
         total_curators: 0,
+        total_publications: 0,
         recent_activity_30_days: 0,
         recent_activity_60_days: 0,
         recent_activity_90_days: 0,
@@ -62,6 +63,7 @@ const Statistics: React.FC = () => {
                 total_entities: statsRes.total_entities,
                 total_key_sentences: statsRes.total_key_sentences,
                 total_curators: statsRes.total_curators,
+                total_publications: statsRes.total_publications,
                 recent_activity_30_days: statsRes.recent_activity_30_days,
                 recent_activity_60_days: statsRes.recent_activity_60_days,
                 recent_activity_90_days: statsRes.recent_activity_90_days,
@@ -106,6 +108,12 @@ const Statistics: React.FC = () => {
             dataIndex: 'sentences',
             key: 'sentences',
             render: (value: number) => <span style={{ color: '#fa8c16' }}>{value}</span>
+        },
+        {
+            title: 'Publications',
+            dataIndex: 'publications',
+            key: 'publications',
+            render: (value: number) => <span style={{ color: '#722ed1' }}>{value}</span>
         },
         {
             title: 'Total',
@@ -193,8 +201,8 @@ const Statistics: React.FC = () => {
                 <Col xs={24} sm={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Total Knowledges"
-                            value={stats.total_knowledges}
+                            title="Total Knowledges / Publications"
+                            value={`${stats.total_knowledges} / ${stats.total_publications}`}
                             prefix={<FileTextOutlined />}
                             valueStyle={{ color: '#1890ff' }}
                         />
