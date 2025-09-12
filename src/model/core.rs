@@ -2022,6 +2022,51 @@ impl WebpageMetadata {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
+pub struct WebpageMetadataStats {
+    pub curator_count: i64,
+    pub curators: Vec<String>,
+    pub category: String,
+}
+
+impl WebpageMetadataStats {
+    pub async fn stats(pool: &sqlx::PgPool, fingerprint: &str) -> Result<Vec<WebpageMetadataStats>, anyhow::Error> {
+        let sql = r#"
+            SELECT category, array_agg(DISTINCT curator) as curators
+            FROM (
+                SELECT 'key_sentence' as category, curator 
+                FROM biomedgps_key_sentence_curation 
+                WHERE fingerprint = $1
+                UNION ALL
+                SELECT 'entity' as category, curator 
+                FROM biomedgps_entity_curation 
+                WHERE fingerprint = $1
+                UNION ALL
+                SELECT 'knowledge' as category, curator 
+                FROM biomedgps_knowledge_curation 
+                WHERE fingerprint = $1
+            ) t
+            GROUP BY category
+        "#;
+        
+        let results = sqlx::query_as::<_, (String, Vec<String>)>(sql)
+            .bind(&fingerprint)
+            .fetch_all(pool)
+            .await?;
+
+        let stats = results.into_iter().map(|(category, curators)| {
+            let category_stats = WebpageMetadataStats {
+                curator_count: curators.len() as i64,
+                curators: curators,
+                category: category,
+            };
+            category_stats
+        }).collect();
+
+        Ok(stats)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Object, sqlx::FromRow, Validate)]
 pub struct EntityCuration {
     // Ignore this field when deserialize from json
     #[serde(skip_deserializing)]

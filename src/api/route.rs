@@ -10,9 +10,8 @@ use crate::api::schema::{
 use crate::model::core::{
     Configuration, Entity, Entity2D, EntityCuration, EntityMetadata, EntityMetadataCuration, Image,
     KeySentenceCuration, KnowledgeCuration, RecordResponse, Relation, RelationCount,
-    RelationMetadata, Statistics, Subgraph, WebpageMetadata,
+    RelationMetadata, Statistics, Subgraph, WebpageMetadata, WebpageMetadataStats,
 };
-use crate::model::stat::CurationStatistics;
 use crate::model::embedding::Embedding;
 use crate::model::entity::compound::CompoundAttr;
 use crate::model::entity_attr::{EntityAttr, EntityAttrRecordResponse};
@@ -21,6 +20,7 @@ use crate::model::init_db::get_kg_score_table_name;
 use crate::model::kge::DEFAULT_MODEL_NAME;
 use crate::model::llm::{ChatBot, Context, LlmResponse, PROMPTS};
 use crate::model::publication::{ConsensusResult, Publication, PublicationsSummary};
+use crate::model::stat::CurationStatistics;
 use crate::model::util::match_color;
 use crate::model::workspace::{
     ExpandedTask, Notification, Task, Workflow, WorkflowSchema, Workspace,
@@ -1799,6 +1799,32 @@ impl BiomedgpsApi {
 
                 warn!("{}", err);
                 DeleteResponse::not_found(err)
+            }
+        }
+    }
+
+    /// Call `/api/v1/webpage-metadata-stats` with query params to fetch webpage metadata stats.
+    #[oai(
+        path = "/webpage-metadata-stats",
+        method = "get",
+        tag = "ApiTags::KnowledgeGraph",
+        operation_id = "fetchWebpageMetadataStats"
+    )]
+    async fn fetch_webpage_metadata_stats(
+        &self,
+        pool: Data<&Arc<sqlx::PgPool>>,
+        fingerprint: Query<String>,
+        _token: CustomSecurityScheme,
+    ) -> GetWholeTableResponse<WebpageMetadataStats> {
+        let pool_arc = pool.clone();
+        let fingerprint = fingerprint.0;
+
+        match WebpageMetadataStats::stats(&pool_arc, &fingerprint).await {
+            Ok(stats) => GetWholeTableResponse::ok(stats),
+            Err(e) => {
+                let err = format!("Failed to fetch webpage metadata stats: {}", e);
+                warn!("{}", err);
+                return GetWholeTableResponse::bad_request(err);
             }
         }
     }
